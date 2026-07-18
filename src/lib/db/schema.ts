@@ -516,6 +516,16 @@ export const notifications = pgTable(
   (t) => [index("notifications_user_idx").on(t.userId, t.readAt)],
 );
 
+// ─────────────────────────── Configurações da aplicação ───────────────────────────
+
+export const appSettings = pgTable("app_settings", {
+  key: text("key").primaryKey(),
+  value: jsonb("value").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
 // ─────────────────────────── Relations ───────────────────────────
 
 export const companiesRelations = relations(companies, ({ many }) => ({
@@ -684,3 +694,4 @@ export type NewClientRegistration = typeof clientRegistrations.$inferInsert;
 export type ProjectLink = typeof projectLinks.$inferSelect;
 export type Activity = typeof activities.$inferSelect;
 export type Notification = typeof notifications.$inferSelect;
+export type AppSetting = typeof appSettings.$inferSelect;

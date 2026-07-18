@@ -22,6 +22,13 @@
       "when": 1784386330866,
       "tag": "0002_eminent_rocket_raccoon",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1784393850178,
+      "tag": "0003_mean_whirlwind",
+      "breakpoints": true
     }
   ]
 }

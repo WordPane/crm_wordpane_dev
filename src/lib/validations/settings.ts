@@ -14,3 +14,40 @@ export const statusFormSchema = z.object({
 });
 
 export type StatusFormValues = z.infer<typeof statusFormSchema>;
+
+/** Configuração SMTP gravada em app_settings (chave "email.smtp"). */
+export const emailSettingsSchema = z.object({
+  host: z
+    .string()
+    .trim()
+    .min(1, "Host SMTP é obrigatório.")
+    .max(255, "Máximo de 255 caracteres."),
+  port: z
+    .number("Porta inválida.")
+    .int("Porta inválida.")
+    .min(1, "Porta inválida.")
+    .max(65535, "Porta inválida."),
+  secure: z.boolean(),
+  user: z
+    .string()
+    .trim()
+    .min(1, "Usuário é obrigatório.")
+    .max(255, "Máximo de 255 caracteres."),
+  // Vazio = mantém a senha atual
+  password: z
+    .string()
+    .max(255, "Máximo de 255 caracteres.")
+    .optional()
+    .or(z.literal("")),
+  fromEmail: z
+    .email("Informe um e-mail válido.")
+    .max(255, "Máximo de 255 caracteres."),
+  fromName: z
+    .string()
+    .trim()
+    .min(1, "Nome do remetente é obrigatório.")
+    .max(120, "Máximo de 120 caracteres."),
+  appUrl: z.url("Informe uma URL válida (ex.: https://crm.exemplo.com)."),
+});
+
+export type EmailSettingsValues = z.infer<typeof emailSettingsSchema>;

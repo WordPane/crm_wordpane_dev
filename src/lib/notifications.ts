@@ -6,6 +6,8 @@ import {
   notifications,
   users,
 } from "@/lib/db/schema";
+import { sendEmail } from "@/lib/email/mailer";
+import { getEmailSettings } from "@/lib/email/settings";
 
 export type NotificationInput = {
   /** comment | demand.created | demand.status | upload */
@@ -31,6 +33,86 @@ export async function notifyUsers(
       href: n.href ?? null,
     })),
   );
+  // E-mail é best-effort: o insert acima é a fonte de verdade e nunca falha por causa de SMTP
+  await emailNotificationRecipients(ids, n);
+}
+
+/** Envia a notificação por e-mail aos usuários ativos (nunca lança exceção). */
+async function emailNotificationRecipients(
+  ids: string[],
+  n: NotificationInput,
+): Promise<void> {
+  try {
+    const settings = await getEmailSettings();
+    if (!settings) {
+      console.warn("Notificações por e-mail ignoradas: SMTP não configurado.");
+      return;
+    }
+
+    const recipients = await db
+      .select({ email: users.email, name: users.name })
+      .from(users)
+      .where(and(inArray(users.id, ids), eq(users.status, "active")));
+    if (recipients.length === 0) return;
+
+    const results = await Promise.allSettled(
+      recipients.map((recipient) =>
+        sendEmail({
+          to: recipient.email,
+          subject: n.title,
+          title: n.title,
+          intro: n.body ?? n.title,
+          cta: n.href
+            ? { label: "Ver no CRM", url: `${settings.appUrl}${n.href}` }
+            : undefined,
+        }),
+      ),
+    );
+
+    results.forEach((result, index) => {
+      if (result.status === "rejected") {
+        console.error(
+          `E-mail de notificação para ${recipients[index].email} falhou:`,
+          result.reason,
+        );
+      } else if (!result.value.ok) {
+        console.error(
+          `E-mail de notificação para ${recipients[index].email} falhou: ${result.value.error}`,
+        );
+      }
+    });
+  } catch (error) {
+    console.error("Falha ao enviar notificações por e-mail:", error);
+  }
+}
+
+/** E-mail de boas-vindas ao 1º usuário de uma empresa aprovada (best-effort). */
+export async function sendWelcomeEmail(input: {
+  to: string;
+  name: string;
+  companyName: string;
+}): Promise<void> {
+  try {
+    const settings = await getEmailSettings();
+    const result = await sendEmail({
+      to: input.to,
+      subject: "Seu acesso ao portal WordPane está ativo",
+      title: "Seu acesso ao portal WordPane está ativo",
+      intro: `Olá, ${input.name}! O acesso de ${input.companyName} ao portal WordPane foi liberado. Entre com o seu e-mail e a senha cadastrada para acompanhar projetos, demandas e arquivos.`,
+      rows: [
+        { label: "Empresa", value: input.companyName },
+        { label: "E-mail de acesso", value: input.to },
+      ],
+      cta: settings
+        ? { label: "Acessar o portal", url: `${settings.appUrl}/login` }
+        : undefined,
+    });
+    if (!result.ok) {
+      console.error(`E-mail de boas-vindas para ${input.to} falhou: ${result.error}`);
+    }
+  } catch (error) {
+    console.error(`E-mail de boas-vindas para ${input.to} falhou:`, error);
+  }
 }
 
 /** Super admins + admins ativos atribuídos à empresa. */

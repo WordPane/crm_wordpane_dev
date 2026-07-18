@@ -8,7 +8,7 @@ import { requireSuperAdmin, requireUser } from "@/lib/access/permissions";
 import { logActivity } from "@/lib/activities";
 import { db } from "@/lib/db";
 import { clientRegistrations, companies, users } from "@/lib/db/schema";
-import { notifyUsers } from "@/lib/notifications";
+import { notifyUsers, sendWelcomeEmail } from "@/lib/notifications";
 import {
   registrationFormSchema,
   rejectRegistrationSchema,
@@ -196,6 +196,13 @@ export async function approveRegistration(id: string): Promise<ActionResult> {
       entityId: result.companyId,
       action: "company.created",
       metadata: { origin: "cadastro_publico" },
+    });
+
+    // Best-effort: falha de SMTP nunca desfaz a aprovação
+    await sendWelcomeEmail({
+      to: userEmail,
+      name: registration.userName,
+      companyName: registration.nomeFantasia?.trim() || registration.razaoSocial,
     });
 
     revalidatePath("/admin/cadastros");
