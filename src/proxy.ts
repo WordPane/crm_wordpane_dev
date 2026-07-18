@@ -1,0 +1,36 @@
+import { NextResponse } from "next/server";
+
+import { auth } from "@/lib/auth";
+
+export default auth((req) => {
+  const { nextUrl } = req;
+  const session = req.auth;
+  const path = nextUrl.pathname;
+  const isLogin = path === "/login";
+
+  if (!session?.user) {
+    if (isLogin) return NextResponse.next();
+    return NextResponse.redirect(new URL("/login", nextUrl));
+  }
+
+  const home =
+    session.user.role === "client" ? "/portal/dashboard" : "/admin/dashboard";
+
+  if (isLogin || path === "/") {
+    return NextResponse.redirect(new URL(home, nextUrl));
+  }
+
+  // Cliente nunca acessa /admin; equipe nunca acessa /portal
+  if (path.startsWith("/admin") && session.user.role === "client") {
+    return NextResponse.redirect(new URL("/portal/dashboard", nextUrl));
+  }
+  if (path.startsWith("/portal") && session.user.role !== "client") {
+    return NextResponse.redirect(new URL("/admin/dashboard", nextUrl));
+  }
+
+  return NextResponse.next();
+});
+
+export const config = {
+  matcher: ["/((?!api|_next/static|_next/image|brand|favicon.ico).*)"],
+};

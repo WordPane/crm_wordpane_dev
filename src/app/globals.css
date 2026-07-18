@@ -1,0 +1,194 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-geist-mono);
+  --font-heading: var(--font-inter);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-green: var(--green);
+  --color-green-2: var(--green-2);
+  --color-green-light: var(--green-light);
+  --color-navy: var(--navy);
+  --color-navy-soft: var(--navy-soft);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/* Tema WordPane — dark-only (fiel ao wordpane_dev) */
+:root,
+.dark {
+  --green: #00d164;
+  --green-2: #31b068;
+  --green-light: #8df5bb;
+  --navy: #071928;
+  --navy-soft: #0b2336;
+
+  --background: #071928;
+  --foreground: #ffffff;
+  --card: #112332;
+  --card-foreground: #ffffff;
+  --popover: #112332;
+  --popover-foreground: #ffffff;
+  --primary: #00d164;
+  --primary-foreground: #071928;
+  --secondary: #0b2336;
+  --secondary-foreground: #ffffff;
+  --muted: #0b2336;
+  --muted-foreground: rgba(255, 255, 255, 0.72);
+  --accent: #152d40;
+  --accent-foreground: #ffffff;
+  --destructive: #ff6b6b;
+  --border: rgba(255, 255, 255, 0.09);
+  --input: rgba(255, 255, 255, 0.12);
+  --ring: #00d164;
+  --chart-1: #00d164;
+  --chart-2: #31b068;
+  --chart-3: #8df5bb;
+  --chart-4: #52708a;
+  --chart-5: #ff6b6b;
+  --radius: 1rem;
+  --sidebar: #071928;
+  --sidebar-foreground: #ffffff;
+  --sidebar-primary: #00d164;
+  --sidebar-primary-foreground: #071928;
+  --sidebar-accent: #0b2336;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: rgba(255, 255, 255, 0.09);
+  --sidebar-ring: #00d164;
+
+  --brand-gradient: linear-gradient(120deg, #00d164 0%, #31b068 100%);
+  --glow-primary: 0 8px 28px rgba(0, 209, 100, 0.35);
+  --glow-primary-hover: 0 12px 34px rgba(0, 209, 100, 0.45);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    line-height: 1.6;
+  }
+  html {
+    @apply font-sans;
+  }
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.02em;
+  }
+}
+
+@layer utilities {
+  /* Texto com gradiente animado da marca */
+  .gradient-text {
+    background: linear-gradient(
+      120deg,
+      #00d164 0%,
+      #8df5bb 25%,
+      #00d164 50%,
+      #31b068 75%,
+      #00d164 100%
+    );
+    background-size: 300% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: gradient-pan 12s ease-in-out infinite;
+  }
+
+  .bg-brand-gradient {
+    background-image: var(--brand-gradient);
+  }
+
+  /* Header/sidebar de vidro */
+  .glass {
+    background: rgba(7, 25, 40, 0.82);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
+
+  /* Chip verde translúcido (status/badges da marca) */
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    border-radius: 999px;
+    padding: 0.15rem 0.7rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--green);
+    background: rgba(0, 209, 100, 0.08);
+    border: 1px solid rgba(0, 209, 100, 0.3);
+    white-space: nowrap;
+  }
+
+  .glow-primary {
+    box-shadow: var(--glow-primary);
+  }
+
+  /* Glow radial de fundo (login, heroes) */
+  .hero-glow {
+    background: radial-gradient(
+      circle at 50% 0%,
+      rgba(0, 209, 100, 0.16) 0%,
+      transparent 60%
+    );
+  }
+}
+
+@keyframes gradient-pan {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gradient-text {
+    animation: none;
+  }
+}

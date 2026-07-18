@@ -1,0 +1,303 @@
+"use server";
+
+import { asc, eq, sql } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
+
+import {
+  assertCompanyAccess,
+  requireTeam,
+  requireUser,
+  type SessionUser,
+} from "@/lib/access/permissions";
+import { logActivity } from "@/lib/activities";
+import { db } from "@/lib/db";
+import {
+  projects,
+  taskChecklistItems,
+  tasks,
+  taskStatuses,
+} from "@/lib/db/schema";
+import { checklistItemSchema, taskFormSchema, taskUpdateSchema } from "@/lib/validations/task";
+import {
+  actionError,
+  nullIfEmpty,
+  type ActionResult,
+} from "@/server/actions/utils";
+
+/** Tarefa + projeto, com acesso garantido à empresa do projeto. */
+async function getScopedTask(user: SessionUser, taskId: string) {
+  const [row] = await db
+    .select({ task: tasks, project: projects })
+    .from(tasks)
+    .innerJoin(projects, eq(tasks.projectId, projects.id))
+    .where(eq(tasks.id, taskId))
+    .limit(1);
+  if (!row) return null;
+  await assertCompanyAccess(user, row.project.companyId);
+  return row;
+}
+
+function revalidateTask(taskId: string, projectId: string) {
+  revalidatePath("/admin/tarefas");
+  revalidatePath(`/admin/tarefas/${taskId}`);
+  revalidatePath(`/admin/projetos/${projectId}`);
+  revalidatePath("/admin/projetos");
+}
+
+export async function createTask(
+  projectId: string,
+  input: unknown,
+): Promise<ActionResult> {
+  try {
+    const user = await requireUser();
+    requireTeam(user);
+    const data = taskFormSchema.parse(input);
+
+    const [project] = await db
+      .select()
+      .from(projects)
+      .where(eq(projects.id, projectId))
+      .limit(1);
+    if (!project) return { error: "Projeto não encontrado." };
+    await assertCompanyAccess(user, project.companyId);
+
+    // Sem status informado → primeiro status ativo pela ordem
+    let statusId = data.statusId || null;
+    if (!statusId) {
+      const [first] = await db
+        .select({ id: taskStatuses.id })
+        .from(taskStatuses)
+        .where(eq(taskStatuses.active, true))
+        .orderBy(asc(taskStatuses.position))
+        .limit(1);
+      statusId = first?.id ?? null;
+    }
+
+    const [created] = await db
+      .insert(tasks)
+      .values({
+        projectId,
+        milestoneId: data.milestoneId || null,
+        title: data.title,
+        description: nullIfEmpty(data.description),
+        ownerId: data.ownerId || null,
+        priority: data.priority,
+        dueDate: data.dueDate || null,
+        statusId,
+        visibleToClient: data.visibleToClient,
+        createdBy: user.id,
+      })
+      .returning({ id: tasks.id });
+
+    await logActivity({
+      actorId: user.id,
+      companyId: project.companyId,
+      projectId,
+      entityType: "task",
+      entityId: created.id,
+      action: "task.created",
+      metadata: { title: data.title },
+    });
+
+    revalidateTask(created.id, projectId);
+    return { success: true, id: created.id };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+/** Edição parcial da tarefa (título/descrição no dialog; responsável/visibilidade na sidebar). */
+export async function updateTask(
+  taskId: string,
+  input: unknown,
+): Promise<ActionResult> {
+  try {
+    const user = await requireUser();
+    requireTeam(user);
+    const scoped = await getScopedTask(user, taskId);
+    if (!scoped) return { error: "Tarefa não encontrada." };
+    const data = taskUpdateSchema.parse(input);
+
+    await db
+      .update(tasks)
+      .set({
+        ...(data.title !== undefined ? { title: data.title } : {}),
+        ...(data.description !== undefined
+          ? { description: nullIfEmpty(data.description) }
+          : {}),
+        ...(data.milestoneId !== undefined
+          ? { milestoneId: data.milestoneId || null }
+          : {}),
+        ...(data.ownerId !== undefined
+          ? { ownerId: data.ownerId || null }
+          : {}),
+        ...(data.priority !== undefined ? { priority: data.priority } : {}),
+        ...(data.dueDate !== undefined
+          ? { dueDate: data.dueDate || null }
+          : {}),
+        ...(data.visibleToClient !== undefined
+          ? { visibleToClient: data.visibleToClient }
+          : {}),
+        updatedAt: new Date(),
+      })
+      .where(eq(tasks.id, taskId));
+
+    revalidateTask(taskId, scoped.project.id);
+    return { success: true };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function updateTaskStatus(
+  taskId: string,
+  statusId: string,
+): Promise<ActionResult> {
+  try {
+    const user = await requireUser();
+    requireTeam(user);
+    const scoped = await getScopedTask(user, taskId);
+    if (!scoped) return { error: "Tarefa não encontrada." };
+    const { task, project } = scoped;
+
+    const [status] = await db
+      .select()
+      .from(taskStatuses)
+      .where(eq(taskStatuses.id, statusId))
+      .limit(1);
+    if (!status) return { error: "Status não encontrado." };
+    if (task.statusId === statusId) return { success: true };
+
+    const [oldStatus] = task.statusId
+      ? await db
+          .select({ name: taskStatuses.name })
+          .from(taskStatuses)
+          .where(eq(taskStatuses.id, task.statusId))
+          .limit(1)
+      : [];
+
+    await db
+      .update(tasks)
+      .set({
+        statusId,
+        completedAt: status.isFinal ? new Date() : null,
+        updatedAt: new Date(),
+      })
+      .where(eq(tasks.id, taskId));
+
+    await logActivity({
+      actorId: user.id,
+      companyId: project.companyId,
+      projectId: project.id,
+      entityType: "task",
+      entityId: taskId,
+      action: "task.status_changed",
+      metadata: {
+        title: task.title,
+        from: oldStatus?.name ?? null,
+        to: status.name,
+      },
+    });
+
+    if (status.isFinal) {
+      await logActivity({
+        actorId: user.id,
+        companyId: project.companyId,
+        projectId: project.id,
+        entityType: "task",
+        entityId: taskId,
+        action: "task.completed",
+        metadata: { title: task.title },
+      });
+    }
+
+    revalidateTask(taskId, project.id);
+    return { success: true };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+// ─────────────────────────── Checklist ───────────────────────────
+
+export async function addChecklistItem(
+  taskId: string,
+  input: unknown,
+): Promise<ActionResult> {
+  try {
+    const user = await requireUser();
+    requireTeam(user);
+    const scoped = await getScopedTask(user, taskId);
+    if (!scoped) return { error: "Tarefa não encontrada." };
+    const { label } = checklistItemSchema.parse(input);
+
+    const [max] = await db
+      .select({
+        value: sql<number>`coalesce(max(${taskChecklistItems.position}), -1)`,
+      })
+      .from(taskChecklistItems)
+      .where(eq(taskChecklistItems.taskId, taskId));
+
+    await db.insert(taskChecklistItems).values({
+      taskId,
+      label,
+      position: max.value + 1,
+    });
+
+    revalidatePath(`/admin/tarefas/${taskId}`);
+    return { success: true };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function toggleChecklistItem(itemId: string): Promise<ActionResult> {
+  try {
+    const user = await requireUser();
+    requireTeam(user);
+
+    const [item] = await db
+      .select()
+      .from(taskChecklistItems)
+      .where(eq(taskChecklistItems.id, itemId))
+      .limit(1);
+    if (!item) return { error: "Item não encontrado." };
+    const scoped = await getScopedTask(user, item.taskId);
+    if (!scoped) return { error: "Tarefa não encontrada." };
+
+    await db
+      .update(taskChecklistItems)
+      .set({ done: !item.done })
+      .where(eq(taskChecklistItems.id, itemId));
+
+    revalidatePath(`/admin/tarefas/${item.taskId}`);
+    return { success: true };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function deleteChecklistItem(itemId: string): Promise<ActionResult> {
+  try {
+    const user = await requireUser();
+    requireTeam(user);
+
+    const [item] = await db
+      .select()
+      .from(taskChecklistItems)
+      .where(eq(taskChecklistItems.id, itemId))
+      .limit(1);
+    if (!item) return { error: "Item não encontrado." };
+    const scoped = await getScopedTask(user, item.taskId);
+    if (!scoped) return { error: "Tarefa não encontrada." };
+
+    await db
+      .delete(taskChecklistItems)
+      .where(eq(taskChecklistItems.id, itemId));
+
+    revalidatePath(`/admin/tarefas/${item.taskId}`);
+    return { success: true };
+  } catch (error) {
+    return actionError(error);
+  }
+}

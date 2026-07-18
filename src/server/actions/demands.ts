@@ -1,0 +1,180 @@
+"use server";
+
+import { asc, eq } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
+
+import {
+  assertCompanyAccess,
+  requireTeam,
+  requireUser,
+  type SessionUser,
+} from "@/lib/access/permissions";
+import { logActivity } from "@/lib/activities";
+import { db } from "@/lib/db";
+import {
+  demands,
+  milestones,
+  projects,
+  taskStatuses,
+  tasks,
+  type Demand,
+} from "@/lib/db/schema";
+import {
+  convertDemandSchema,
+  demandStatusLabels,
+} from "@/lib/validations/demand";
+import { clientUsersOfCompany, notifyUsers } from "@/lib/notifications";
+import { actionError, type ActionResult } from "@/server/actions/utils";
+
+/** Demanda existente + acesso garantido à empresa dela. */
+async function getScopedDemand(user: SessionUser, demandId: string) {
+  const [demand] = await db
+    .select()
+    .from(demands)
+    .where(eq(demands.id, demandId))
+    .limit(1);
+  if (!demand) return null;
+  await assertCompanyAccess(user, demand.companyId);
+  return demand;
+}
+
+function revalidateDemand(companyId: string) {
+  revalidatePath("/admin/demandas");
+  revalidatePath(`/admin/clientes/${companyId}`);
+}
+
+export async function updateDemandStatus(
+  demandId: string,
+  status: Demand["status"],
+): Promise<ActionResult> {
+  try {
+    const user = await requireUser();
+    requireTeam(user);
+    const demand = await getScopedDemand(user, demandId);
+    if (!demand) return { error: "Demanda não encontrada." };
+    if (demand.status === status) return { success: true };
+
+    await db
+      .update(demands)
+      .set({ status, updatedAt: new Date() })
+      .where(eq(demands.id, demandId));
+
+    await logActivity({
+      actorId: user.id,
+      companyId: demand.companyId,
+      entityType: "demand",
+      entityId: demandId,
+      action: "demand.status_changed",
+      metadata: {
+        title: demand.title,
+        from: demandStatusLabels[demand.status],
+        to: demandStatusLabels[status],
+      },
+    });
+
+    // Mudança de status pela equipe → avisa os clientes da empresa
+    const recipients = await clientUsersOfCompany(demand.companyId);
+    await notifyUsers(recipients, {
+      type: "demand.status",
+      title: `Demanda "${demand.title}": ${demandStatusLabels[status]}`,
+      body: `Status alterado de "${demandStatusLabels[demand.status]}" para "${demandStatusLabels[status]}".`,
+      href: "/portal/demandas",
+    });
+
+    revalidateDemand(demand.companyId);
+    return { success: true };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+/** Converte a demanda em tarefa da equipe (origin: demanda_cliente). */
+export async function convertDemandToTask(
+  demandId: string,
+  input: unknown,
+): Promise<ActionResult> {
+  try {
+    const user = await requireUser();
+    requireTeam(user);
+    const demand = await getScopedDemand(user, demandId);
+    if (!demand) return { error: "Demanda não encontrada." };
+    if (demand.taskId) {
+      return { error: "Esta demanda já foi convertida em tarefa." };
+    }
+    const data = convertDemandSchema.parse(input);
+
+    const [project] = await db
+      .select()
+      .from(projects)
+      .where(eq(projects.id, data.projectId))
+      .limit(1);
+    if (!project) return { error: "Projeto não encontrado." };
+    if (project.companyId !== demand.companyId) {
+      return { error: "O projeto precisa ser da mesma empresa da demanda." };
+    }
+
+    if (data.milestoneId) {
+      const [milestone] = await db
+        .select({ id: milestones.id, projectId: milestones.projectId })
+        .from(milestones)
+        .where(eq(milestones.id, data.milestoneId))
+        .limit(1);
+      if (!milestone) return { error: "Etapa não encontrada." };
+      if (milestone.projectId !== project.id) {
+        return { error: "A etapa não pertence ao projeto selecionado." };
+      }
+    }
+
+    // Primeiro status ativo pela ordem (mesma regra de createTask)
+    const [firstStatus] = await db
+      .select({ id: taskStatuses.id })
+      .from(taskStatuses)
+      .where(eq(taskStatuses.active, true))
+      .orderBy(asc(taskStatuses.position))
+      .limit(1);
+
+    const [created] = await db
+      .insert(tasks)
+      .values({
+        projectId: project.id,
+        milestoneId: data.milestoneId || null,
+        title: demand.title,
+        description: demand.description,
+        ownerId: data.ownerId || null,
+        priority: demand.priority,
+        statusId: firstStatus?.id ?? null,
+        origin: "demanda_cliente",
+        createdBy: user.id,
+      })
+      .returning({ id: tasks.id });
+
+    // Demanda sai da triagem quando ainda estava aberta/em análise
+    const nextStatus =
+      demand.status === "aberta" || demand.status === "em_analise"
+        ? "em_andamento"
+        : demand.status;
+
+    await db
+      .update(demands)
+      .set({ taskId: created.id, status: nextStatus, updatedAt: new Date() })
+      .where(eq(demands.id, demandId));
+
+    await logActivity({
+      actorId: user.id,
+      companyId: demand.companyId,
+      projectId: project.id,
+      entityType: "demand",
+      entityId: demandId,
+      action: "demand.converted",
+      metadata: { title: demand.title, project: project.name },
+    });
+
+    revalidateDemand(demand.companyId);
+    revalidatePath("/admin/tarefas");
+    revalidatePath(`/admin/tarefas/${created.id}`);
+    revalidatePath(`/admin/projetos/${project.id}`);
+    return { success: true, id: created.id };
+  } catch (error) {
+    return actionError(error);
+  }
+}

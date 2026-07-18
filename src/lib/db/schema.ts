@@ -1,0 +1,632 @@
+import { relations } from "drizzle-orm";
+import {
+  boolean,
+  date,
+  index,
+  integer,
+  jsonb,
+  pgEnum,
+  pgTable,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+  varchar,
+} from "drizzle-orm/pg-core";
+
+// ─────────────────────────── Enums ───────────────────────────
+
+export const userRoleEnum = pgEnum("user_role", [
+  "super_admin",
+  "admin",
+  "client",
+]);
+export const userStatusEnum = pgEnum("user_status", [
+  "active",
+  "invited",
+  "suspended",
+]);
+export const companyStatusEnum = pgEnum("company_status", [
+  "ativo",
+  "inativo",
+  "prospect",
+]);
+export const projectTypeEnum = pgEnum("project_type", [
+  "site_institucional",
+  "landing_page",
+  "sistema_web",
+  "saas",
+  "integracao",
+  "api",
+  "outro",
+]);
+export const priorityEnum = pgEnum("priority", [
+  "baixa",
+  "media",
+  "alta",
+  "urgente",
+]);
+export const milestoneStatusEnum = pgEnum("milestone_status", [
+  "pendente",
+  "em_andamento",
+  "concluida",
+]);
+export const taskOriginEnum = pgEnum("task_origin", [
+  "interna",
+  "demanda_cliente",
+]);
+export const demandStatusEnum = pgEnum("demand_status", [
+  "aberta",
+  "em_analise",
+  "em_andamento",
+  "concluida",
+  "recusada",
+]);
+export const demandCategoryEnum = pgEnum("demand_category", [
+  "suporte",
+  "alteracao",
+  "nova_funcionalidade",
+  "correcao",
+  "outro",
+]);
+
+// ─────────────────────────── Empresas (clientes) ───────────────────────────
+
+export const companies = pgTable(
+  "companies",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    razaoSocial: varchar("razao_social", { length: 255 }).notNull(),
+    nomeFantasia: varchar("nome_fantasia", { length: 255 }),
+    cnpj: varchar("cnpj", { length: 18 }),
+    inscricaoEstadual: varchar("inscricao_estadual", { length: 30 }),
+    logradouro: varchar("logradouro", { length: 255 }),
+    numero: varchar("numero", { length: 20 }),
+    complemento: varchar("complemento", { length: 120 }),
+    bairro: varchar("bairro", { length: 120 }),
+    cidade: varchar("cidade", { length: 120 }),
+    estado: varchar("estado", { length: 2 }),
+    cep: varchar("cep", { length: 9 }),
+    pais: varchar("pais", { length: 60 }).notNull().default("Brasil"),
+    telefone: varchar("telefone", { length: 20 }),
+    whatsapp: varchar("whatsapp", { length: 20 }),
+    site: varchar("site", { length: 255 }),
+    email: varchar("email", { length: 255 }),
+    status: companyStatusEnum("status").notNull().default("ativo"),
+    observacoes: text("observacoes"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [uniqueIndex("companies_cnpj_key").on(t.cnpj)],
+);
+
+// ─────────────────────────── Usuários ───────────────────────────
+
+export const users = pgTable(
+  "users",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    name: varchar("name", { length: 160 }).notNull(),
+    email: varchar("email", { length: 255 }).notNull(),
+    passwordHash: text("password_hash").notNull(),
+    phone: varchar("phone", { length: 20 }),
+    position: varchar("position", { length: 120 }), // cargo
+    avatarUrl: text("avatar_url"),
+    role: userRoleEnum("role").notNull().default("client"),
+    status: userStatusEnum("status").notNull().default("active"),
+    // Preenchido apenas para usuários clientes (portal)
+    companyId: uuid("company_id").references(() => companies.id, {
+      onDelete: "cascade",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("users_email_key").on(t.email),
+    index("users_company_idx").on(t.companyId),
+  ],
+);
+
+// Admins (não super) só enxergam empresas atribuídas
+export const adminCompanyAssignments = pgTable(
+  "admin_company_assignments",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    adminId: uuid("admin_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("admin_company_unique").on(t.adminId, t.companyId),
+    index("admin_company_company_idx").on(t.companyId),
+  ],
+);
+
+// ─────────────────────────── Status configuráveis ───────────────────────────
+
+export const projectStatuses = pgTable("project_statuses", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: varchar("name", { length: 80 }).notNull().unique(),
+  color: varchar("color", { length: 20 }).notNull().default("#00d164"),
+  position: integer("position").notNull().default(0),
+  isFinal: boolean("is_final").notNull().default(false),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export const taskStatuses = pgTable("task_statuses", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: varchar("name", { length: 80 }).notNull().unique(),
+  color: varchar("color", { length: 20 }).notNull().default("#00d164"),
+  position: integer("position").notNull().default(0),
+  isFinal: boolean("is_final").notNull().default(false),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+// ─────────────────────────── Projetos ───────────────────────────
+
+export const projects = pgTable(
+  "projects",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    name: varchar("name", { length: 200 }).notNull(),
+    description: text("description"),
+    type: projectTypeEnum("type").notNull().default("outro"),
+    statusId: uuid("status_id").references(() => projectStatuses.id),
+    ownerId: uuid("owner_id").references(() => users.id), // responsável
+    startDate: date("start_date"),
+    dueDate: date("due_date"),
+    priority: priorityEnum("priority").notNull().default("media"),
+    createdBy: uuid("created_by").references(() => users.id),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("projects_company_idx").on(t.companyId),
+    index("projects_status_idx").on(t.statusId),
+    index("projects_due_idx").on(t.dueDate),
+  ],
+);
+
+export const projectMembers = pgTable(
+  "project_members",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [uniqueIndex("project_members_unique").on(t.projectId, t.userId)],
+);
+
+// ─────────────────────────── Etapas (milestones) ───────────────────────────
+
+export const milestones = pgTable(
+  "milestones",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    name: varchar("name", { length: 160 }).notNull(),
+    description: text("description"),
+    dueDate: date("due_date"),
+    ownerId: uuid("owner_id").references(() => users.id),
+    status: milestoneStatusEnum("status").notNull().default("pendente"),
+    position: integer("position").notNull().default(0),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("milestones_project_idx").on(t.projectId)],
+);
+
+// ─────────────────────────── Tarefas ───────────────────────────
+
+export const tasks = pgTable(
+  "tasks",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    milestoneId: uuid("milestone_id").references(() => milestones.id, {
+      onDelete: "set null",
+    }),
+    title: varchar("title", { length: 220 }).notNull(),
+    description: text("description"),
+    ownerId: uuid("owner_id").references(() => users.id),
+    priority: priorityEnum("priority").notNull().default("media"),
+    dueDate: date("due_date"),
+    statusId: uuid("status_id").references(() => taskStatuses.id),
+    origin: taskOriginEnum("origin").notNull().default("interna"),
+    visibleToClient: boolean("visible_to_client").notNull().default(true),
+    createdBy: uuid("created_by").references(() => users.id),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("tasks_project_idx").on(t.projectId),
+    index("tasks_milestone_idx").on(t.milestoneId),
+    index("tasks_status_idx").on(t.statusId),
+    index("tasks_due_idx").on(t.dueDate),
+  ],
+);
+
+export const taskChecklistItems = pgTable(
+  "task_checklist_items",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    taskId: uuid("task_id")
+      .notNull()
+      .references(() => tasks.id, { onDelete: "cascade" }),
+    label: varchar("label", { length: 300 }).notNull(),
+    done: boolean("done").notNull().default(false),
+    position: integer("position").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("checklist_task_idx").on(t.taskId)],
+);
+
+// ─────────────────────────── Comentários ───────────────────────────
+
+export const comments = pgTable(
+  "comments",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    taskId: uuid("task_id")
+      .notNull()
+      .references(() => tasks.id, { onDelete: "cascade" }),
+    authorId: uuid("author_id")
+      .notNull()
+      .references(() => users.id),
+    body: text("body").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    editedAt: timestamp("edited_at", { withTimezone: true }),
+  },
+  (t) => [index("comments_task_idx").on(t.taskId)],
+);
+
+// ─────────────────────────── Arquivos ───────────────────────────
+
+export const attachments = pgTable(
+  "attachments",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    projectId: uuid("project_id").references(() => projects.id, {
+      onDelete: "cascade",
+    }),
+    taskId: uuid("task_id").references(() => tasks.id, {
+      onDelete: "cascade",
+    }),
+    demandId: uuid("demand_id"),
+    uploadedBy: uuid("uploaded_by")
+      .notNull()
+      .references(() => users.id),
+    fileName: varchar("file_name", { length: 255 }).notNull(),
+    fileKey: text("file_key").notNull(), // path local ou URL do blob
+    fileSize: integer("file_size").notNull().default(0),
+    mimeType: varchar("mime_type", { length: 120 }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("attachments_project_idx").on(t.projectId),
+    index("attachments_task_idx").on(t.taskId),
+  ],
+);
+
+// ─────────────────────────── Demandas (portal do cliente) ───────────────────────────
+
+export const demands = pgTable(
+  "demands",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    title: varchar("title", { length: 220 }).notNull(),
+    description: text("description").notNull(),
+    category: demandCategoryEnum("category").notNull().default("outro"),
+    priority: priorityEnum("priority").notNull().default("media"),
+    status: demandStatusEnum("status").notNull().default("aberta"),
+    taskId: uuid("demands_task_id"), // tarefa gerada para a equipe
+    createdBy: uuid("created_by")
+      .notNull()
+      .references(() => users.id),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("demands_company_idx").on(t.companyId),
+    index("demands_status_idx").on(t.status),
+  ],
+);
+
+// ─────────────────────────── Links temporários ───────────────────────────
+
+export const projectLinks = pgTable(
+  "project_links",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    url: text("url").notNull(),
+    description: varchar("description", { length: 255 }),
+    version: varchar("version", { length: 40 }),
+    notes: text("notes"),
+    createdBy: uuid("created_by").references(() => users.id),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("project_links_project_idx").on(t.projectId)],
+);
+
+// ─────────────────────────── Atividades (timeline + histórico) ───────────────────────────
+
+export const activities = pgTable(
+  "activities",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    actorId: uuid("actor_id").references(() => users.id),
+    companyId: uuid("company_id").references(() => companies.id, {
+      onDelete: "cascade",
+    }),
+    projectId: uuid("project_id").references(() => projects.id, {
+      onDelete: "cascade",
+    }),
+    entityType: varchar("entity_type", { length: 40 }).notNull(), // project | milestone | task | comment | attachment | demand | link | company
+    entityId: uuid("entity_id"),
+    action: varchar("action", { length: 60 }).notNull(), // ex.: project.created, task.status_changed
+    metadata: jsonb("metadata"), // valores antes/depois, títulos etc.
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("activities_project_idx").on(t.projectId, t.createdAt),
+    index("activities_company_idx").on(t.companyId, t.createdAt),
+    index("activities_entity_idx").on(t.entityType, t.entityId),
+  ],
+);
+
+// ─────────────────────────── Notificações internas ───────────────────────────
+
+export const notifications = pgTable(
+  "notifications",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    type: varchar("type", { length: 60 }).notNull(),
+    title: varchar("title", { length: 220 }).notNull(),
+    body: text("body"),
+    href: text("href"),
+    readAt: timestamp("read_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("notifications_user_idx").on(t.userId, t.readAt)],
+);
+
+// ─────────────────────────── Relations ───────────────────────────
+
+export const companiesRelations = relations(companies, ({ many }) => ({
+  users: many(users),
+  admins: many(adminCompanyAssignments),
+  projects: many(projects),
+  demands: many(demands),
+  activities: many(activities),
+}));
+
+export const usersRelations = relations(users, ({ one, many }) => ({
+  company: one(companies, {
+    fields: [users.companyId],
+    references: [companies.id],
+  }),
+  assignments: many(adminCompanyAssignments),
+  projectMemberships: many(projectMembers),
+  comments: many(comments),
+  notifications: many(notifications),
+}));
+
+export const adminCompanyAssignmentsRelations = relations(
+  adminCompanyAssignments,
+  ({ one }) => ({
+    admin: one(users, {
+      fields: [adminCompanyAssignments.adminId],
+      references: [users.id],
+    }),
+    company: one(companies, {
+      fields: [adminCompanyAssignments.companyId],
+      references: [companies.id],
+    }),
+  }),
+);
+
+export const projectsRelations = relations(projects, ({ one, many }) => ({
+  company: one(companies, {
+    fields: [projects.companyId],
+    references: [companies.id],
+  }),
+  status: one(projectStatuses, {
+    fields: [projects.statusId],
+    references: [projectStatuses.id],
+  }),
+  owner: one(users, { fields: [projects.ownerId], references: [users.id] }),
+  members: many(projectMembers),
+  milestones: many(milestones),
+  tasks: many(tasks),
+  links: many(projectLinks),
+  attachments: many(attachments),
+  activities: many(activities),
+}));
+
+export const projectMembersRelations = relations(projectMembers, ({ one }) => ({
+  project: one(projects, {
+    fields: [projectMembers.projectId],
+    references: [projects.id],
+  }),
+  user: one(users, { fields: [projectMembers.userId], references: [users.id] }),
+}));
+
+export const milestonesRelations = relations(milestones, ({ one, many }) => ({
+  project: one(projects, {
+    fields: [milestones.projectId],
+    references: [projects.id],
+  }),
+  owner: one(users, { fields: [milestones.ownerId], references: [users.id] }),
+  tasks: many(tasks),
+}));
+
+export const tasksRelations = relations(tasks, ({ one, many }) => ({
+  project: one(projects, {
+    fields: [tasks.projectId],
+    references: [projects.id],
+  }),
+  milestone: one(milestones, {
+    fields: [tasks.milestoneId],
+    references: [milestones.id],
+  }),
+  status: one(taskStatuses, {
+    fields: [tasks.statusId],
+    references: [taskStatuses.id],
+  }),
+  owner: one(users, { fields: [tasks.ownerId], references: [users.id] }),
+  checklist: many(taskChecklistItems),
+  comments: many(comments),
+  attachments: many(attachments),
+}));
+
+export const taskChecklistItemsRelations = relations(
+  taskChecklistItems,
+  ({ one }) => ({
+    task: one(tasks, {
+      fields: [taskChecklistItems.taskId],
+      references: [tasks.id],
+    }),
+  }),
+);
+
+export const commentsRelations = relations(comments, ({ one }) => ({
+  task: one(tasks, { fields: [comments.taskId], references: [tasks.id] }),
+  author: one(users, { fields: [comments.authorId], references: [users.id] }),
+}));
+
+export const attachmentsRelations = relations(attachments, ({ one }) => ({
+  project: one(projects, {
+    fields: [attachments.projectId],
+    references: [projects.id],
+  }),
+  task: one(tasks, { fields: [attachments.taskId], references: [tasks.id] }),
+  uploader: one(users, {
+    fields: [attachments.uploadedBy],
+    references: [users.id],
+  }),
+}));
+
+export const demandsRelations = relations(demands, ({ one }) => ({
+  company: one(companies, {
+    fields: [demands.companyId],
+    references: [companies.id],
+  }),
+  author: one(users, { fields: [demands.createdBy], references: [users.id] }),
+}));
+
+export const projectLinksRelations = relations(projectLinks, ({ one }) => ({
+  project: one(projects, {
+    fields: [projectLinks.projectId],
+    references: [projects.id],
+  }),
+}));
+
+export const activitiesRelations = relations(activities, ({ one }) => ({
+  actor: one(users, { fields: [activities.actorId], references: [users.id] }),
+  project: one(projects, {
+    fields: [activities.projectId],
+    references: [projects.id],
+  }),
+  company: one(companies, {
+    fields: [activities.companyId],
+    references: [companies.id],
+  }),
+}));
+
+export const notificationsRelations = relations(notifications, ({ one }) => ({
+  user: one(users, { fields: [notifications.userId], references: [users.id] }),
+}));
+
+// ─────────────────────────── Tipos ───────────────────────────
+
+export type Company = typeof companies.$inferSelect;
+export type NewCompany = typeof companies.$inferInsert;
+export type User = typeof users.$inferSelect;
+export type NewUser = typeof users.$inferInsert;
+export type Project = typeof projects.$inferSelect;
+export type NewProject = typeof projects.$inferInsert;
+export type ProjectStatus = typeof projectStatuses.$inferSelect;
+export type TaskStatus = typeof taskStatuses.$inferSelect;
+export type Milestone = typeof milestones.$inferSelect;
+export type Task = typeof tasks.$inferSelect;
+export type TaskChecklistItem = typeof taskChecklistItems.$inferSelect;
+export type Comment = typeof comments.$inferSelect;
+export type Attachment = typeof attachments.$inferSelect;
+export type Demand = typeof demands.$inferSelect;
+export type ProjectLink = typeof projectLinks.$inferSelect;
+export type Activity = typeof activities.$inferSelect;
+export type Notification = typeof notifications.$inferSelect;

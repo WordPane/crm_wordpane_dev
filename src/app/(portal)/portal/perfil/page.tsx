@@ -1,0 +1,80 @@
+import type { Metadata } from "next";
+import { notFound } from "next/navigation";
+
+import { PortalAvatarUpload } from "@/components/portal/portal-avatar-upload";
+import { PortalPasswordForm } from "@/components/portal/portal-password-form";
+import { PortalProfileForm } from "@/components/portal/portal-profile-form";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { requireUser } from "@/lib/access/permissions";
+import { getPortalProfile } from "@/lib/queries/portal";
+
+export const metadata: Metadata = { title: "Perfil" };
+
+export default async function PortalProfilePage() {
+  const user = await requireUser();
+  const profile = await getPortalProfile(user);
+  if (!profile) notFound();
+
+  return (
+    <div className="mx-auto max-w-2xl space-y-6">
+      <div>
+        <h1 className="text-2xl font-extrabold">Perfil</h1>
+        <p className="text-sm text-muted-foreground">
+          Seus dados de acesso e contato no portal.
+        </p>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Foto do perfil</CardTitle>
+          <CardDescription>
+            Exibida nos seus comentários e no menu do portal.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <PortalAvatarUpload
+            name={profile.name}
+            avatarUrl={profile.avatarUrl ? `/api/avatar/${user.id}` : null}
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Dados pessoais</CardTitle>
+          <CardDescription>
+            Como a equipe WordPane identifica você.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <PortalProfileForm
+            email={profile.email}
+            defaultValues={{
+              name: profile.name,
+              phone: profile.phone ?? "",
+              position: profile.position ?? "",
+            }}
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Segurança</CardTitle>
+          <CardDescription>
+            Troque sua senha de acesso ao portal.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <PortalPasswordForm />
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
