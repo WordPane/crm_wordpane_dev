@@ -2,6 +2,7 @@
 
 import {
   Building2,
+  CalendarDays,
   FolderKanban,
   Inbox,
   LayoutDashboard,
@@ -18,6 +19,7 @@ import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
   { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/admin/agenda", label: "Agenda", icon: CalendarDays },
   { href: "/admin/clientes", label: "Clientes", icon: Building2 },
   { href: "/admin/projetos", label: "Projetos", icon: FolderKanban },
   { href: "/admin/demandas", label: "Demandas", icon: Inbox },
