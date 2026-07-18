@@ -12,6 +12,7 @@ import {
 import { logActivity } from "@/lib/activities";
 import { db } from "@/lib/db";
 import {
+  milestones,
   projects,
   taskChecklistItems,
   tasks,
@@ -118,6 +119,37 @@ export async function updateTask(
     if (!scoped) return { error: "Tarefa não encontrada." };
     const data = taskUpdateSchema.parse(input);
 
+    // Troca de etapa: valida que a etapa pertence ao projeto e prepara o log
+    let milestoneChange: { from: string | null; to: string | null } | null =
+      null;
+    if (
+      data.milestoneId !== undefined &&
+      (data.milestoneId || null) !== scoped.task.milestoneId
+    ) {
+      let newName: string | null = null;
+      if (data.milestoneId) {
+        const [ms] = await db
+          .select({ name: milestones.name, projectId: milestones.projectId })
+          .from(milestones)
+          .where(eq(milestones.id, data.milestoneId))
+          .limit(1);
+        if (!ms || ms.projectId !== scoped.project.id) {
+          return { error: "Etapa não encontrada neste projeto." };
+        }
+        newName = ms.name;
+      }
+      let oldName: string | null = null;
+      if (scoped.task.milestoneId) {
+        const [old] = await db
+          .select({ name: milestones.name })
+          .from(milestones)
+          .where(eq(milestones.id, scoped.task.milestoneId))
+          .limit(1);
+        oldName = old?.name ?? null;
+      }
+      milestoneChange = { from: oldName, to: newName };
+    }
+
     await db
       .update(tasks)
       .set({
@@ -141,6 +173,22 @@ export async function updateTask(
         updatedAt: new Date(),
       })
       .where(eq(tasks.id, taskId));
+
+    if (milestoneChange) {
+      await logActivity({
+        actorId: user.id,
+        companyId: scoped.project.companyId,
+        projectId: scoped.project.id,
+        entityType: "task",
+        entityId: taskId,
+        action: "task.milestone_changed",
+        metadata: {
+          title: scoped.task.title,
+          from: milestoneChange.from,
+          to: milestoneChange.to,
+        },
+      });
+    }
 
     revalidateTask(taskId, scoped.project.id);
     return { success: true };

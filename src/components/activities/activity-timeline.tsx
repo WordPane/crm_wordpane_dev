@@ -47,6 +47,8 @@ function describe(activity: ActivityItem): string {
       return `criou a tarefa "${str(m.title) ?? ""}"`;
     case "task.status_changed":
       return `moveu a tarefa "${str(m.title) ?? ""}" de "${str(m.from) ?? "—"}" para "${str(m.to) ?? "—"}"`;
+    case "task.milestone_changed":
+      return `moveu a tarefa "${str(m.title) ?? ""}" da etapa "${str(m.from) ?? "Sem etapa"}" para "${str(m.to) ?? "Sem etapa"}"`;
     case "task.completed":
       return `concluiu a tarefa "${str(m.title) ?? ""}"`;
     case "milestone.created":

@@ -104,7 +104,12 @@ export function PortalNavbar({
             items={notifications}
             viewAllHref="/portal/notificacoes"
           />
-          <UserMenu name={userName} email={userEmail} image={userImage} />
+          <UserMenu
+            name={userName}
+            email={userEmail}
+            image={userImage}
+            profileHref="/portal/perfil"
+          />
 
           <DropdownMenu>
             <DropdownMenuTrigger

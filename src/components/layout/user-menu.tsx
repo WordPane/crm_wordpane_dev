@@ -1,6 +1,7 @@
 "use client";
 
 import { LogOut, UserRound } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -28,11 +29,15 @@ export function UserMenu({
   name,
   email,
   image,
+  profileHref,
 }: {
   name: string;
   email: string;
   image?: string | null;
+  profileHref?: string;
 }) {
+  const router = useRouter();
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger className="flex items-center gap-2 rounded-full outline-none transition-opacity hover:opacity-80">
@@ -53,6 +58,12 @@ export function UserMenu({
           </DropdownMenuLabel>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
+        {profileHref && (
+          <DropdownMenuItem onClick={() => router.push(profileHref)}>
+            <UserRound />
+            Meu perfil
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem
           variant="destructive"
           onClick={() => {

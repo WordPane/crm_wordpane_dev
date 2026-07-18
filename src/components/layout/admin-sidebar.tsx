@@ -23,11 +23,11 @@ const NAV_ITEMS = [
   { href: "/admin/clientes", label: "Clientes", icon: Building2 },
   { href: "/admin/projetos", label: "Projetos", icon: FolderKanban },
   { href: "/admin/demandas", label: "Demandas", icon: Inbox },
-  { href: "/admin/cadastros", label: "Cadastros", icon: UserPlus },
   { href: "/admin/tarefas", label: "Tarefas", icon: ListChecks },
 ] as const;
 
 const SUPER_ONLY_ITEMS = [
+  { href: "/admin/cadastros", label: "Cadastros", icon: UserPlus },
   { href: "/admin/equipe", label: "Equipe", icon: Users },
   { href: "/admin/configuracoes", label: "Configurações", icon: Settings },
 ] as const;

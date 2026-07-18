@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { ClipboardList } from "lucide-react";
+import { redirect } from "next/navigation";
 
 import { RegistrationFilters } from "@/components/registrations/registration-filters";
 import { RegistrationList } from "@/components/registrations/registration-list";
@@ -25,6 +26,8 @@ export default async function RegistrationsPage({
 }) {
   const user = await requireUser();
   requireTeam(user);
+  // Triagem de cadastros é exclusiva de super admins.
+  if (user.role !== "super_admin") redirect("/admin/dashboard");
 
   const params = await searchParams;
   const statusParam = first(params.status);

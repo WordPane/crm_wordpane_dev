@@ -1,6 +1,6 @@
 import { desc, eq, sql } from "drizzle-orm";
 
-import { requireTeam, type SessionUser } from "@/lib/access/permissions";
+import { requireSuperAdmin, type SessionUser } from "@/lib/access/permissions";
 import { db } from "@/lib/db";
 import {
   clientRegistrations,
@@ -21,7 +21,7 @@ export async function listRegistrations(
   user: SessionUser,
   status?: ClientRegistration["status"],
 ): Promise<RegistrationListItem[]> {
-  requireTeam(user);
+  requireSuperAdmin(user);
 
   return db
     .select({
@@ -60,7 +60,7 @@ export async function listRegistrations(
 export async function countPendingRegistrations(
   user: SessionUser,
 ): Promise<number> {
-  requireTeam(user);
+  requireSuperAdmin(user);
 
   const [row] = await db
     .select({ value: sql<number>`count(*)::int` })

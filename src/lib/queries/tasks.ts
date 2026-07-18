@@ -206,3 +206,23 @@ export async function listActiveTaskStatuses(
     .where(eq(taskStatuses.active, true))
     .orderBy(asc(taskStatuses.position), asc(taskStatuses.name));
 }
+
+/** Etapas de um projeto (para o seletor de etapa da tarefa). */
+export async function listProjectMilestonesForTask(
+  user: SessionUser,
+  projectId: string,
+): Promise<{ id: string; name: string }[]> {
+  requireTeam(user);
+  const [project] = await db
+    .select({ companyId: projects.companyId })
+    .from(projects)
+    .where(eq(projects.id, projectId))
+    .limit(1);
+  if (!project) return [];
+  await assertCompanyAccess(user, project.companyId);
+  return db
+    .select({ id: milestones.id, name: milestones.name })
+    .from(milestones)
+    .where(eq(milestones.projectId, projectId))
+    .orderBy(asc(milestones.position), asc(milestones.name));
+}

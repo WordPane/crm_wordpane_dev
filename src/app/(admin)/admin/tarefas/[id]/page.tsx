@@ -26,7 +26,11 @@ import {
 import { listTaskActivities } from "@/lib/queries/activities";
 import { listTaskAttachments } from "@/lib/queries/attachments";
 import { listTaskComments } from "@/lib/queries/comments";
-import { getTask, listActiveTaskStatuses } from "@/lib/queries/tasks";
+import {
+  getTask,
+  listActiveTaskStatuses,
+  listProjectMilestonesForTask,
+} from "@/lib/queries/tasks";
 import { listTeamSelectOptions } from "@/lib/queries/team";
 import { formatDate, isOverdue, timeAgo } from "@/lib/utils/format";
 import { cn } from "@/lib/utils";
@@ -52,16 +56,17 @@ export default async function TaskDetailPage({
   }
   if (!detail) notFound();
 
-  const { task, project, company, milestone, status, creator, checklist } =
+  const { task, project, company, status, creator, checklist } =
     detail;
 
-  const [statuses, teamUsers, comments, taskAttachments, taskActivities] =
+  const [statuses, teamUsers, comments, taskAttachments, taskActivities, projectMilestones] =
     await Promise.all([
       listActiveTaskStatuses(user),
       listTeamSelectOptions(user),
       listTaskComments(user, task.id),
       listTaskAttachments(user, task.id),
       listTaskActivities(user, task.id),
+      listProjectMilestonesForTask(user, project.id),
     ]);
 
   const overdue = !task.completedAt && isOverdue(task.dueDate);
@@ -195,6 +200,8 @@ export default async function TaskDetailPage({
               taskId={task.id}
               ownerId={task.ownerId}
               statusId={task.statusId}
+              milestoneId={task.milestoneId}
+              milestones={projectMilestones}
               visibleToClient={task.visibleToClient}
               statuses={statuses}
               teamUsers={teamUsers}
@@ -208,10 +215,6 @@ export default async function TaskDetailPage({
                 <dd className={cn(overdue && "font-medium text-red-300")}>
                   {formatDate(task.dueDate)}
                 </dd>
-              </div>
-              <div className="flex justify-between gap-2">
-                <dt className="text-muted-foreground">Etapa</dt>
-                <dd>{milestone?.name ?? "—"}</dd>
               </div>
               <div className="flex justify-between gap-2">
                 <dt className="text-muted-foreground">Empresa</dt>

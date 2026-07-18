@@ -31,7 +31,12 @@ export default async function AdminLayout({
             items={notifications}
             viewAllHref="/admin/notificacoes"
           />
-          <UserMenu name={user.name} email={user.email} image={user.image} />
+          <UserMenu
+            name={user.name}
+            email={user.email}
+            image={user.image}
+            profileHref="/admin/perfil"
+          />
         </header>
 
         <main className="flex-1 p-6">{children}</main>

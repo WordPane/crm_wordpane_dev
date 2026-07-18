@@ -4,7 +4,7 @@ import { hashSync } from "bcryptjs";
 import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
-import { requireTeam, requireUser } from "@/lib/access/permissions";
+import { requireSuperAdmin, requireUser } from "@/lib/access/permissions";
 import { logActivity } from "@/lib/activities";
 import { db } from "@/lib/db";
 import { clientRegistrations, companies, users } from "@/lib/db/schema";
@@ -106,12 +106,12 @@ export async function submitRegistration(input: unknown): Promise<ActionResult> 
 
 /**
  * Aprova o cadastro: cria a empresa (ativa) e o 1º usuário (admin dela),
- * com o hash de senha gravado no registro. Qualquer membro da equipe aprova.
+ * com o hash de senha gravado no registro. Somente super admins aprovam.
  */
 export async function approveRegistration(id: string): Promise<ActionResult> {
   try {
     const user = await requireUser();
-    requireTeam(user);
+    requireSuperAdmin(user);
 
     const [registration] = await db
       .select()
@@ -208,14 +208,14 @@ export async function approveRegistration(id: string): Promise<ActionResult> {
   }
 }
 
-/** Recusa o cadastro com justificativa interna obrigatória. */
+/** Recusa o cadastro com justificativa interna obrigatória. Só super admins. */
 export async function rejectRegistration(
   id: string,
   note: string,
 ): Promise<ActionResult> {
   try {
     const user = await requireUser();
-    requireTeam(user);
+    requireSuperAdmin(user);
     const data = rejectRegistrationSchema.parse({ note });
 
     const [registration] = await db

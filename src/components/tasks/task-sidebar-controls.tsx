@@ -25,6 +25,8 @@ export function TaskSidebarControls({
   taskId,
   ownerId,
   statusId,
+  milestoneId,
+  milestones,
   visibleToClient,
   statuses,
   teamUsers,
@@ -32,6 +34,8 @@ export function TaskSidebarControls({
   taskId: string;
   ownerId: string | null;
   statusId: string | null;
+  milestoneId: string | null;
+  milestones: SelectOption[];
   visibleToClient: boolean;
   statuses: StatusInfo[];
   teamUsers: SelectOption[];
@@ -111,6 +115,41 @@ export function TaskSidebarControls({
             {statuses.map((s) => (
               <SelectItem key={s.id} value={s.id}>
                 {s.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="space-y-1.5">
+        <Label>Etapa</Label>
+        <Select
+          value={milestoneId ?? NONE}
+          disabled={pending}
+          onValueChange={(value) =>
+            run(
+              updateTask(taskId, {
+                milestoneId: !value || value === NONE ? "" : value,
+              }),
+              "Etapa atualizada.",
+            )
+          }
+        >
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="Selecione">
+              {(value: string | null) =>
+                !value || value === NONE
+                  ? "Sem etapa"
+                  : (milestones.find((m) => m.id === value)?.name ??
+                    "Sem etapa")
+              }
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={NONE}>Sem etapa</SelectItem>
+            {milestones.map((m) => (
+              <SelectItem key={m.id} value={m.id}>
+                {m.name}
               </SelectItem>
             ))}
           </SelectContent>
