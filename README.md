@@ -48,22 +48,19 @@ cp .env.example .env.local
 
 # 3. Banco de dados
 npm run db:migrate   # aplica as migrações (drizzle/)
-npm run db:seed      # dados de demonstração
 
 # 4. Rodar
 npm run dev          # http://localhost:3000
 ```
 
-### Credenciais demo (seed)
+### Primeiro acesso
 
-| Perfil       | E-mail               | Senha        |
-| ------------ | -------------------- | ------------ |
-| Super admin  | `admin@wordpane.com` | `wordpane123` |
-| Admin        | `joao@wordpane.com`  | `wordpane123` |
-| Cliente      | `maria@xpto.com.br`  | `cliente123`  |
+O banco de produção inicia limpo (apenas os status configuráveis). A primeira
+conta super admin é criada diretamente no banco — em `/admin/equipe` você cria
+os demais usuários (equipe e clientes) pela interface.
 
-O admin `joao@` tem apenas a empresa XPTO atribuída — útil para validar o
-escopo de visibilidade.
+Para popular com **dados de demonstração** em ambiente de desenvolvimento,
+rode `npm run db:seed` (empresa XPTO, projeto, demanda e usuários fictícios).
 
 ## Scripts
 
