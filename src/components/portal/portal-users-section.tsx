@@ -15,14 +15,7 @@ import { toast } from "sonner";
 
 import { CompanyAdminChip, UserStatusChip } from "@/components/chips";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
@@ -56,143 +49,141 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { maskPhone } from "@/lib/format";
-import type { CompanyUserItem } from "@/lib/queries/companies";
+import type { PortalCompanyUserItem } from "@/lib/queries/portal";
 import {
-  companyUserCreateSchema,
-  companyUserUpdateSchema,
-  type CompanyUserUpdateValues,
-} from "@/lib/validations/user";
+  portalUserCreateSchema,
+  portalUserUpdateSchema,
+  type PortalUserUpdateValues,
+} from "@/lib/validations/portal";
 import {
-  createCompanyUser,
-  updateCompanyUser,
-} from "@/server/actions/company-users";
+  createPortalCompanyUser,
+  updatePortalCompanyUser,
+} from "@/server/actions/portal-users";
 
-export function CompanyUsersSection({
-  companyId,
+export function PortalUsersSection({
   users,
 }: {
-  companyId: string;
-  users: CompanyUserItem[];
+  users: PortalCompanyUserItem[];
 }) {
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editing, setEditing] = useState<CompanyUserItem | null>(null);
+  const [editing, setEditing] = useState<PortalCompanyUserItem | null>(null);
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Usuários do portal</CardTitle>
-        <CardDescription>
-          Pessoas desta empresa com acesso ao portal do cliente.
-        </CardDescription>
-        <CardAction>
-          <Button
-            size="sm"
-            onClick={() => {
-              setEditing(null);
-              setDialogOpen(true);
-            }}
-          >
-            <Plus />
-            Novo usuário
-          </Button>
-        </CardAction>
-      </CardHeader>
-      <CardContent>
-        {users.length === 0 ? (
-          <div className="flex flex-col items-center gap-3 py-12 text-center">
-            <UserRound className="size-10 text-muted-foreground/40" />
-            <p className="text-sm font-medium">Nenhum usuário cadastrado</p>
-            <p className="text-sm text-muted-foreground">
-              Crie o primeiro acesso ao portal para esta empresa.
-            </p>
-          </div>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead>Nome</TableHead>
-                <TableHead>E-mail</TableHead>
-                <TableHead>Cargo</TableHead>
-                <TableHead>Telefone</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="w-10" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {users.map((u) => (
-                <TableRow key={u.id}>
-                  <TableCell className="font-medium">
-                    <span className="flex items-center gap-2">
-                      {u.name}
-                      {u.isCompanyAdmin && <CompanyAdminChip />}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {u.email}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {u.position ?? "—"}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {u.phone ?? "—"}
-                  </TableCell>
-                  <TableCell>
-                    <UserStatusChip status={u.status} />
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger
-                        render={
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            aria-label="Ações"
-                          />
-                        }
-                      >
-                        <MoreHorizontal className="size-4" />
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={() => {
-                            setEditing(u);
-                            setDialogOpen(true);
-                          }}
-                        >
-                          <Pencil />
-                          Editar
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-extrabold">Usuários</h1>
+          <p className="text-sm text-muted-foreground">
+            Pessoas da sua empresa com acesso ao portal.
+          </p>
+        </div>
+        <Button
+          size="sm"
+          onClick={() => {
+            setEditing(null);
+            setDialogOpen(true);
+          }}
+        >
+          <Plus />
+          Novo usuário
+        </Button>
+      </div>
+
+      <Card>
+        <CardContent>
+          {users.length === 0 ? (
+            <div className="flex flex-col items-center gap-3 py-12 text-center">
+              <UserRound className="size-10 text-muted-foreground/40" />
+              <p className="text-sm font-medium">Nenhum usuário cadastrado</p>
+              <p className="text-sm text-muted-foreground">
+                Crie o primeiro acesso ao portal para a sua empresa.
+              </p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead>Nome</TableHead>
+                  <TableHead>E-mail</TableHead>
+                  <TableHead>Cargo</TableHead>
+                  <TableHead>Telefone</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="w-10" />
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
-      </CardContent>
+              </TableHeader>
+              <TableBody>
+                {users.map((u) => (
+                  <TableRow key={u.id}>
+                    <TableCell className="font-medium">
+                      <span className="flex items-center gap-2">
+                        {u.name}
+                        {u.isCompanyAdmin && <CompanyAdminChip />}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {u.email}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {u.position ?? "—"}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {u.phone ?? "—"}
+                    </TableCell>
+                    <TableCell>
+                      <UserStatusChip status={u.status} />
+                    </TableCell>
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger
+                          render={
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              aria-label="Ações"
+                            />
+                          }
+                        >
+                          <MoreHorizontal className="size-4" />
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={() => {
+                              setEditing(u);
+                              setDialogOpen(true);
+                            }}
+                          >
+                            <Pencil />
+                            Editar
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
 
       {dialogOpen && (
-        <CompanyUserDialog
+        <PortalUserDialog
           key={editing?.id ?? "new"}
-          companyId={companyId}
           user={editing}
           open={dialogOpen}
           onOpenChange={setDialogOpen}
         />
       )}
-    </Card>
+    </div>
   );
 }
 
-function CompanyUserDialog({
-  companyId,
+function PortalUserDialog({
   user,
   open,
   onOpenChange,
 }: {
-  companyId: string;
-  user: CompanyUserItem | null;
+  user: PortalCompanyUserItem | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
@@ -203,10 +194,10 @@ function CompanyUserDialog({
 
   // O formulário usa um tipo único; o resolver muda conforme criação/edição
   // (a action revalida com o schema adequado em cada fluxo).
-  const form = useForm<CompanyUserUpdateValues>({
+  const form = useForm<PortalUserUpdateValues>({
     resolver: zodResolver(
-      isEdit ? companyUserUpdateSchema : companyUserCreateSchema,
-    ) as Resolver<CompanyUserUpdateValues>,
+      isEdit ? portalUserUpdateSchema : portalUserCreateSchema,
+    ) as Resolver<PortalUserUpdateValues>,
     defaultValues: {
       name: user?.name ?? "",
       email: user?.email ?? "",
@@ -219,12 +210,12 @@ function CompanyUserDialog({
   });
   const { errors } = form.formState;
 
-  function onSubmit(values: CompanyUserUpdateValues) {
+  function onSubmit(values: PortalUserUpdateValues) {
     setError(null);
     startTransition(async () => {
       const result = isEdit
-        ? await updateCompanyUser(companyId, user.id, values)
-        : await createCompanyUser(companyId, values);
+        ? await updatePortalCompanyUser(user.id, values)
+        : await createPortalCompanyUser(values);
 
       if ("error" in result) {
         setError(result.error);
@@ -245,16 +236,16 @@ function CompanyUserDialog({
           <DialogDescription>
             {isEdit
               ? "Atualize os dados de acesso ao portal."
-              : "Crie um acesso ao portal do cliente para esta empresa."}
+              : "Crie um acesso ao portal para alguém da sua empresa."}
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <Label htmlFor="cu-name">Nome *</Label>
+              <Label htmlFor="pu-name">Nome *</Label>
               <Input
-                id="cu-name"
+                id="pu-name"
                 placeholder="Nome completo"
                 aria-invalid={!!errors.name}
                 {...form.register("name")}
@@ -264,9 +255,9 @@ function CompanyUserDialog({
               )}
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="cu-email">E-mail *</Label>
+              <Label htmlFor="pu-email">E-mail *</Label>
               <Input
-                id="cu-email"
+                id="pu-email"
                 type="email"
                 placeholder="pessoa@empresa.com"
                 aria-invalid={!!errors.email}
@@ -279,13 +270,13 @@ function CompanyUserDialog({
               )}
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="cu-phone">Telefone</Label>
+              <Label htmlFor="pu-phone">Telefone</Label>
               <Controller
                 control={form.control}
                 name="phone"
                 render={({ field }) => (
                   <Input
-                    id="cu-phone"
+                    id="pu-phone"
                     placeholder="(00) 00000-0000"
                     inputMode="numeric"
                     value={field.value ?? ""}
@@ -298,19 +289,19 @@ function CompanyUserDialog({
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="cu-position">Cargo</Label>
+              <Label htmlFor="pu-position">Cargo</Label>
               <Input
-                id="cu-position"
+                id="pu-position"
                 placeholder="Ex.: Gerente de TI"
                 {...form.register("position")}
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="cu-password">
+              <Label htmlFor="pu-password">
                 {isEdit ? "Nova senha" : "Senha *"}
               </Label>
               <Input
-                id="cu-password"
+                id="pu-password"
                 type="password"
                 placeholder={
                   isEdit ? "Deixe em branco para manter" : "Mín. 6 caracteres"
@@ -365,12 +356,12 @@ function CompanyUserDialog({
             render={({ field }) => (
               <div className="flex items-center gap-2">
                 <Checkbox
-                  id="cu-company-admin"
+                  id="pu-company-admin"
                   checked={field.value}
                   onCheckedChange={(checked) => field.onChange(checked)}
                 />
-                <Label htmlFor="cu-company-admin" className="font-normal">
-                  Admin da empresa (gerencia usuários)
+                <Label htmlFor="pu-company-admin" className="font-normal">
+                  Pode gerenciar usuários
                 </Label>
               </div>
             )}

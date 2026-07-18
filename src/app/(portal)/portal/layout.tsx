@@ -57,6 +57,7 @@ export default async function PortalLayout({
         companyName={company.name}
         unreadNotifications={unreadNotifications}
         notifications={notifications}
+        canManageUsers={profile?.isCompanyAdmin ?? false}
       />
       <main className="mx-auto w-full max-w-6xl px-4 pt-24 pb-12 sm:px-6">
         {children}

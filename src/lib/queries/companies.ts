@@ -35,6 +35,7 @@ export type CompanyUserItem = {
   phone: string | null;
   position: string | null;
   status: User["status"];
+  isCompanyAdmin: boolean;
 };
 
 export type CompanyAdminItem = {
@@ -120,6 +121,7 @@ export async function listCompanyUsers(
       phone: users.phone,
       position: users.position,
       status: users.status,
+      isCompanyAdmin: users.isCompanyAdmin,
     })
     .from(users)
     .where(and(eq(users.companyId, companyId), eq(users.role, "client")))

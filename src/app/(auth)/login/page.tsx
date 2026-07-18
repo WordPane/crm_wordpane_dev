@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import { LoginForm } from "./login-form";
 
@@ -20,6 +21,16 @@ export default function LoginPage() {
           <h1 className="mb-6 text-center text-lg font-bold">Acesse sua conta</h1>
           <LoginForm />
         </div>
+
+        <p className="mt-4 text-center text-sm text-muted-foreground">
+          Ainda não tem acesso?{" "}
+          <Link
+            href="/cadastro"
+            className="underline-offset-4 transition-colors hover:text-foreground hover:underline"
+          >
+            Cadastre sua empresa
+          </Link>
+        </p>
 
         <p className="mt-6 text-center text-xs text-muted-foreground/60">
           © {new Date().getFullYear()} WordPane — Uso interno e clientes

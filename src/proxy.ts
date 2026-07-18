@@ -7,16 +7,18 @@ export default auth((req) => {
   const session = req.auth;
   const path = nextUrl.pathname;
   const isLogin = path === "/login";
+  const isCadastro = path === "/cadastro";
+  const isPublic = isLogin || isCadastro;
 
   if (!session?.user) {
-    if (isLogin) return NextResponse.next();
+    if (isPublic) return NextResponse.next();
     return NextResponse.redirect(new URL("/login", nextUrl));
   }
 
   const home =
     session.user.role === "client" ? "/portal/dashboard" : "/admin/dashboard";
 
-  if (isLogin || path === "/") {
+  if (isPublic || path === "/") {
     return NextResponse.redirect(new URL(home, nextUrl));
   }
 

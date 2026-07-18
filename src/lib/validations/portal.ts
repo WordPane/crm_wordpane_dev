@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { demandCategories } from "@/lib/validations/demand";
 import { priorities } from "@/lib/validations/project";
+import { userStatuses } from "@/lib/validations/user";
 
 /** Campo de texto opcional: aceita vazio (""), limita o tamanho. */
 const optionalText = (max: number) =>
@@ -104,3 +105,44 @@ export const portalPasswordSchema = z
   });
 
 export type PortalPasswordValues = z.infer<typeof portalPasswordSchema>;
+
+// ─────────────────────────── Usuários da empresa (admin da empresa) ───────────────────────────
+
+// bcrypt considera no máximo 72 bytes de senha
+const userPasswordCreate = z
+  .string()
+  .min(6, "A senha deve ter ao menos 6 caracteres.")
+  .max(72, "Máximo de 72 caracteres.");
+
+const userPasswordUpdate = z
+  .string()
+  .min(6, "A senha deve ter ao menos 6 caracteres.")
+  .max(72, "Máximo de 72 caracteres.")
+  .optional()
+  .or(z.literal(""));
+
+const portalUserBaseFields = {
+  name: z
+    .string()
+    .trim()
+    .min(1, "Nome é obrigatório.")
+    .max(160, "Máximo de 160 caracteres."),
+  email: z.email("Informe um e-mail válido.").max(255, "Máximo de 255 caracteres."),
+  phone: optionalText(20),
+  position: optionalText(120),
+  status: z.enum(userStatuses),
+  isCompanyAdmin: z.boolean(),
+};
+
+export const portalUserCreateSchema = z.object({
+  ...portalUserBaseFields,
+  password: userPasswordCreate,
+});
+
+export const portalUserUpdateSchema = z.object({
+  ...portalUserBaseFields,
+  password: userPasswordUpdate,
+});
+
+export type PortalUserCreateValues = z.infer<typeof portalUserCreateSchema>;
+export type PortalUserUpdateValues = z.infer<typeof portalUserUpdateSchema>;

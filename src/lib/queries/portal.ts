@@ -26,6 +26,7 @@ import {
   type ProjectLink,
   type Task,
   type TaskChecklistItem,
+  type User,
 } from "@/lib/db/schema";
 import type { ActivityItem } from "@/lib/queries/activities";
 import type { AttachmentItem } from "@/lib/queries/attachments";
@@ -72,6 +73,7 @@ export type PortalProfile = {
   phone: string | null;
   position: string | null;
   avatarUrl: string | null;
+  isCompanyAdmin: boolean;
 };
 
 /** Dados frescos do próprio usuário (perfil/avatar — a sessão JWT pode estar velha). */
@@ -85,11 +87,45 @@ export async function getPortalProfile(
       phone: users.phone,
       position: users.position,
       avatarUrl: users.avatarUrl,
+      isCompanyAdmin: users.isCompanyAdmin,
     })
     .from(users)
     .where(eq(users.id, user.id))
     .limit(1);
   return row ?? null;
+}
+
+// ─────────────────────────── Usuários da empresa ───────────────────────────
+
+export type PortalCompanyUserItem = {
+  id: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  position: string | null;
+  status: User["status"];
+  isCompanyAdmin: boolean;
+};
+
+/** Usuários cliente da própria empresa (gestão pelo admin da empresa). */
+export async function listPortalCompanyUsers(
+  user: SessionUser,
+): Promise<PortalCompanyUserItem[]> {
+  const companyId = requireClientCompanyId(user);
+
+  return db
+    .select({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+      phone: users.phone,
+      position: users.position,
+      status: users.status,
+      isCompanyAdmin: users.isCompanyAdmin,
+    })
+    .from(users)
+    .where(and(eq(users.companyId, companyId), eq(users.role, "client")))
+    .orderBy(asc(users.name));
 }
 
 // ─────────────────────────── Projetos ───────────────────────────

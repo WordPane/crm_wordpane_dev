@@ -42,6 +42,7 @@ export const companyUserCreateSchema = z.object({
   ...baseUserFields,
   phone: optionalText(20),
   password: passwordCreate,
+  isCompanyAdmin: z.boolean(),
 });
 
 export const companyUserUpdateSchema = companyUserCreateSchema.extend({

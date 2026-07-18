@@ -1,8 +1,16 @@
-import type { Company, Demand, Milestone, Project, User } from "@/lib/db/schema";
+import type {
+  ClientRegistration,
+  Company,
+  Demand,
+  Milestone,
+  Project,
+  User,
+} from "@/lib/db/schema";
 import {
   demandCategoryLabels,
   demandStatusLabels,
 } from "@/lib/validations/demand";
+import { registrationStatusLabels } from "@/lib/validations/registration";
 import {
   milestoneStatusLabels,
   priorityLabels,
@@ -63,6 +71,11 @@ export function RoleChip({ role }: { role: "super_admin" | "admin" }) {
       {role === "super_admin" ? "Super admin" : "Admin"}
     </span>
   );
+}
+
+/** Marca o usuário cliente que gerencia os usuários da própria empresa. */
+export function CompanyAdminChip() {
+  return <span className="chip">Admin</span>;
 }
 
 /** Chip de status configurável (projeto/tarefa) colorido pela cor cadastrada. */
@@ -140,6 +153,25 @@ export function DemandCategoryChip({ category }: { category: Demand["category"] 
   return (
     <span className="chip border-border bg-muted text-muted-foreground">
       {demandCategoryLabels[category]}
+    </span>
+  );
+}
+
+const registrationStatusClasses: Record<ClientRegistration["status"], string> =
+  {
+    pendente: "border-amber-400/30 bg-amber-400/10 text-amber-300",
+    aprovado: "",
+    recusado: "border-red-400/30 bg-red-400/10 text-red-300",
+  };
+
+export function RegistrationStatusChip({
+  status,
+}: {
+  status: ClientRegistration["status"];
+}) {
+  return (
+    <span className={cn("chip", registrationStatusClasses[status])}>
+      {registrationStatusLabels[status]}
     </span>
   );
 }

@@ -69,6 +69,11 @@ export const demandCategoryEnum = pgEnum("demand_category", [
   "correcao",
   "outro",
 ]);
+export const registrationStatusEnum = pgEnum("registration_status", [
+  "pendente",
+  "aprovado",
+  "recusado",
+]);
 
 // ─────────────────────────── Empresas (clientes) ───────────────────────────
 
@@ -118,6 +123,8 @@ export const users = pgTable(
     avatarUrl: text("avatar_url"),
     role: userRoleEnum("role").notNull().default("client"),
     status: userStatusEnum("status").notNull().default("active"),
+    // Só tem significado para role "client": gerencia os usuários da própria empresa
+    isCompanyAdmin: boolean("is_company_admin").notNull().default(false),
     // Preenchido apenas para usuários clientes (portal)
     companyId: uuid("company_id").references(() => companies.id, {
       onDelete: "cascade",
@@ -394,6 +401,51 @@ export const demands = pgTable(
   ],
 );
 
+// ─────────────────────────── Cadastro público (aprovação manual) ───────────────────────────
+
+export const clientRegistrations = pgTable(
+  "client_registrations",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    // Empresa
+    razaoSocial: varchar("razao_social", { length: 255 }).notNull(),
+    nomeFantasia: varchar("nome_fantasia", { length: 255 }),
+    cnpj: varchar("cnpj", { length: 18 }),
+    telefone: varchar("telefone", { length: 20 }),
+    whatsapp: varchar("whatsapp", { length: 20 }),
+    email: varchar("email", { length: 255 }),
+    site: varchar("site", { length: 255 }),
+    cidade: varchar("cidade", { length: 120 }),
+    estado: varchar("estado", { length: 2 }),
+    mensagem: text("mensagem"), // "conte o que precisa" (opcional)
+    // Responsável (será o 1º usuário, admin da empresa)
+    userName: varchar("user_name", { length: 160 }).notNull(),
+    userEmail: varchar("user_email", { length: 255 }).notNull(),
+    userPasswordHash: text("user_password_hash").notNull(),
+    userPhone: varchar("user_phone", { length: 20 }),
+    userPosition: varchar("user_position", { length: 120 }),
+    // Triagem
+    status: registrationStatusEnum("status").notNull().default("pendente"),
+    reviewNote: text("review_note"),
+    reviewedBy: uuid("reviewed_by").references(() => users.id),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    approvedCompanyId: uuid("approved_company_id").references(
+      () => companies.id,
+    ),
+    approvedUserId: uuid("approved_user_id").references(() => users.id),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("client_registrations_status_created_idx").on(t.status, t.createdAt),
+    index("client_registrations_user_email_idx").on(t.userEmail),
+  ],
+);
+
 // ─────────────────────────── Links temporários ───────────────────────────
 
 export const projectLinks = pgTable(
@@ -627,6 +679,8 @@ export type TaskChecklistItem = typeof taskChecklistItems.$inferSelect;
 export type Comment = typeof comments.$inferSelect;
 export type Attachment = typeof attachments.$inferSelect;
 export type Demand = typeof demands.$inferSelect;
+export type ClientRegistration = typeof clientRegistrations.$inferSelect;
+export type NewClientRegistration = typeof clientRegistrations.$inferInsert;
 export type ProjectLink = typeof projectLinks.$inferSelect;
 export type Activity = typeof activities.$inferSelect;
 export type Notification = typeof notifications.$inferSelect;

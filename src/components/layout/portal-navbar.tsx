@@ -7,6 +7,7 @@ import {
   Menu,
   Paperclip,
   UserRound,
+  Users,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -36,6 +37,13 @@ const NAV_ITEMS = [
   { href: "/portal/perfil", label: "Perfil", icon: UserRound },
 ] as const;
 
+// Item extra para o admin da empresa (entre "Demandas" e "Arquivos")
+const USERS_NAV_ITEM = {
+  href: "/portal/usuarios",
+  label: "Usuários",
+  icon: Users,
+} as const;
+
 export function PortalNavbar({
   userName,
   userEmail,
@@ -43,6 +51,7 @@ export function PortalNavbar({
   companyName,
   unreadNotifications,
   notifications,
+  canManageUsers,
 }: {
   userName: string;
   userEmail: string;
@@ -50,9 +59,14 @@ export function PortalNavbar({
   companyName: string;
   unreadNotifications: number;
   notifications: NotificationBellItem[];
+  canManageUsers: boolean;
 }) {
   const pathname = usePathname();
   const router = useRouter();
+
+  const navItems = canManageUsers
+    ? [...NAV_ITEMS.slice(0, 3), USERS_NAV_ITEM, ...NAV_ITEMS.slice(3)]
+    : [...NAV_ITEMS];
 
   function isActive(href: string): boolean {
     return pathname === href || pathname.startsWith(`${href}/`);
@@ -67,7 +81,7 @@ export function PortalNavbar({
         </div>
 
         <nav className="hidden flex-1 items-center justify-center gap-1 md:flex">
-          {NAV_ITEMS.map(({ href, label }) => (
+          {navItems.map(({ href, label }) => (
             <Link
               key={href}
               href={href}
@@ -114,7 +128,7 @@ export function PortalNavbar({
                 </DropdownMenuLabel>
               </DropdownMenuGroup>
               <DropdownMenuSeparator />
-              {NAV_ITEMS.map(({ href, label, icon: Icon }) => (
+              {navItems.map(({ href, label, icon: Icon }) => (
                 <DropdownMenuItem
                   key={href}
                   onClick={() => router.push(href)}

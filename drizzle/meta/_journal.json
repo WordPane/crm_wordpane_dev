@@ -8,6 +8,20 @@
       "when": 1784349790132,
       "tag": "0000_tense_zodiak",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1784383415228,
+      "tag": "0001_loud_beast",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1784386330866,
+      "tag": "0002_eminent_rocket_raccoon",
+      "breakpoints": true
     }
   ]
 }

@@ -1,0 +1,1 @@
+ALTER TABLE "users" ADD COLUMN "is_company_admin" boolean DEFAULT false NOT NULL;

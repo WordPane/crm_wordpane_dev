@@ -1,7 +1,7 @@
 "use server";
 
 import { hashSync } from "bcryptjs";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 import { requireTeamCompanyAccess, requireUser } from "@/lib/access/permissions";
@@ -27,15 +27,33 @@ export async function createCompanyUser(
     await requireTeamCompanyAccess(user, companyId);
     const data = companyUserCreateSchema.parse(input);
 
-    await db.insert(users).values({
-      name: data.name,
-      email: normalizeEmail(data.email),
-      phone: nullIfEmpty(data.phone),
-      position: nullIfEmpty(data.position),
-      passwordHash: hashSync(data.password, 10),
-      role: "client",
-      status: data.status,
-      companyId,
+    await db.transaction(async (tx) => {
+      // Primeira empresa sem admin: o novo usuário vira admin automaticamente
+      // (cobre o primeiro usuário da empresa e empresas legadas sem admin).
+      const [adminCount] = await tx
+        .select({ value: sql<number>`count(*)::int` })
+        .from(users)
+        .where(
+          and(
+            eq(users.companyId, companyId),
+            eq(users.role, "client"),
+            eq(users.isCompanyAdmin, true),
+          ),
+        );
+      const isCompanyAdmin =
+        (adminCount?.value ?? 0) === 0 ? true : data.isCompanyAdmin;
+
+      await tx.insert(users).values({
+        name: data.name,
+        email: normalizeEmail(data.email),
+        phone: nullIfEmpty(data.phone),
+        position: nullIfEmpty(data.position),
+        passwordHash: hashSync(data.password, 10),
+        role: "client",
+        status: data.status,
+        isCompanyAdmin,
+        companyId,
+      });
     });
 
     revalidatePath(`/admin/clientes/${companyId}`);
@@ -81,6 +99,7 @@ export async function updateCompanyUser(
         phone: nullIfEmpty(data.phone),
         position: nullIfEmpty(data.position),
         status: data.status,
+        isCompanyAdmin: data.isCompanyAdmin,
         ...(password ? { passwordHash: hashSync(password, 10) } : {}),
         updatedAt: new Date(),
       })

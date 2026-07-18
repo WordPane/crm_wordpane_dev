@@ -147,6 +147,8 @@ async function seed() {
         passwordHash: clientPassword,
         role: "client",
         position: "Marketing",
+        // Primeiro usuário da XPTO: admin da empresa (gerencia usuários no portal)
+        isCompanyAdmin: true,
         companyId: xpto.id,
       })
       .onConflictDoNothing()
