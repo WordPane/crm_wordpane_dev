@@ -31,7 +31,7 @@ export function CompanySearch({ defaultValue }: { defaultValue: string }) {
       <Input
         value={value}
         onChange={(e) => setValue(e.target.value)}
-        placeholder="Buscar por nome ou CNPJ..."
+        placeholder="Buscar por nome, CNPJ ou CPF..."
         className="bg-white/[0.03] pl-9"
         aria-label="Buscar clientes"
       />

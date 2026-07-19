@@ -19,7 +19,12 @@ import { quoteStatusLabels } from "@/lib/validations/quote";
 export type QuotePdfInput = {
   quote: Quote;
   items: QuoteItem[];
-  company: { name: string; cnpj: string | null; email: string | null };
+  company: {
+    name: string;
+    cnpj: string | null;
+    email: string | null;
+    personType: "pj" | "pf";
+  };
 };
 
 const GREEN = "#00b359";
@@ -170,7 +175,9 @@ function QuotePdfDocument({ quote, items, company }: QuotePdfInput) {
           <Text style={styles.sectionTitle}>Cliente</Text>
           <Text style={styles.value}>{company.name}</Text>
           {company.cnpj && (
-            <Text style={styles.label}>CNPJ: {company.cnpj}</Text>
+            <Text style={styles.label}>
+              {company.personType === "pf" ? "CPF" : "CNPJ"}: {company.cnpj}
+            </Text>
           )}
           {company.email && (
             <Text style={styles.label}>{company.email}</Text>

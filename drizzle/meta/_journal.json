@@ -57,6 +57,13 @@
       "when": 1784433854380,
       "tag": "0007_bumpy_prowler",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1784437157184,
+      "tag": "0008_lovely_sentinels",
+      "breakpoints": true
     }
   ]
 }

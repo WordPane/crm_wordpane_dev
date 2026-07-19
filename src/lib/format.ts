@@ -13,6 +13,20 @@ export function maskCnpj(value: string): string {
     .replace(/(\d{4})(\d)/, "$1-$2");
 }
 
+/** 000.000.000-00 */
+export function maskCpf(value: string): string {
+  const d = value.replace(/\D/g, "").slice(0, 11);
+  return d
+    .replace(/^(\d{3})(\d)/, "$1.$2")
+    .replace(/^(\d{3})\.(\d{3})(\d)/, "$1.$2.$3")
+    .replace(/\.(\d{3})(\d)/, ".$1-$2");
+}
+
+/** Aplica a máscara certa conforme o tipo de pessoa (pj → CNPJ, pf → CPF). */
+export function maskDocument(value: string, personType: "pj" | "pf"): string {
+  return personType === "pf" ? maskCpf(value) : maskCnpj(value);
+}
+
 /** 00000-000 */
 export function maskCep(value: string): string {
   const d = value.replace(/\D/g, "").slice(0, 8);

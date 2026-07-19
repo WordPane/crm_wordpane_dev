@@ -61,7 +61,7 @@ export default async function CompaniesPage({
               <>
                 <p className="font-medium">Nenhuma empresa encontrada</p>
                 <p className="text-sm text-muted-foreground">
-                  Tente outro termo de busca (nome ou CNPJ).
+                  Tente outro termo de busca (nome, CNPJ ou CPF).
                 </p>
               </>
             ) : (
@@ -87,7 +87,7 @@ export default async function CompaniesPage({
             <TableHeader>
               <TableRow className="hover:bg-transparent">
                 <TableHead>Empresa</TableHead>
-                <TableHead>CNPJ</TableHead>
+                <TableHead>CNPJ/CPF</TableHead>
                 <TableHead>Cidade/UF</TableHead>
                 <TableHead>E-mail</TableHead>
                 <TableHead>WhatsApp</TableHead>

@@ -31,6 +31,7 @@ export async function GET(
       companyName: sql<string>`coalesce(${companies.nomeFantasia}, ${companies.razaoSocial})`,
       companyCnpj: companies.cnpj,
       companyEmail: companies.email,
+      companyPersonType: companies.personType,
     })
     .from(quotes)
     .innerJoin(companies, eq(quotes.companyId, companies.id))
@@ -94,6 +95,7 @@ export async function GET(
       name: row.companyName,
       cnpj: row.companyCnpj,
       email: row.companyEmail,
+      personType: row.companyPersonType,
     },
   });
 

@@ -108,6 +108,7 @@ export const chargeStatusEnum = pgEnum("charge_status", [
   "refunded",
   "cancelled",
 ]);
+export const personTypeEnum = pgEnum("person_type", ["pj", "pf"]);
 
 // ─────────────────────────── Empresas (clientes) ───────────────────────────
 
@@ -117,7 +118,8 @@ export const companies = pgTable(
     id: uuid("id").defaultRandom().primaryKey(),
     razaoSocial: varchar("razao_social", { length: 255 }).notNull(),
     nomeFantasia: varchar("nome_fantasia", { length: 255 }),
-    cnpj: varchar("cnpj", { length: 18 }),
+    personType: personTypeEnum("person_type").notNull().default("pj"), // pj = CNPJ, pf = CPF
+    cnpj: varchar("cnpj", { length: 18 }), // CNPJ ou CPF, conforme personType
     inscricaoEstadual: varchar("inscricao_estadual", { length: 30 }),
     logradouro: varchar("logradouro", { length: 255 }),
     numero: varchar("numero", { length: 20 }),
@@ -607,6 +609,7 @@ export const clientRegistrations = pgTable(
     // Empresa
     razaoSocial: varchar("razao_social", { length: 255 }).notNull(),
     nomeFantasia: varchar("nome_fantasia", { length: 255 }),
+    personType: personTypeEnum("person_type").notNull().default("pj"),
     cnpj: varchar("cnpj", { length: 18 }),
     telefone: varchar("telefone", { length: 20 }),
     whatsapp: varchar("whatsapp", { length: 20 }),

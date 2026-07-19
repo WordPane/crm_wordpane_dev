@@ -67,6 +67,7 @@ export async function submitRegistration(input: unknown): Promise<ActionResult> 
     await db.insert(clientRegistrations).values({
       razaoSocial: data.razaoSocial,
       nomeFantasia: nullIfEmpty(data.nomeFantasia),
+      personType: data.personType,
       cnpj: nullIfEmpty(data.cnpj),
       telefone: nullIfEmpty(data.telefone),
       whatsapp: nullIfEmpty(data.whatsapp),
@@ -145,6 +146,7 @@ export async function approveRegistration(id: string): Promise<ActionResult> {
         .values({
           razaoSocial: registration.razaoSocial,
           nomeFantasia: registration.nomeFantasia,
+          personType: registration.personType,
           cnpj: registration.cnpj,
           telefone: registration.telefone,
           whatsapp: registration.whatsapp,

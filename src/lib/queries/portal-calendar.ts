@@ -77,6 +77,7 @@ export async function getPortalCalendarEvents(
         statusIsFinal: projectStatuses.isFinal,
       })
       .from(projects)
+      .innerJoin(companies, eq(projects.companyId, companies.id))
       .leftJoin(projectStatuses, eq(projects.statusId, projectStatuses.id))
       .where(
         and(

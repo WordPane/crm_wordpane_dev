@@ -153,7 +153,11 @@ export function RegistrationList({
                             <DetailItem label="Nome fantasia">
                               {registration.nomeFantasia}
                             </DetailItem>
-                            <DetailItem label="CNPJ">
+                            <DetailItem
+                              label={
+                                registration.personType === "pf" ? "CPF" : "CNPJ"
+                              }
+                            >
                               {registration.cnpj}
                             </DetailItem>
                             <DetailItem label="Cidade/UF">

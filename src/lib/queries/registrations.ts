@@ -28,6 +28,7 @@ export async function listRegistrations(
       id: clientRegistrations.id,
       razaoSocial: clientRegistrations.razaoSocial,
       nomeFantasia: clientRegistrations.nomeFantasia,
+      personType: clientRegistrations.personType,
       cnpj: clientRegistrations.cnpj,
       telefone: clientRegistrations.telefone,
       whatsapp: clientRegistrations.whatsapp,

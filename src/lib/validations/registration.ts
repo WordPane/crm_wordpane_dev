@@ -18,6 +18,7 @@ export const registrationStatusLabels: Record<
 };
 
 const CNPJ_REGEX = /^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$/;
+const CPF_REGEX = /^\d{3}\.\d{3}\.\d{3}-\d{2}$/;
 
 /** Campo de texto opcional: aceita vazio (""), limita o tamanho. */
 const optionalText = (max: number) =>
@@ -38,12 +39,8 @@ export const registrationFormSchema = z
       .min(1, "Razão social é obrigatória.")
       .max(255, "Máximo de 255 caracteres."),
     nomeFantasia: optionalText(255),
-    cnpj: z
-      .string()
-      .trim()
-      .regex(CNPJ_REGEX, "Use o formato 00.000.000/0000-00.")
-      .optional()
-      .or(z.literal("")),
+    personType: z.enum(["pj", "pf"]),
+    cnpj: optionalText(18),
     telefone: optionalText(20),
     whatsapp: optionalText(20),
     email: z
@@ -84,6 +81,24 @@ export const registrationFormSchema = z
   .refine((values) => values.userPassword === values.userPasswordConfirm, {
     message: "As senhas não conferem.",
     path: ["userPasswordConfirm"],
+  })
+  .superRefine((values, ctx) => {
+    const doc = values.cnpj?.trim() ?? "";
+    if (!doc) return;
+    if (values.personType === "pf" && !CPF_REGEX.test(doc)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["cnpj"],
+        message: "Use o formato 000.000.000-00.",
+      });
+    }
+    if (values.personType === "pj" && !CNPJ_REGEX.test(doc)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["cnpj"],
+        message: "Use o formato 00.000.000/0000-00.",
+      });
+    }
   });
 
 export type RegistrationFormValues = z.infer<typeof registrationFormSchema>;
@@ -91,6 +106,7 @@ export type RegistrationFormValues = z.infer<typeof registrationFormSchema>;
 export const emptyRegistrationValues: RegistrationFormValues = {
   razaoSocial: "",
   nomeFantasia: "",
+  personType: "pj",
   cnpj: "",
   telefone: "",
   whatsapp: "",

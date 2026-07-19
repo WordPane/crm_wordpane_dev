@@ -98,7 +98,7 @@ export default async function CompanyDetailPage({
           </div>
           {company.cnpj && (
             <p className="text-sm text-muted-foreground">
-              CNPJ {company.cnpj}
+              {company.personType === "pf" ? "CPF" : "CNPJ"} {company.cnpj}
             </p>
           )}
         </div>

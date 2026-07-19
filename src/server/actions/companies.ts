@@ -29,6 +29,7 @@ export async function createCompany(input: unknown): Promise<ActionResult> {
       .values({
         razaoSocial: data.razaoSocial,
         nomeFantasia: nullIfEmpty(data.nomeFantasia),
+        personType: data.personType,
         cnpj: nullIfEmpty(data.cnpj),
         inscricaoEstadual: nullIfEmpty(data.inscricaoEstadual),
         logradouro: nullIfEmpty(data.logradouro),
@@ -80,6 +81,7 @@ export async function updateCompany(
       .set({
         razaoSocial: data.razaoSocial,
         nomeFantasia: nullIfEmpty(data.nomeFantasia),
+        personType: data.personType,
         cnpj: nullIfEmpty(data.cnpj),
         inscricaoEstadual: nullIfEmpty(data.inscricaoEstadual),
         logradouro: nullIfEmpty(data.logradouro),
