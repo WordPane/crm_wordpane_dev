@@ -85,6 +85,7 @@ export default async function DemandsPage({
           }))}
           milestones={milestones}
           teamUsers={teamUsers}
+          canManage={user.role === "super_admin"}
         />
       )}
     </div>

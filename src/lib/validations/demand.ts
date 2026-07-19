@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import type { Demand } from "@/lib/db/schema";
+import { priorities } from "@/lib/validations/project";
 
 export const demandStatuses = [
   "aberta",
@@ -43,6 +44,25 @@ const optionalId = z
 export const demandStatusUpdateSchema = z.object({
   status: z.enum(demandStatuses),
 });
+
+/** Edição da demanda pela equipe (super admin) — inclusive o projeto vinculado. */
+export const demandUpdateSchema = z.object({
+  projectId: z.uuid("Selecione o projeto.").optional().or(z.literal("")),
+  title: z
+    .string()
+    .trim()
+    .min(5, "O título deve ter ao menos 5 caracteres.")
+    .max(220, "Máximo de 220 caracteres."),
+  category: z.enum(demandCategories, "Selecione a categoria."),
+  priority: z.enum(priorities, "Selecione a prioridade."),
+  description: z
+    .string()
+    .trim()
+    .min(20, "Descreva a demanda com ao menos 20 caracteres.")
+    .max(5000, "Máximo de 5000 caracteres."),
+});
+
+export type DemandUpdateValues = z.infer<typeof demandUpdateSchema>;
 
 /** Conversão da demanda em tarefa da equipe. */
 export const convertDemandSchema = z.object({

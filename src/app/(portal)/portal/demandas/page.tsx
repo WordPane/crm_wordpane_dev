@@ -73,6 +73,14 @@ export default async function PortalDemandsPage() {
                 <DemandStatusChip status={demand.status} />
               </div>
               <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                {demand.project && (
+                  <Link
+                    href={`/portal/projetos/${demand.project.id}`}
+                    className="inline-flex items-center gap-1 font-medium text-[#00d164] transition-colors hover:text-foreground"
+                  >
+                    {demand.project.name}
+                  </Link>
+                )}
                 <span>Enviada em {formatDate(demand.createdAt)}</span>
                 {demand.task?.visible && (
                   <Link

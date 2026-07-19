@@ -62,7 +62,11 @@ function Field({
 }
 
 /** Formulário de nova demanda do cliente (com anexos opcionais). */
-export function PortalDemandForm() {
+export function PortalDemandForm({
+  projects,
+}: {
+  projects: { id: string; name: string }[];
+}) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
@@ -73,6 +77,7 @@ export function PortalDemandForm() {
   const form = useForm<PortalDemandValues>({
     resolver: zodResolver(portalDemandSchema),
     defaultValues: {
+      projectId: "",
       title: "",
       category: "" as PortalDemandValues["category"],
       priority: "" as PortalDemandValues["priority"],
@@ -147,6 +152,41 @@ export function PortalDemandForm() {
 
   return (
     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+      <Field
+        label="Projeto *"
+        error={errors.projectId?.message}
+        hint="A demanda será vinculada a este projeto."
+      >
+        <Controller
+          control={form.control}
+          name="projectId"
+          render={({ field }) => (
+            <Select
+              value={field.value || undefined}
+              onValueChange={(value) => field.onChange(value)}
+            >
+              <SelectTrigger className="w-full" aria-invalid={!!errors.projectId}>
+                <SelectValue placeholder="Selecione o projeto">
+                  {(value: string | null) =>
+                    !value
+                      ? "Selecione o projeto"
+                      : (projects.find((p) => p.id === value)?.name ??
+                        "Selecione o projeto")
+                  }
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {projects.map((project) => (
+                  <SelectItem key={project.id} value={project.id}>
+                    {project.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        />
+      </Field>
+
       <Field label="Título *" htmlFor="dm-title" error={errors.title?.message}>
         <Input
           id="dm-title"

@@ -24,6 +24,7 @@ const demandAttachmentSchema = z.object({
 });
 
 export const portalDemandSchema = z.object({
+  projectId: z.uuid("Selecione o projeto."),
   title: z
     .string()
     .trim()

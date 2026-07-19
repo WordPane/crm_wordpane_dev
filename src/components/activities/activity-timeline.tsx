@@ -69,8 +69,14 @@ function describe(activity: ActivityItem): string {
       return `anexou "${str(m.fileName) ?? ""}" em "${str(m.target) ?? ""}"`;
     case "link.added":
       return `adicionou o link ${str(m.description) ?? str(m.url) ?? ""}`;
+    case "demand.created":
+      return `enviou a demanda "${str(m.title) ?? ""}"`;
     case "demand.status_changed":
       return `mudou o status da demanda "${str(m.title) ?? ""}" de "${str(m.from) ?? "—"}" para "${str(m.to) ?? "—"}"`;
+    case "demand.updated":
+      return `editou a demanda "${str(m.title) ?? ""}"`;
+    case "demand.deleted":
+      return `excluiu a demanda "${str(m.title) ?? ""}"`;
     case "demand.converted":
       return `converteu a demanda "${str(m.title) ?? ""}" em tarefa`;
     case "quote.created":

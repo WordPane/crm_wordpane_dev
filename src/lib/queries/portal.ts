@@ -678,6 +678,8 @@ export type PortalDemandItem = {
   priority: Demand["priority"];
   status: Demand["status"];
   createdAt: Date;
+  /** Projeto ao qual a demanda foi vinculada (null nas antigas). */
+  project: { id: string; name: string } | null;
   /** Tarefa vinculada — o link só é exibido quando ela é visível ao cliente. */
   task: { id: string; projectId: string; visible: boolean } | null;
 };
@@ -696,11 +698,14 @@ export async function listPortalDemands(
       priority: demands.priority,
       status: demands.status,
       createdAt: demands.createdAt,
+      projectId: projects.id,
+      projectName: projects.name,
       taskId: tasks.id,
       taskProjectId: tasks.projectId,
       taskVisible: tasks.visibleToClient,
     })
     .from(demands)
+    .leftJoin(projects, eq(demands.projectId, projects.id))
     .leftJoin(tasks, eq(demands.taskId, tasks.id))
     .where(eq(demands.companyId, companyId))
     .orderBy(desc(demands.createdAt));
@@ -712,6 +717,10 @@ export async function listPortalDemands(
     priority: r.priority,
     status: r.status,
     createdAt: r.createdAt,
+    project:
+      r.projectId && r.projectName
+        ? { id: r.projectId, name: r.projectName }
+        : null,
     task:
       r.taskId && r.taskProjectId
         ? { id: r.taskId, projectId: r.taskProjectId, visible: r.taskVisible! }

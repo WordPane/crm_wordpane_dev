@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
-import { PortalNavbar } from "@/components/layout/portal-navbar";
+import { PortalSidebar } from "@/components/layout/portal-sidebar";
+import { NotificationBell } from "@/components/layout/notification-bell";
+import { UserMenu } from "@/components/layout/user-menu";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { requireUser } from "@/lib/access/permissions";
@@ -50,18 +52,31 @@ export default async function PortalLayout({
 
   return (
     <div className="min-h-screen">
-      <PortalNavbar
-        userName={user.name}
-        userEmail={user.email}
-        userImage={profile?.avatarUrl ? `/api/avatar/${user.id}` : null}
+      <PortalSidebar
         companyName={company.name}
-        unreadNotifications={unreadNotifications}
-        notifications={notifications}
         canManageUsers={profile?.isCompanyAdmin ?? false}
       />
-      <main className="mx-auto w-full max-w-6xl px-4 pt-24 pb-12 sm:px-6">
-        {children}
-      </main>
+
+      <div className="flex min-h-screen flex-col pl-60">
+        <header className="glass sticky top-0 z-30 flex h-16 items-center justify-end gap-3 border-b border-border px-6">
+          <NotificationBell
+            key={unreadNotifications}
+            initialUnread={unreadNotifications}
+            items={notifications}
+            viewAllHref="/portal/notificacoes"
+          />
+          <UserMenu
+            name={user.name}
+            email={user.email}
+            image={profile?.avatarUrl ? `/api/avatar/${user.id}` : null}
+            profileHref="/portal/perfil"
+          />
+        </header>
+
+        <main className="flex-1 p-6">
+          <div className="mx-auto w-full max-w-6xl">{children}</div>
+        </main>
+      </div>
     </div>
   );
 }

@@ -6,6 +6,8 @@ import {
   ChevronDown,
   ExternalLink,
   Loader2,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -18,6 +20,7 @@ import {
   DemandStatusChip,
   PriorityChip,
 } from "@/components/chips";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -27,6 +30,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -35,6 +39,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Table,
   TableBody,
@@ -48,13 +53,20 @@ import { formatDate, timeAgo } from "@/lib/utils/format";
 import { cn } from "@/lib/utils";
 import {
   convertDemandSchema,
+  demandCategories,
+  demandCategoryLabels,
   demandStatusLabels,
   demandStatuses,
+  demandUpdateSchema,
   type ConvertDemandValues,
+  type DemandUpdateValues,
 } from "@/lib/validations/demand";
+import { priorities, priorityLabels } from "@/lib/validations/project";
 import type { Demand } from "@/lib/db/schema";
 import {
   convertDemandToTask,
+  deleteDemand,
+  updateDemand,
   updateDemandStatus,
 } from "@/server/actions/demands";
 
@@ -71,6 +83,8 @@ type DemandListProps = {
   teamUsers: SelectOption[];
   /** false na tab Demandas da empresa (esconde a coluna Empresa). */
   showCompany?: boolean;
+  /** super_admin: habilita editar/excluir demandas. */
+  canManage?: boolean;
 };
 
 /** Lista de demandas com linha expansível: descrição + triagem (status/conversão). */
@@ -80,10 +94,13 @@ export function DemandList({
   milestones,
   teamUsers,
   showCompany = true,
+  canManage = false,
 }: DemandListProps) {
   const router = useRouter();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [converting, setConverting] = useState<DemandListItem | null>(null);
+  const [editing, setEditing] = useState<DemandListItem | null>(null);
+  const [deleting, setDeleting] = useState<DemandListItem | null>(null);
   const [pending, startTransition] = useTransition();
 
   function changeStatus(demand: DemandListItem, status: Demand["status"]) {
@@ -176,6 +193,17 @@ export function DemandList({
                       className="bg-white/[0.02] align-top"
                     >
                       <div className="space-y-4 py-2">
+                        {demand.projectId && demand.projectName && (
+                          <p className="text-xs text-muted-foreground">
+                            Projeto:{" "}
+                            <Link
+                              href={`/admin/projetos/${demand.projectId}`}
+                              className="font-medium text-[#00d164] hover:underline"
+                            >
+                              {demand.projectName}
+                            </Link>
+                          </p>
+                        )}
                         <p className="max-w-3xl text-sm whitespace-pre-wrap text-muted-foreground">
                           {demand.description}
                         </p>
@@ -231,6 +259,30 @@ export function DemandList({
                               Converter em tarefa
                             </Button>
                           )}
+
+                          {canManage && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={pending}
+                              onClick={() => setEditing(demand)}
+                            >
+                              <Pencil />
+                              Editar
+                            </Button>
+                          )}
+                          {canManage && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={pending}
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => setDeleting(demand)}
+                            >
+                              <Trash2 />
+                              Excluir
+                            </Button>
+                          )}
                         </div>
                       </div>
                     </TableCell>
@@ -251,6 +303,36 @@ export function DemandList({
           open={converting !== null}
           onOpenChange={(open) => {
             if (!open) setConverting(null);
+          }}
+        />
+      )}
+
+      {editing && (
+        <EditDemandDialog
+          demand={editing}
+          projects={projects.filter((p) => p.companyId === editing.companyId)}
+          open={editing !== null}
+          onOpenChange={(open) => {
+            if (!open) setEditing(null);
+          }}
+        />
+      )}
+
+      {deleting && (
+        <ConfirmDialog
+          open={deleting !== null}
+          onOpenChange={(open) => {
+            if (!open) setDeleting(null);
+          }}
+          title="Excluir demanda"
+          description={`Tem certeza que deseja excluir "${deleting.title}"? Os anexos também serão removidos.${deleting.taskId ? " A tarefa vinculada criada a partir dela será mantida." : ""} Esta ação não pode ser desfeita.`}
+          onConfirm={async () => {
+            const result = await deleteDemand(deleting.id);
+            if ("error" in result) return result.error;
+            toast.success("Demanda excluída.");
+            setDeleting(null);
+            router.refresh();
+            return null;
           }}
         />
       )}
@@ -275,11 +357,17 @@ function ConvertDemandDialog({
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
-  const [selectedProjectId, setSelectedProjectId] = useState("");
+  const [selectedProjectId, setSelectedProjectId] = useState(
+    demand.projectId ?? "",
+  );
 
   const form = useForm<ConvertDemandValues>({
     resolver: zodResolver(convertDemandSchema),
-    defaultValues: { projectId: "", milestoneId: "", ownerId: "" },
+    defaultValues: {
+      projectId: demand.projectId ?? "",
+      milestoneId: "",
+      ownerId: "",
+    },
   });
   const { errors, isSubmitting } = form.formState;
   const projectMilestones = milestones.filter(
@@ -457,6 +545,206 @@ function ConvertDemandDialog({
             </DialogFooter>
           </form>
         )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** Edição da demanda pelo super admin (título, descrição, categoria, prioridade, projeto). */
+function EditDemandDialog({
+  demand,
+  projects,
+  open,
+  onOpenChange,
+}: {
+  demand: DemandListItem;
+  projects: SelectOption[];
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
+
+  const form = useForm<DemandUpdateValues>({
+    resolver: zodResolver(demandUpdateSchema),
+    defaultValues: {
+      projectId: demand.projectId ?? "",
+      title: demand.title,
+      category: demand.category,
+      priority: demand.priority,
+      description: demand.description,
+    },
+  });
+  const { errors, isSubmitting } = form.formState;
+
+  async function onSubmit(values: DemandUpdateValues) {
+    setError(null);
+    const result = await updateDemand(demand.id, values);
+    if ("error" in result) {
+      setError(result.error);
+      return;
+    }
+    toast.success("Demanda atualizada.");
+    onOpenChange(false);
+    router.refresh();
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Editar demanda</DialogTitle>
+          <DialogDescription>
+            Corrija os dados enviados pelo cliente. A demanda vinculada a uma
+            tarefa continua apontando para a mesma tarefa.
+          </DialogDescription>
+        </DialogHeader>
+
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="ed-title">Título *</Label>
+            <Input
+              id="ed-title"
+              aria-invalid={!!errors.title}
+              {...form.register("title")}
+            />
+            {errors.title && (
+              <p className="text-xs text-destructive">{errors.title.message}</p>
+            )}
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label>Categoria *</Label>
+              <Controller
+                control={form.control}
+                name="category"
+                render={({ field }) => (
+                  <Select
+                    value={field.value}
+                    onValueChange={(value) => field.onChange(value)}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue>
+                        {(value: string | null) => {
+                          const c = demandCategories.find((c) => c === value);
+                          return c ? demandCategoryLabels[c] : "";
+                        }}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {demandCategories.map((category) => (
+                        <SelectItem key={category} value={category}>
+                          {demandCategoryLabels[category]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Prioridade *</Label>
+              <Controller
+                control={form.control}
+                name="priority"
+                render={({ field }) => (
+                  <Select
+                    value={field.value}
+                    onValueChange={(value) => field.onChange(value)}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue>
+                        {(value: string | null) => {
+                          const p = priorities.find((p) => p === value);
+                          return p ? priorityLabels[p] : "";
+                        }}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {priorities.map((priority) => (
+                        <SelectItem key={priority} value={priority}>
+                          {priorityLabels[priority]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Projeto</Label>
+            <Controller
+              control={form.control}
+              name="projectId"
+              render={({ field }) => (
+                <Select
+                  value={field.value || NONE}
+                  onValueChange={(value) =>
+                    field.onChange(!value || value === NONE ? "" : value)
+                  }
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Sem projeto">
+                      {(value: string | null) =>
+                        !value || value === NONE
+                          ? "Sem projeto"
+                          : (projects.find((p) => p.id === value)?.name ??
+                            "Sem projeto")
+                      }
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE}>Sem projeto</SelectItem>
+                    {projects.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="ed-description">Descrição *</Label>
+            <Textarea
+              id="ed-description"
+              rows={6}
+              aria-invalid={!!errors.description}
+              {...form.register("description")}
+            />
+            {errors.description && (
+              <p className="text-xs text-destructive">
+                {errors.description.message}
+              </p>
+            )}
+          </div>
+
+          {error && (
+            <p className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {error}
+            </p>
+          )}
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isSubmitting}
+              onClick={() => onOpenChange(false)}
+            >
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting && <Loader2 className="animate-spin" />}
+              Salvar alterações
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );

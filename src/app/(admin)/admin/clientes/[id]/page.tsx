@@ -244,6 +244,7 @@ export default async function CompanyDetailPage({
                   milestones={milestones}
                   teamUsers={teamUsers}
                   showCompany={false}
+                  canManage={user.role === "super_admin"}
                 />
               )}
             </CardContent>

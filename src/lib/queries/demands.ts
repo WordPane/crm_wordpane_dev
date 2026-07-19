@@ -24,6 +24,8 @@ export type DemandListItem = {
   priority: Demand["priority"];
   status: Demand["status"];
   taskId: string | null;
+  projectId: string | null;
+  projectName: string | null;
   createdAt: Date;
   companyId: string;
   companyName: string;
@@ -59,6 +61,8 @@ export async function listDemands(
       priority: demands.priority,
       status: demands.status,
       taskId: demands.taskId,
+      projectId: demands.projectId,
+      projectName: projects.name,
       createdAt: demands.createdAt,
       companyId: companies.id,
       companyName: sql<string>`coalesce(${companies.nomeFantasia}, ${companies.razaoSocial})`,
@@ -66,6 +70,7 @@ export async function listDemands(
     })
     .from(demands)
     .innerJoin(companies, eq(demands.companyId, companies.id))
+    .leftJoin(projects, eq(demands.projectId, projects.id))
     .leftJoin(users, eq(demands.createdBy, users.id))
     .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy(desc(demands.createdAt));

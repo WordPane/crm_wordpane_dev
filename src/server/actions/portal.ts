@@ -301,11 +301,20 @@ export async function createPortalDemand(input: unknown): Promise<ActionResult> 
     const companyId = await requireClient(user);
     const data = portalDemandSchema.parse(input);
 
+    // O projeto precisa ser da própria empresa do cliente
+    const [project] = await db
+      .select({ id: projects.id })
+      .from(projects)
+      .where(and(eq(projects.id, data.projectId), eq(projects.companyId, companyId)))
+      .limit(1);
+    if (!project) return { error: "Projeto não encontrado." };
+
     const demandId = await db.transaction(async (tx) => {
       const [created] = await tx
         .insert(demands)
         .values({
           companyId,
+          projectId: data.projectId,
           title: data.title,
           description: data.description,
           category: data.category,

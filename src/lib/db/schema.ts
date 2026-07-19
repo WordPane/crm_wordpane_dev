@@ -388,6 +388,9 @@ export const demands = pgTable(
     companyId: uuid("company_id")
       .notNull()
       .references(() => companies.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id").references(() => projects.id, {
+      onDelete: "set null",
+    }), // projeto ao qual a demanda se refere
     title: varchar("title", { length: 220 }).notNull(),
     description: text("description").notNull(),
     category: demandCategoryEnum("category").notNull().default("outro"),
@@ -407,6 +410,7 @@ export const demands = pgTable(
   (t) => [
     index("demands_company_idx").on(t.companyId),
     index("demands_status_idx").on(t.status),
+    index("demands_project_idx").on(t.projectId),
   ],
 );
 
@@ -718,6 +722,10 @@ export const demandsRelations = relations(demands, ({ one }) => ({
     references: [companies.id],
   }),
   author: one(users, { fields: [demands.createdBy], references: [users.id] }),
+  project: one(projects, {
+    fields: [demands.projectId],
+    references: [projects.id],
+  }),
 }));
 
 export const quotesRelations = relations(quotes, ({ one, many }) => ({

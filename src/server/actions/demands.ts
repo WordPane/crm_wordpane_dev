@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 
 import {
   assertCompanyAccess,
+  requireSuperAdmin,
   requireTeam,
   requireUser,
   type SessionUser,
@@ -12,6 +13,7 @@ import {
 import { logActivity } from "@/lib/activities";
 import { db } from "@/lib/db";
 import {
+  attachments,
   demands,
   milestones,
   projects,
@@ -19,9 +21,11 @@ import {
   tasks,
   type Demand,
 } from "@/lib/db/schema";
+import { getStorage } from "@/lib/storage";
 import {
   convertDemandSchema,
   demandStatusLabels,
+  demandUpdateSchema,
 } from "@/lib/validations/demand";
 import { clientUsersOfCompany, notifyUsers } from "@/lib/notifications";
 import { actionError, type ActionResult } from "@/server/actions/utils";
@@ -174,6 +178,111 @@ export async function convertDemandToTask(
     revalidatePath(`/admin/tarefas/${created.id}`);
     revalidatePath(`/admin/projetos/${project.id}`);
     return { success: true, id: created.id };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+/** Edição da demanda (somente super_admin): título, descrição, categoria, prioridade e projeto. */
+export async function updateDemand(
+  demandId: string,
+  input: unknown,
+): Promise<ActionResult> {
+  try {
+    const user = await requireUser();
+    requireSuperAdmin(user);
+    const data = demandUpdateSchema.parse(input);
+
+    const [demand] = await db
+      .select()
+      .from(demands)
+      .where(eq(demands.id, demandId))
+      .limit(1);
+    if (!demand) return { error: "Demanda não encontrada." };
+
+    const projectId = data.projectId || null;
+    if (projectId) {
+      const [project] = await db
+        .select({ companyId: projects.companyId })
+        .from(projects)
+        .where(eq(projects.id, projectId))
+        .limit(1);
+      if (!project) return { error: "Projeto não encontrado." };
+      if (project.companyId !== demand.companyId) {
+        return { error: "O projeto precisa ser da mesma empresa da demanda." };
+      }
+    }
+
+    await db
+      .update(demands)
+      .set({
+        title: data.title,
+        description: data.description,
+        category: data.category,
+        priority: data.priority,
+        projectId,
+        updatedAt: new Date(),
+      })
+      .where(eq(demands.id, demandId));
+
+    await logActivity({
+      actorId: user.id,
+      companyId: demand.companyId,
+      entityType: "demand",
+      entityId: demandId,
+      action: "demand.updated",
+      metadata: { title: data.title },
+    });
+
+    revalidateDemand(demand.companyId);
+    revalidatePath("/portal/demandas");
+    return { success: true, id: demandId };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+/**
+ * Exclusão da demanda (somente super_admin), junto com os anexos.
+ * Se a demanda já foi convertida, a tarefa vinculada é mantida.
+ */
+export async function deleteDemand(demandId: string): Promise<ActionResult> {
+  try {
+    const user = await requireUser();
+    requireSuperAdmin(user);
+
+    const [demand] = await db
+      .select()
+      .from(demands)
+      .where(eq(demands.id, demandId))
+      .limit(1);
+    if (!demand) return { error: "Demanda não encontrada." };
+
+    // Anexos: remove os arquivos do storage (best-effort) e os registros
+    const demandAttachments = await db
+      .select()
+      .from(attachments)
+      .where(eq(attachments.demandId, demandId));
+    await db.delete(attachments).where(eq(attachments.demandId, demandId));
+    const storage = getStorage();
+    await Promise.allSettled(
+      demandAttachments.map((a) => storage.delete(a.fileKey)),
+    );
+
+    await db.delete(demands).where(eq(demands.id, demandId));
+
+    await logActivity({
+      actorId: user.id,
+      companyId: demand.companyId,
+      entityType: "demand",
+      entityId: demandId,
+      action: "demand.deleted",
+      metadata: { title: demand.title },
+    });
+
+    revalidateDemand(demand.companyId);
+    revalidatePath("/portal/demandas");
+    return { success: true };
   } catch (error) {
     return actionError(error);
   }
