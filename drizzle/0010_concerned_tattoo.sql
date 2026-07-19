@@ -1,0 +1,1 @@
+ALTER TABLE "services" ADD COLUMN "service_code" varchar(20);

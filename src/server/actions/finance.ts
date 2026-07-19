@@ -97,6 +97,7 @@ export async function createService(input: unknown): Promise<ActionResult> {
         defaultValueCents: valueCents,
         billing: data.billing,
         cycle: data.cycle,
+        serviceCode: data.serviceCode || null,
       })
       .returning({ id: services.id });
 
@@ -129,6 +130,7 @@ export async function updateService(
         defaultValueCents: valueCents,
         billing: data.billing,
         cycle: data.cycle,
+        serviceCode: data.serviceCode || null,
         updatedAt: new Date(),
       })
       .where(eq(services.id, serviceId));

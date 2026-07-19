@@ -520,6 +520,7 @@ export const services = pgTable("services", {
   defaultValueCents: integer("default_value_cents").notNull(),
   billing: serviceBillingEnum("billing").notNull().default("one_time"),
   cycle: subscriptionCycleEnum("cycle").notNull().default("monthly"), // só se recurring
+  serviceCode: varchar("service_code", { length: 20 }), // código municipal NFS-e (vazio = padrão do emissor)
   active: boolean("active").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()

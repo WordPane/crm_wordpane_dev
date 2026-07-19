@@ -6,7 +6,13 @@ import {
   downloadInvoiceFile,
 } from "@/lib/asaas/client";
 import { db } from "@/lib/db";
-import { charges, invoices, type Charge } from "@/lib/db/schema";
+import {
+  charges,
+  companyServices,
+  invoices,
+  services,
+  type Charge,
+} from "@/lib/db/schema";
 import { getIssuer } from "@/lib/issuer";
 import {
   clientUsersOfCompany,
@@ -42,6 +48,24 @@ export async function emitInvoiceForCharge(
 
     const issuer = await getIssuer();
 
+    // Código do serviço: o do serviço vinculado à cobrança (assinatura),
+    // ou o padrão do emissor quando não houver vínculo/código específico
+    let serviceCode = issuer.serviceCode;
+    let serviceName = issuer.serviceName;
+    if (charge.companyServiceId) {
+      const [linked] = await db
+        .select({
+          serviceCode: services.serviceCode,
+          serviceName: services.name,
+        })
+        .from(companyServices)
+        .innerJoin(services, eq(companyServices.serviceId, services.id))
+        .where(eq(companyServices.id, charge.companyServiceId))
+        .limit(1);
+      if (linked?.serviceCode) serviceCode = linked.serviceCode;
+      if (linked?.serviceName) serviceName = linked.serviceName;
+    }
+
     const [invoice] = await db
       .insert(invoices)
       .values({ chargeId: charge.id, status: "scheduled" })
@@ -53,8 +77,8 @@ export async function emitInvoiceForCharge(
         description: charge.description,
         valueCents: charge.valueCents,
         effectiveDate: format(new Date(), "yyyy-MM-dd"),
-        serviceCode: issuer.serviceCode,
-        serviceName: issuer.serviceName,
+        serviceCode,
+        serviceName,
       });
       await db
         .update(invoices)

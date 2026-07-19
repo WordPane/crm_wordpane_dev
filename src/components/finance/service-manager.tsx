@@ -164,6 +164,11 @@ export function ServiceManager({
                           {service.description}
                         </p>
                       )}
+                      {service.serviceCode && (
+                        <p className="text-xs text-muted-foreground">
+                          NFS-e: {service.serviceCode}
+                        </p>
+                      )}
                     </TableCell>
                     <TableCell className="text-right font-medium">
                       {formatCurrency(service.defaultValueCents)}
@@ -357,6 +362,7 @@ function ServiceFormDialog({
       defaultValue: service ? centsToInput(service.defaultValueCents) : "",
       billing: service?.billing ?? "one_time",
       cycle: service?.cycle ?? "monthly",
+      serviceCode: service?.serviceCode ?? "",
     },
   });
   const { errors, isSubmitting } = form.formState;
@@ -401,6 +407,20 @@ function ServiceFormDialog({
               placeholder="Opcional"
               {...form.register("description")}
             />
+          </Field>
+
+          <Field
+            label="Código do serviço (NFS-e)"
+            error={errors.serviceCode?.message}
+          >
+            <Input
+              placeholder="Vazio = código padrão do emissor"
+              {...form.register("serviceCode")}
+            />
+            <p className="text-xs text-muted-foreground">
+              Código municipal usado na emissão da nota fiscal deste serviço
+              (ex.: 01.01 para desenvolvimento de sistemas).
+            </p>
           </Field>
 
           <div className="grid gap-4 sm:grid-cols-3">

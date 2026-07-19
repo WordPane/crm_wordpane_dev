@@ -79,6 +79,13 @@ export const serviceFormSchema = z.object({
   defaultValue: z.string().trim().min(1, "Informe o valor padrão."),
   billing: z.enum(serviceBillings),
   cycle: z.enum(subscriptionCycles),
+  /** Código municipal de serviço para NFS-e (vazio = padrão do emissor). */
+  serviceCode: z
+    .string()
+    .trim()
+    .max(20, "Máximo de 20 caracteres.")
+    .optional()
+    .or(z.literal("")),
 });
 
 export type ServiceFormValues = z.infer<typeof serviceFormSchema>;
