@@ -110,6 +110,8 @@ export type LocalCycle = keyof typeof asaasCycle;
 /**
  * Garante que a empresa existe como customer no Asaas e retorna o id.
  * Persiste `companies.asaasCustomerId` para não duplicar (a API não deduplica).
+ * Sincroniza os dados cadastrais a cada uso: CPF/CNPJ preenchido depois da
+ * primeira cobrança é enviado ao Asaas (obrigatório para boleto/fatura).
  */
 export async function ensureCustomer(companyId: string): Promise<string> {
   const [company] = await db
@@ -118,34 +120,51 @@ export async function ensureCustomer(companyId: string): Promise<string> {
     .where(eq(companies.id, companyId))
     .limit(1);
   if (!company) throw new AsaasError("Empresa não encontrada.");
-  if (company.asaasCustomerId) return company.asaasCustomerId;
+
+  const name = company.nomeFantasia || company.razaoSocial;
+  const cpfCnpj = company.cnpj?.replace(/\D/g, "") || undefined;
+  const email = company.email ?? undefined;
 
   const settings = await requireSettings();
-
-  // Reutiliza cliente já existente com o mesmo externalReference
-  const existing = await request<ListResponse<AsaasCustomer>>(
-    settings,
-    "GET",
-    `/customers?externalReference=${encodeURIComponent(company.id)}&limit=1`,
-  );
-  let customerId = existing.data[0]?.id;
+  let customerId = company.asaasCustomerId;
 
   if (!customerId) {
-    const cpfCnpj = company.cnpj?.replace(/\D/g, "") || undefined;
-    const created = await request<AsaasCustomer>(settings, "POST", "/customers", {
-      name: company.nomeFantasia || company.razaoSocial,
-      cpfCnpj,
-      email: company.email ?? undefined,
-      externalReference: company.id,
-      notificationDisabled: false,
-    });
-    customerId = created.id;
+    // Reutiliza cliente já existente com o mesmo externalReference
+    const existing = await request<ListResponse<AsaasCustomer>>(
+      settings,
+      "GET",
+      `/customers?externalReference=${encodeURIComponent(company.id)}&limit=1`,
+    );
+    customerId = existing.data[0]?.id;
+
+    if (!customerId) {
+      const created = await request<AsaasCustomer>(
+        settings,
+        "POST",
+        "/customers",
+        {
+          name,
+          cpfCnpj,
+          email,
+          externalReference: company.id,
+          notificationDisabled: false,
+        },
+      );
+      customerId = created.id;
+    }
+
+    await db
+      .update(companies)
+      .set({ asaasCustomerId: customerId })
+      .where(eq(companies.id, company.id));
   }
 
-  await db
-    .update(companies)
-    .set({ asaasCustomerId: customerId })
-    .where(eq(companies.id, company.id));
+  // Mantém o cadastro do Asaas em dia (CPF/CNPJ, nome, e-mail)
+  await request(settings, "PUT", `/customers/${customerId}`, {
+    name,
+    cpfCnpj,
+    email,
+  });
 
   return customerId;
 }
