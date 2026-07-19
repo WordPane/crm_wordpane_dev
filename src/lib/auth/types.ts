@@ -8,6 +8,8 @@ declare module "next-auth" {
       id: string;
       role: UserRole;
       companyId: string | null;
+      /** Super admin que iniciou a impersonação (auto-login), quando houver. */
+      impersonatedBy?: string | null;
     } & DefaultSession["user"];
   }
 
@@ -23,5 +25,6 @@ declare module "@auth/core/jwt" {
     id: string;
     role: UserRole;
     companyId: string | null;
+    impersonatedBy?: string | null;
   }
 }

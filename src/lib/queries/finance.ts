@@ -10,6 +10,7 @@ import {
   charges,
   companies,
   companyServices,
+  invoices,
   services,
   type Charge,
   type CompanyService,
@@ -32,6 +33,8 @@ export type ChargeListItem = {
   createdAt: Date;
   quoteId: string | null;
   company: { id: string; name: string };
+  /** Nota fiscal da cobrança (quando emitida). */
+  invoice: { id: string; status: string; number: string | null } | null;
 };
 
 /** Cobranças no escopo do usuário (mais recentes primeiro), filtráveis. */
@@ -62,9 +65,13 @@ export async function listCharges(
       quoteId: charges.quoteId,
       companyId: companies.id,
       companyName: companyName,
+      invoiceId: invoices.id,
+      invoiceStatus: invoices.status,
+      invoiceNumber: invoices.number,
     })
     .from(charges)
     .innerJoin(companies, eq(charges.companyId, companies.id))
+    .leftJoin(invoices, eq(invoices.chargeId, charges.id))
     .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy(desc(charges.createdAt));
 
@@ -80,6 +87,10 @@ export async function listCharges(
     createdAt: r.createdAt,
     quoteId: r.quoteId,
     company: { id: r.companyId, name: r.companyName },
+    invoice:
+      r.invoiceId && r.invoiceStatus
+        ? { id: r.invoiceId, status: r.invoiceStatus, number: r.invoiceNumber }
+        : null,
   }));
 }
 

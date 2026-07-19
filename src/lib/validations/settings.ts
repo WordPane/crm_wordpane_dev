@@ -60,3 +60,47 @@ export const asaasSettingsSchema = z.object({
 });
 
 export type AsaasSettingsValues = z.infer<typeof asaasSettingsSchema>;
+
+/** Dados do emissor exibidos no PDF do orçamento (app_settings["issuer.info"]). */
+export const issuerSettingsSchema = z.object({
+  displayName: z
+    .string()
+    .trim()
+    .min(1, "Nome de exibição é obrigatório.")
+    .max(120, "Máximo de 120 caracteres."),
+  razaoSocial: z
+    .string()
+    .trim()
+    .min(1, "Razão social é obrigatória.")
+    .max(255, "Máximo de 255 caracteres."),
+  cnpj: z
+    .string()
+    .trim()
+    .min(1, "CNPJ é obrigatório.")
+    .max(18, "Máximo de 18 caracteres."),
+  email: z
+    .email("Informe um e-mail válido.")
+    .max(255, "Máximo de 255 caracteres."),
+  phone: z
+    .string()
+    .trim()
+    .min(1, "Telefone é obrigatório.")
+    .max(20, "Máximo de 20 caracteres."),
+  addressLine: z
+    .string()
+    .trim()
+    .min(1, "Endereço é obrigatório.")
+    .max(255, "Máximo de 255 caracteres."),
+  serviceCode: z
+    .string()
+    .trim()
+    .min(1, "Código do serviço é obrigatório.")
+    .max(20, "Máximo de 20 caracteres."),
+  serviceName: z
+    .string()
+    .trim()
+    .min(1, "Nome do serviço é obrigatório.")
+    .max(120, "Máximo de 120 caracteres."),
+});
+
+export type IssuerSettingsValues = z.infer<typeof issuerSettingsSchema>;

@@ -198,6 +198,47 @@ export default async function PortalFinancePage() {
                       <span>Paga em {formatDate(charge.paidAt)}</span>
                       <span>{chargeBillingTypeLabels[charge.billingType]}</span>
                     </div>
+                    {charge.invoice?.status === "authorized" && (
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <span className="text-xs text-muted-foreground">
+                          Nota fiscal:
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          render={
+                            <a
+                              href={`/api/invoices/${charge.invoice.id}/pdf`}
+                              target="_blank"
+                              rel="noreferrer"
+                            />
+                          }
+                        >
+                          <ExternalLink />
+                          PDF
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          render={
+                            <a
+                              href={`/api/invoices/${charge.invoice.id}/xml`}
+                              target="_blank"
+                              rel="noreferrer"
+                            />
+                          }
+                        >
+                          <ExternalLink />
+                          XML
+                        </Button>
+                      </div>
+                    )}
+                    {(charge.invoice?.status === "scheduled" ||
+                      charge.invoice?.status === "synchronized") && (
+                      <p className="mt-3 text-xs text-muted-foreground">
+                        Nota fiscal em emissão — fica disponível em instantes.
+                      </p>
+                    )}
                   </li>
                 ))}
               </ul>

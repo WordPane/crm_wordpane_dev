@@ -168,7 +168,11 @@ export default async function CompanyDetailPage({
         </TabsContent>
 
         <TabsContent value="usuarios" className="pt-4">
-          <CompanyUsersSection companyId={company.id} users={companyUsers} />
+          <CompanyUsersSection
+            companyId={company.id}
+            users={companyUsers}
+            canImpersonate={user.role === "super_admin"}
+          />
         </TabsContent>
 
         <TabsContent value="projetos" className="pt-4">

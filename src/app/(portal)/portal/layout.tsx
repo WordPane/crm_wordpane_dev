@@ -1,4 +1,3 @@
-import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { PortalSidebar } from "@/components/layout/portal-sidebar";
@@ -10,8 +9,6 @@ import { requireUser } from "@/lib/access/permissions";
 import { countUnread, listNotifications } from "@/lib/queries/notifications";
 import { getPortalCompany, getPortalProfile } from "@/lib/queries/portal";
 import { logout } from "@/server/actions/auth";
-
-export const metadata: Metadata = { title: "Portal do cliente" };
 
 export default async function PortalLayout({
   children,
@@ -58,6 +55,20 @@ export default async function PortalLayout({
       />
 
       <div className="flex min-h-screen flex-col pl-60">
+        {user.impersonatedBy && (
+          <div className="flex items-center justify-center gap-3 bg-amber-400 px-4 py-2 text-sm font-medium text-amber-950">
+            Você está acessando como {user.name} (impersonação do super admin).
+            <form action={logout}>
+              <button
+                type="submit"
+                className="font-semibold underline underline-offset-2"
+              >
+                Sair
+              </button>
+            </form>
+          </div>
+        )}
+
         <header className="glass sticky top-0 z-30 flex h-16 items-center justify-end gap-3 border-b border-border px-6">
           <NotificationBell
             key={unreadNotifications}

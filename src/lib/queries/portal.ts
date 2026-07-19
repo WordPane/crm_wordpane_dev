@@ -14,6 +14,7 @@ import {
   companies,
   companyServices,
   demands,
+  invoices,
   milestones,
   projectLinks,
   projects,
@@ -959,6 +960,8 @@ export type PortalChargeItem = {
   paidAt: Date | null;
   createdAt: Date;
   asaasPaymentId: string | null;
+  /** Nota fiscal da cobrança (quando emitida). */
+  invoice: { id: string; status: "scheduled" | "synchronized" | "authorized" | "error" | "canceled" } | null;
 };
 
 /** Cobranças da empresa do cliente (mais recentes primeiro). */
@@ -967,7 +970,7 @@ export async function listPortalCharges(
 ): Promise<PortalChargeItem[]> {
   const companyId = requireClientCompanyId(user);
 
-  return db
+  const rows = await db
     .select({
       id: charges.id,
       description: charges.description,
@@ -980,10 +983,31 @@ export async function listPortalCharges(
       paidAt: charges.paidAt,
       createdAt: charges.createdAt,
       asaasPaymentId: charges.asaasPaymentId,
+      invoiceId: invoices.id,
+      invoiceStatus: invoices.status,
     })
     .from(charges)
+    .leftJoin(invoices, eq(invoices.chargeId, charges.id))
     .where(eq(charges.companyId, companyId))
     .orderBy(desc(charges.createdAt));
+
+  return rows.map((r) => ({
+    id: r.id,
+    description: r.description,
+    valueCents: r.valueCents,
+    billingType: r.billingType,
+    dueDate: r.dueDate,
+    status: r.status,
+    invoiceUrl: r.invoiceUrl,
+    bankSlipUrl: r.bankSlipUrl,
+    paidAt: r.paidAt,
+    createdAt: r.createdAt,
+    asaasPaymentId: r.asaasPaymentId,
+    invoice:
+      r.invoiceId && r.invoiceStatus
+        ? { id: r.invoiceId, status: r.invoiceStatus }
+        : null,
+  }));
 }
 
 export type PortalSubscriptionItem = {

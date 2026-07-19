@@ -106,6 +106,8 @@ function describe(activity: ActivityItem): string {
       return `ativou o serviço "${str(m.service) ?? ""}" (${str(m.value) ?? ""})`;
     case "service.deactivated":
       return `cancelou a assinatura de "${str(m.service) ?? ""}"`;
+    case "auth.impersonated":
+      return `${str(m.admin) ?? "O super admin"} acessou o portal como ${str(m.user) ?? ""}`;
     default:
       return activity.action;
   }

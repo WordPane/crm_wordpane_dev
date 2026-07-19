@@ -13,6 +13,8 @@ export type SessionUser = {
   image?: string | null;
   role: UserRole;
   companyId: string | null;
+  /** Super admin que iniciou a impersonação (auto-login), quando houver. */
+  impersonatedBy?: string | null;
 };
 
 export class ForbiddenError extends Error {
@@ -33,6 +35,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
     image: session.user.image,
     role: session.user.role,
     companyId: session.user.companyId ?? null,
+    impersonatedBy: session.user.impersonatedBy ?? null,
   };
 }
 

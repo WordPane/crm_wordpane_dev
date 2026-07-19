@@ -33,7 +33,11 @@ export async function GET(
   try {
     const response = await fetch(
       `https://brasilapi.com.br/api/cnpj/v1/${digits}`,
-      { next: { revalidate: 86400 } }, // dados cadastrais mudam raramente
+      {
+        // BrasilAPI limita requisições sem User-Agent (HTTP 429)
+        headers: { "User-Agent": "wordpane-crm/1.0 (hello@wordpane.dev)" },
+        next: { revalidate: 86400 }, // dados cadastrais mudam raramente
+      },
     );
 
     if (response.status === 404) {

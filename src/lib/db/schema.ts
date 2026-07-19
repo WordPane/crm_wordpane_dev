@@ -108,6 +108,13 @@ export const chargeStatusEnum = pgEnum("charge_status", [
   "refunded",
   "cancelled",
 ]);
+export const invoiceStatusEnum = pgEnum("invoice_status", [
+  "scheduled",
+  "synchronized",
+  "authorized",
+  "error",
+  "canceled",
+]);
 export const personTypeEnum = pgEnum("person_type", ["pj", "pf"]);
 
 // ─────────────────────────── Empresas (clientes) ───────────────────────────
@@ -592,6 +599,35 @@ export const charges = pgTable(
   ],
 );
 
+/** Notas fiscais de serviço (NFS-e) emitidas via Asaas após o pagamento. */
+export const invoices = pgTable(
+  "invoices",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    chargeId: uuid("charge_id")
+      .notNull()
+      .references(() => charges.id, { onDelete: "cascade" }),
+    asaasInvoiceId: varchar("asaas_invoice_id", { length: 40 }),
+    status: invoiceStatusEnum("status").notNull().default("scheduled"),
+    number: varchar("number", { length: 40 }),
+    pdfKey: text("pdf_key"), // PDF da nota no storage interno
+    xmlKey: text("xml_key"), // XML da nota no storage interno
+    asaasPdfUrl: text("asaas_pdf_url"),
+    asaasXmlUrl: text("asaas_xml_url"),
+    errorMessage: text("error_message"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("invoices_charge_key").on(t.chargeId), // 1 NF por cobrança
+    index("invoices_status_idx").on(t.status),
+  ],
+);
+
 /** Dedup de webhooks do Asaas (entrega at-least-once). */
 export const webhookEvents = pgTable("webhook_events", {
   id: text("id").primaryKey(), // evt_... do Asaas
@@ -910,6 +946,13 @@ export const chargesRelations = relations(charges, ({ one }) => ({
   creator: one(users, { fields: [charges.createdBy], references: [users.id] }),
 }));
 
+export const invoicesRelations = relations(invoices, ({ one }) => ({
+  charge: one(charges, {
+    fields: [invoices.chargeId],
+    references: [charges.id],
+  }),
+}));
+
 export const projectLinksRelations = relations(projectLinks, ({ one }) => ({
   project: one(projects, {
     fields: [projectLinks.projectId],
@@ -958,6 +1001,8 @@ export type NewService = typeof services.$inferInsert;
 export type CompanyService = typeof companyServices.$inferSelect;
 export type Charge = typeof charges.$inferSelect;
 export type NewCharge = typeof charges.$inferInsert;
+export type Invoice = typeof invoices.$inferSelect;
+export type NewInvoice = typeof invoices.$inferInsert;
 export type ClientRegistration = typeof clientRegistrations.$inferSelect;
 export type NewClientRegistration = typeof clientRegistrations.$inferInsert;
 export type ProjectLink = typeof projectLinks.$inferSelect;

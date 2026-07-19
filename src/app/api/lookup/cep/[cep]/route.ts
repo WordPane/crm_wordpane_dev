@@ -29,7 +29,10 @@ export async function GET(
   try {
     const response = await fetch(
       `https://viacep.com.br/ws/${digits}/json/`,
-      { next: { revalidate: 86400 } },
+      {
+        headers: { "User-Agent": "wordpane-crm/1.0 (hello@wordpane.dev)" },
+        next: { revalidate: 86400 },
+      },
     );
     if (!response.ok) {
       return NextResponse.json(

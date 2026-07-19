@@ -3,6 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Loader2,
+  LogIn,
   MoreHorizontal,
   Pencil,
   Plus,
@@ -66,13 +67,17 @@ import {
   createCompanyUser,
   updateCompanyUser,
 } from "@/server/actions/company-users";
+import { impersonateUser } from "@/server/actions/impersonate";
 
 export function CompanyUsersSection({
   companyId,
   users,
+  canImpersonate = false,
 }: {
   companyId: string;
   users: CompanyUserItem[];
+  /** super admin: habilita "Acessar como" (auto-login no portal do cliente). */
+  canImpersonate?: boolean;
 }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<CompanyUserItem | null>(null);
@@ -162,6 +167,17 @@ export function CompanyUsersSection({
                           <Pencil />
                           Editar
                         </DropdownMenuItem>
+                        {canImpersonate && u.status !== "suspended" && (
+                          <DropdownMenuItem
+                            onClick={() => {
+                              toast.info(`Acessando como ${u.name}...`);
+                              impersonateUser(u.id);
+                            }}
+                          >
+                            <LogIn />
+                            Acessar como
+                          </DropdownMenuItem>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>

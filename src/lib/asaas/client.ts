@@ -217,6 +217,65 @@ export async function deleteSubscription(
   await request(settings, "DELETE", `/subscriptions/${asaasSubscriptionId}`);
 }
 
+// ─────────────────────────── Notas fiscais (NFS-e) ───────────────────────────
+
+export type AsaasInvoice = { id: string };
+
+/**
+ * Agenda/emite a NFS-e de uma cobrança paga. Se effectiveDate for hoje,
+ * o Asaas autoriza em ~15 min e avisa via webhook (INVOICE_AUTHORIZED).
+ */
+export async function createInvoice(input: {
+  paymentId: string;
+  description: string;
+  valueCents: number;
+  effectiveDate: string; // YYYY-MM-DD
+  serviceCode: string;
+  serviceName: string;
+}): Promise<AsaasInvoice> {
+  const settings = await requireSettings();
+  return request<AsaasInvoice>(settings, "POST", "/invoices", {
+    payment: input.paymentId,
+    serviceDescription: input.description,
+    value: input.valueCents / 100,
+    deductions: 0,
+    effectiveDate: input.effectiveDate,
+    municipalServiceCode: input.serviceCode,
+    municipalServiceName: input.serviceName,
+    // Simples Nacional: impostos recolhidos via DAS, não na nota
+    taxes: {
+      retainIss: false,
+      iss: 0,
+      cofins: 0,
+      csll: 0,
+      inss: 0,
+      ir: 0,
+      pis: 0,
+    },
+  });
+}
+
+/** Baixa um arquivo da nota (pdfUrl/xmlUrl do Asaas) para o storage interno. */
+export async function downloadInvoiceFile(url: string): Promise<Buffer> {
+  let response = await fetch(url, { cache: "no-store" });
+  if (response.status === 401 || response.status === 403) {
+    const settings = await requireSettings();
+    response = await fetch(url, {
+      headers: {
+        access_token: settings.apiKey,
+        "User-Agent": "wordpane-crm",
+      },
+      cache: "no-store",
+    });
+  }
+  if (!response.ok) {
+    throw new AsaasError(
+      `Falha ao baixar o arquivo da nota fiscal (HTTP ${response.status}).`,
+    );
+  }
+  return Buffer.from(await response.arrayBuffer());
+}
+
 // ─────────────────────────── Teste de conexão ───────────────────────────
 
 /** Valida a API key com uma chamada barata (lista 1 cliente). */

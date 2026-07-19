@@ -152,16 +152,13 @@ export async function convertDemandToTask(
       })
       .returning({ id: tasks.id });
 
-    // Demanda sai da triagem quando ainda estava aberta/em análise
-    const nextStatus =
-      demand.status === "aberta" || demand.status === "em_analise"
-        ? "em_andamento"
-        : demand.status;
-
+    // A demanda deixa de existir: anexos migram para a tarefa e o
+    // acompanhamento passa a ser só pela tarefa (admin e portal)
     await db
-      .update(demands)
-      .set({ taskId: created.id, status: nextStatus, updatedAt: new Date() })
-      .where(eq(demands.id, demandId));
+      .update(attachments)
+      .set({ taskId: created.id, demandId: null })
+      .where(eq(attachments.demandId, demandId));
+    await db.delete(demands).where(eq(demands.id, demandId));
 
     await logActivity({
       actorId: user.id,
@@ -171,6 +168,15 @@ export async function convertDemandToTask(
       entityId: demandId,
       action: "demand.converted",
       metadata: { title: demand.title, project: project.name },
+    });
+
+    // A demanda some do portal — o cliente acompanha pela tarefa gerada
+    const recipients = await clientUsersOfCompany(demand.companyId);
+    await notifyUsers(recipients, {
+      type: "demand.converted",
+      title: `Demanda virou tarefa: "${demand.title}"`,
+      body: `A equipe converteu sua demanda em uma tarefa do projeto "${project.name}".`,
+      href: `/portal/projetos/${project.id}/tarefas/${created.id}`,
     });
 
     revalidateDemand(demand.companyId);

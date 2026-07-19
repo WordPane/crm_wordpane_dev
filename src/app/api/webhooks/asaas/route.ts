@@ -11,6 +11,12 @@ import {
   type Charge,
 } from "@/lib/db/schema";
 import {
+  emitInvoiceForCharge,
+  processInvoiceAuthorized,
+  processInvoiceCanceled,
+  processInvoiceError,
+} from "@/lib/invoices";
+import {
   clientUsersOfCompany,
   notifyUsers,
   teamUsersOfCompany,
@@ -37,10 +43,19 @@ type WebhookPayment = {
   bankSlipUrl?: string;
 };
 
+type WebhookInvoice = {
+  id: string;
+  number?: string | number | null;
+  pdfUrl?: string | null;
+  xmlUrl?: string | null;
+  statusDescription?: string | null;
+};
+
 type WebhookEvent = {
   id?: string;
   event?: string;
   payment?: WebhookPayment;
+  invoice?: WebhookInvoice;
 };
 
 const BILLING_TYPE_REVERSE: Record<string, Charge["billingType"]> = {
@@ -94,7 +109,7 @@ export async function POST(request: Request) {
   }
 
   const body = (await request.json().catch(() => null)) as WebhookEvent | null;
-  if (!body?.id || !body.event || !body.payment?.id) {
+  if (!body?.id || !body.event || (!body.payment?.id && !body.invoice?.id)) {
     return NextResponse.json({ error: "Payload inválido." }, { status: 400 });
   }
 
@@ -111,6 +126,32 @@ export async function POST(request: Request) {
   const payment = body.payment;
 
   try {
+    // Eventos de nota fiscal (NFS-e)
+    if (body.event.startsWith("INVOICE_") && body.invoice) {
+      switch (body.event) {
+        case "INVOICE_AUTHORIZED":
+          await processInvoiceAuthorized(body.invoice);
+          break;
+        case "INVOICE_ERROR":
+          await processInvoiceError({
+            id: body.invoice.id,
+            message: body.invoice.statusDescription,
+          });
+          break;
+        case "INVOICE_CANCELED":
+          await processInvoiceCanceled({ id: body.invoice.id });
+          break;
+        default:
+          break;
+      }
+      return NextResponse.json({ received: true });
+    }
+
+    // Evento de cobrança sem payment válido — nada a fazer
+    if (!payment) {
+      return NextResponse.json({ received: true });
+    }
+
     // Cobrança nova gerada por assinatura → cria espelho local
     if (body.event === "PAYMENT_CREATED" && payment.subscription) {
       const [companyService] = await db
@@ -183,6 +224,8 @@ export async function POST(request: Request) {
           body: `O pagamento de ${formatCurrency(charge.valueCents)} foi confirmado pelo Asaas.`,
           href: "/admin/financeiro",
         });
+        // Emite a NFS-e automaticamente (best-effort, não bloqueia o webhook)
+        await emitInvoiceForCharge(charge);
         break;
       }
       case "PAYMENT_OVERDUE": {

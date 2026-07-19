@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ChargeStatusChip } from "@/components/chips";
 import { CancelChargeButton } from "@/components/finance/cancel-charge-button";
 import { ChargeFilters } from "@/components/finance/charge-filters";
+import { EmitInvoiceButton } from "@/components/finance/emit-invoice-button";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -185,6 +186,48 @@ export default async function FinancePage({
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center justify-end gap-1">
+                      {charge.invoice?.status === "authorized" && (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            render={
+                              <a
+                                href={`/api/invoices/${charge.invoice.id}/pdf`}
+                                target="_blank"
+                                rel="noreferrer"
+                              />
+                            }
+                          >
+                            NF PDF
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            render={
+                              <a
+                                href={`/api/invoices/${charge.invoice.id}/xml`}
+                                target="_blank"
+                                rel="noreferrer"
+                              />
+                            }
+                          >
+                            XML
+                          </Button>
+                        </>
+                      )}
+                      {(charge.invoice?.status === "scheduled" ||
+                        charge.invoice?.status === "synchronized") && (
+                        <span className="text-xs whitespace-nowrap text-muted-foreground">
+                          NF emitindo...
+                        </span>
+                      )}
+                      {(charge.status === "received" ||
+                        charge.status === "confirmed") &&
+                        (!charge.invoice ||
+                          charge.invoice.status === "error") && (
+                          <EmitInvoiceButton chargeId={charge.id} />
+                        )}
                       {charge.invoiceUrl && (
                         <Button
                           variant="ghost"

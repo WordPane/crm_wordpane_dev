@@ -22,9 +22,11 @@ import { db } from "@/lib/db";
 import {
   charges,
   companyServices,
+  invoices,
   quotes,
   services,
 } from "@/lib/db/schema";
+import { emitInvoiceForCharge } from "@/lib/invoices";
 import { clientUsersOfCompany, notifyUsers } from "@/lib/notifications";
 import {
   formatCurrency,
@@ -528,6 +530,48 @@ export async function deactivateService(
     });
 
     revalidateFinance(companyService.companyId);
+    return { success: true };
+  } catch (error) {
+    return financeError(error);
+  }
+}
+
+/**
+ * Emissão manual da NFS-e de uma cobrança paga (equipe).
+ * Idempotente; se a emissão anterior falhou, tenta novamente.
+ */
+export async function emitChargeInvoice(chargeId: string): Promise<ActionResult> {
+  try {
+    const user = await requireUser();
+    requireTeam(user);
+
+    const [charge] = await db
+      .select()
+      .from(charges)
+      .where(eq(charges.id, chargeId))
+      .limit(1);
+    if (!charge) return { error: "Cobrança não encontrada." };
+    await assertCompanyAccess(user, charge.companyId);
+    if (charge.status !== "received" && charge.status !== "confirmed") {
+      return { error: "A nota fiscal só pode ser emitida após o pagamento." };
+    }
+
+    // Retry: remove o registro de erro anterior para emitir de novo
+    const [failed] = await db
+      .select({ id: invoices.id, status: invoices.status })
+      .from(invoices)
+      .where(eq(invoices.chargeId, chargeId))
+      .limit(1);
+    if (failed && failed.status !== "error") {
+      return { error: "Esta cobrança já possui nota fiscal emitida ou em emissão." };
+    }
+    if (failed) {
+      await db.delete(invoices).where(eq(invoices.id, failed.id));
+    }
+
+    await emitInvoiceForCharge(charge);
+
+    revalidateFinance(charge.companyId);
     return { success: true };
   } catch (error) {
     return financeError(error);
