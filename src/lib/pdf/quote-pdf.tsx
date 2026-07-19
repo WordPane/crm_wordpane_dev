@@ -296,8 +296,7 @@ function QuotePdfDocument({
 
         <View style={styles.footer} fixed>
           <Text>
-            {issuer.displayName} · {issuer.razaoSocial} · CNPJ {issuer.cnpj} ·{" "}
-            {issuer.email}
+            {issuer.razaoSocial} · CNPJ {issuer.cnpj} · {issuer.email}
           </Text>
           <Text>
             Orçamento {number} gerado em {formatDate(new Date())}
