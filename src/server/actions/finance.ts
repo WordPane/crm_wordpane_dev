@@ -27,7 +27,11 @@ import {
   services,
 } from "@/lib/db/schema";
 import { emitInvoiceForCharge } from "@/lib/invoices";
-import { clientUsersOfCompany, notifyUsers } from "@/lib/notifications";
+import {
+  clientUsersOfCompany,
+  notifyChargeReminder,
+  notifyUsers,
+} from "@/lib/notifications";
 import {
   formatCurrency,
   formatDate,
@@ -576,6 +580,34 @@ export async function emitChargeInvoice(chargeId: string): Promise<ActionResult>
       revalidateFinance(charge.companyId);
       return { error: result.error };
     }
+
+    revalidateFinance(charge.companyId);
+    return { success: true };
+  } catch (error) {
+    return financeError(error);
+  }
+}
+
+/** Reenvia o e-mail/notificação da cobrança em aberto para o cliente. */
+export async function resendChargeNotification(
+  chargeId: string,
+): Promise<ActionResult> {
+  try {
+    const user = await requireUser();
+    requireTeam(user);
+
+    const [charge] = await db
+      .select()
+      .from(charges)
+      .where(eq(charges.id, chargeId))
+      .limit(1);
+    if (!charge) return { error: "Cobrança não encontrada." };
+    await assertCompanyAccess(user, charge.companyId);
+    if (charge.status !== "pending" && charge.status !== "overdue") {
+      return { error: "Só é possível reenviar cobranças em aberto." };
+    }
+
+    await notifyChargeReminder(charge);
 
     revalidateFinance(charge.companyId);
     return { success: true };

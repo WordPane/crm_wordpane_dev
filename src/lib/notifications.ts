@@ -3,12 +3,15 @@ import { and, eq, inArray, or, type SQL } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   adminCompanyAssignments,
+  charges,
   notifications,
   users,
+  type Charge,
 } from "@/lib/db/schema";
 import { sendEmail } from "@/lib/email/mailer";
 import { getEmailSettings } from "@/lib/email/settings";
 import type { EmailTemplateRow } from "@/lib/email/templates";
+import { formatCurrency, formatDate } from "@/lib/utils/format";
 
 export type NotificationInput = {
   /** comment | demand.created | demand.status | upload | quote.sent | quote.approved | quote.rejected */
@@ -156,4 +159,35 @@ export async function clientUsersOfCompany(
       ),
     );
   return rows.map((r) => r.id);
+}
+
+/**
+ * Lembrete de cobrança em aberto/vencida para os usuários da empresa
+ * (notificação interna + e-mail com o link do portal).
+ * Atualiza `lastReminderAt` — usado pelo lembrete diário (cron) e pelo
+ * reenvio manual no financeiro.
+ */
+export async function notifyChargeReminder(charge: Charge): Promise<void> {
+  const overdue = charge.status === "overdue";
+  const recipients = await clientUsersOfCompany(charge.companyId);
+  await notifyUsers(recipients, {
+    type: "charge.reminder",
+    title: overdue
+      ? `Cobrança vencida: ${charge.description}`
+      : `Lembrete de cobrança: ${charge.description}`,
+    body: overdue
+      ? `A cobrança de ${formatCurrency(charge.valueCents)} venceu em ${formatDate(charge.dueDate)} e ainda está em aberto. Regularize pelo portal.`
+      : `Lembramos que a cobrança de ${formatCurrency(charge.valueCents)} com vencimento em ${formatDate(charge.dueDate)} segue em aberto.`,
+    href: "/portal/financeiro",
+    rows: [
+      { label: "Descrição", value: charge.description },
+      { label: "Valor", value: formatCurrency(charge.valueCents) },
+      { label: "Vencimento", value: formatDate(charge.dueDate) },
+    ],
+  });
+
+  await db
+    .update(charges)
+    .set({ lastReminderAt: new Date() })
+    .where(eq(charges.id, charge.id));
 }

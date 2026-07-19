@@ -85,6 +85,20 @@
       "when": 1784475596143,
       "tag": "0011_magenta_pepper_potts",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1784480391347,
+      "tag": "0012_chunky_stranger",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1784481059016,
+      "tag": "0013_chubby_sage",
+      "breakpoints": true
     }
   ]
 }

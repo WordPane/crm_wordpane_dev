@@ -10,6 +10,11 @@ import {
   type SessionUser,
 } from "@/lib/access/permissions";
 import { logActivity } from "@/lib/activities";
+import {
+  getCommentAuthorId,
+  notifyCommentMentions,
+  resolveCommentParent,
+} from "@/lib/comments";
 import { db } from "@/lib/db";
 import {
   attachments,
@@ -79,9 +84,20 @@ export async function createPortalComment(
       .limit(1);
     if (!row) return { error: "Tarefa não encontrada." };
 
+    const parentId = await resolveCommentParent(taskId, data.parentId);
+    const parentAuthorId = parentId
+      ? await getCommentAuthorId(parentId)
+      : null;
+
     const [created] = await db
       .insert(comments)
-      .values({ taskId, authorId: user.id, body: data.body })
+      .values({
+        taskId,
+        authorId: user.id,
+        parentId,
+        mentions: data.mentions ?? null,
+        body: data.body,
+      })
       .returning({ id: comments.id });
 
     await logActivity({
@@ -108,6 +124,18 @@ export async function createPortalComment(
         href: `/admin/tarefas/${taskId}`,
       },
     );
+
+    // Menções com @ e resposta a comentário
+    await notifyCommentMentions({
+      mentionIds: data.mentions,
+      authorId: user.id,
+      authorName: user.name,
+      taskId,
+      taskTitle: row.task.title,
+      projectId: row.project.id,
+      excerpt: data.body.slice(0, 140),
+      parentAuthorId,
+    });
 
     revalidatePath(`/portal/projetos/${row.project.id}/tarefas/${taskId}`);
     revalidatePortalProject(row.project.id);

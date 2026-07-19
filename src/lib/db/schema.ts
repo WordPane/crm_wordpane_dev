@@ -375,6 +375,10 @@ export const comments = pgTable(
     authorId: uuid("author_id")
       .notNull()
       .references(() => users.id),
+    parentId: uuid("parent_id").references((): AnyPgColumn => comments.id, {
+      onDelete: "set null",
+    }), // resposta a outro comentário (thread de 1 nível)
+    mentions: jsonb("mentions").$type<string[]>(), // ids de usuários mencionados com @
     body: text("body").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -587,6 +591,7 @@ export const charges = pgTable(
     invoiceUrl: text("invoice_url"),
     bankSlipUrl: text("bank_slip_url"),
     paidAt: timestamp("paid_at", { withTimezone: true }),
+    lastReminderAt: timestamp("last_reminder_at", { withTimezone: true }), // último lembrete enviado
     createdBy: uuid("created_by").references(() => users.id), // null = via webhook
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()

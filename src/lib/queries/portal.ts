@@ -656,6 +656,8 @@ export async function getPortalTask(
         .select({
           id: comments.id,
           body: comments.body,
+          parentId: comments.parentId,
+          mentions: comments.mentions,
           createdAt: comments.createdAt,
           authorId: users.id,
           authorName: users.name,
@@ -683,6 +685,19 @@ export async function getPortalTask(
         .orderBy(desc(attachments.createdAt)),
     ]);
 
+  // Nomes dos mencionados (para destacar no texto)
+  const mentionIds = [
+    ...new Set(commentRows.flatMap((c) => c.mentions ?? [])),
+  ] as string[];
+  const mentionNameMap = new Map<string, string>();
+  if (mentionIds.length > 0) {
+    const mentioned = await db
+      .select({ id: users.id, name: users.name })
+      .from(users)
+      .where(inArray(users.id, mentionIds));
+    for (const u of mentioned) mentionNameMap.set(u.id, u.name);
+  }
+
   return {
     task: row.task,
     project: { id: row.project.id, name: row.project.name },
@@ -694,6 +709,10 @@ export async function getPortalTask(
       id: c.id,
       body: c.body,
       createdAt: c.createdAt,
+      parentId: c.parentId,
+      mentionNames: (c.mentions ?? [])
+        .map((id) => mentionNameMap.get(id))
+        .filter((name): name is string => Boolean(name)),
       author: c.authorId
         ? {
             id: c.authorId,

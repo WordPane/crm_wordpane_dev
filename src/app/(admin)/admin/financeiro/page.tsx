@@ -6,6 +6,7 @@ import { ChargeStatusChip } from "@/components/chips";
 import { CancelChargeButton } from "@/components/finance/cancel-charge-button";
 import { ChargeFilters } from "@/components/finance/charge-filters";
 import { EmitInvoiceButton } from "@/components/finance/emit-invoice-button";
+import { ResendChargeButton } from "@/components/finance/resend-charge-button";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -115,7 +116,7 @@ export default async function FinancePage({
             <p className="text-xl font-extrabold text-[#00d164]">
               {formatCurrency(summary.receivedThisMonthCents)}
             </p>
-            <p className="text-xs text-muted-foreground">pagos confirmados</p>
+            <p className="text-xs text-muted-foreground">pagos e confirmados</p>
           </CardContent>
         </Card>
       </div>
@@ -253,10 +254,13 @@ export default async function FinancePage({
                       )}
                       {(charge.status === "pending" ||
                         charge.status === "overdue") && (
-                        <CancelChargeButton
-                          chargeId={charge.id}
-                          description={charge.description}
-                        />
+                        <>
+                          <ResendChargeButton chargeId={charge.id} />
+                          <CancelChargeButton
+                            chargeId={charge.id}
+                            description={charge.description}
+                          />
+                        </>
                       )}
                     </div>
                   </TableCell>

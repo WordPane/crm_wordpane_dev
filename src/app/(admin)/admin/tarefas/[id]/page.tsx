@@ -25,7 +25,7 @@ import {
 } from "@/lib/access/permissions";
 import { listTaskActivities } from "@/lib/queries/activities";
 import { listTaskAttachments } from "@/lib/queries/attachments";
-import { listTaskComments } from "@/lib/queries/comments";
+import { listMentionableUsers, listTaskComments } from "@/lib/queries/comments";
 import {
   getTask,
   listActiveTaskStatuses,
@@ -59,7 +59,7 @@ export default async function TaskDetailPage({
   const { task, project, company, status, creator, checklist } =
     detail;
 
-  const [statuses, teamUsers, comments, taskAttachments, taskActivities, projectMilestones] =
+  const [statuses, teamUsers, comments, taskAttachments, taskActivities, projectMilestones, mentionableUsers] =
     await Promise.all([
       listActiveTaskStatuses(user),
       listTeamSelectOptions(user),
@@ -67,6 +67,7 @@ export default async function TaskDetailPage({
       listTaskAttachments(user, task.id),
       listTaskActivities(user, task.id),
       listProjectMilestonesForTask(user, project.id),
+      listMentionableUsers(company.id),
     ]);
 
   const overdue = !task.completedAt && isOverdue(task.dueDate);
@@ -156,6 +157,7 @@ export default async function TaskDetailPage({
                 comments={comments}
                 currentUserId={user.id}
                 currentUserRole={user.role}
+                mentionableUsers={mentionableUsers}
               />
             </CardContent>
           </Card>
