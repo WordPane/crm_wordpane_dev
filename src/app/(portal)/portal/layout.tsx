@@ -6,6 +6,7 @@ import { UserMenu } from "@/components/layout/user-menu";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { requireUser } from "@/lib/access/permissions";
+import { getBranding } from "@/lib/brand/settings";
 import { countUnread, listNotifications } from "@/lib/queries/notifications";
 import { getPortalCompany, getPortalProfile } from "@/lib/queries/portal";
 import { logout } from "@/server/actions/auth";
@@ -19,7 +20,10 @@ export default async function PortalLayout({
   const user = await requireUser();
   if (user.role !== "client") redirect("/admin/dashboard");
 
-  const company = await getPortalCompany(user);
+  const [company, brand] = await Promise.all([
+    getPortalCompany(user),
+    getBranding(),
+  ]);
   if (!company) {
     return (
       <div className="flex min-h-screen items-center justify-center p-6">
@@ -28,7 +32,7 @@ export default async function PortalLayout({
             <p className="font-medium">Conta sem empresa vinculada</p>
             <p className="text-sm text-muted-foreground">
               Sua conta ainda não está associada a uma empresa. Fale com a
-              equipe WordPane para concluir o cadastro.
+              equipe {brand.appName} para concluir o cadastro.
             </p>
             <form action={logout}>
               <Button type="submit" variant="outline">
@@ -53,6 +57,7 @@ export default async function PortalLayout({
       <PortalSidebar
         companyName={company.name}
         canManageUsers={profile?.isCompanyAdmin ?? false}
+        brand={brand}
       />
 
       <div className="flex min-h-screen flex-col pl-60">

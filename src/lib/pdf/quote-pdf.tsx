@@ -13,6 +13,7 @@ import type { IssuerInfo } from "@/lib/issuer";
 import {
   formatCurrency,
   formatDate,
+  formatPercentBps,
   formatQuoteNumber,
 } from "@/lib/utils/format";
 import { quoteStatusLabels } from "@/lib/validations/quote";
@@ -31,8 +32,10 @@ export type QuotePdfInput = {
     phone: string | null;
   };
   issuer: IssuerInfo;
-  /** Logo oficial em data URI (lida do /public pelo route handler). */
+  /** Logo da marca em data URI (resolvida pelo route handler). */
   logoSrc: string;
+  /** Cores da marca (white-label). */
+  brand: { primaryColor: string; backgroundColor: string };
 };
 
 const GREEN = "#00d164";
@@ -173,15 +176,20 @@ function QuotePdfDocument({
   company,
   issuer,
   logoSrc,
+  brand,
 }: QuotePdfInput) {
   const number = formatQuoteNumber(quote.number);
   const subtotalCents = quote.totalCents + quote.discountCents;
+  const brandStyles = {
+    header: [styles.header, { backgroundColor: brand.backgroundColor }],
+    sectionTitle: [styles.sectionTitle, { color: brand.primaryColor }],
+  };
 
   return (
     <Document title={`Orçamento ${number}`}>
       <Page size="A4" style={styles.page}>
-        {/* ─── Cabeçalho escuro com a logo oficial ─── */}
-        <View style={styles.header}>
+        {/* ─── Cabeçalho escuro com a logo da marca ─── */}
+        <View style={brandStyles.header}>
           {/* eslint-disable-next-line jsx-a11y/alt-text -- react-pdf não usa alt */}
           <Image src={logoSrc} style={styles.logo} />
           <View>
@@ -207,10 +215,10 @@ function QuotePdfDocument({
             </View>
           )}
 
-          {/* ─── Emitente (WordPane) + Cliente ─── */}
+          {/* ─── Emitente + Cliente ─── */}
           <View style={styles.partiesRow}>
             <View style={styles.party}>
-              <Text style={styles.sectionTitle}>Emitente</Text>
+              <Text style={brandStyles.sectionTitle}>Emitente</Text>
               <Text style={styles.value}>{issuer.displayName}</Text>
               <Text style={styles.label}>{issuer.razaoSocial}</Text>
               <Text style={styles.label}>CNPJ: {issuer.cnpj}</Text>
@@ -220,7 +228,7 @@ function QuotePdfDocument({
               </Text>
             </View>
             <View style={styles.party}>
-              <Text style={styles.sectionTitle}>Cliente</Text>
+              <Text style={brandStyles.sectionTitle}>Cliente</Text>
               <Text style={styles.value}>{company.name}</Text>
               {company.cnpj && (
                 <Text style={styles.label}>
@@ -236,7 +244,7 @@ function QuotePdfDocument({
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Referência</Text>
+            <Text style={brandStyles.sectionTitle}>Referência</Text>
             <Text style={styles.value}>{quote.title}</Text>
           </View>
 
@@ -270,7 +278,12 @@ function QuotePdfDocument({
                 </Text>
               </View>
               <View style={styles.totalRow}>
-                <Text style={styles.totalLabel}>Desconto</Text>
+                <Text style={styles.totalLabel}>
+                  Desconto
+                  {quote.discountType === "percent" &&
+                    quote.discountPercentBps > 0 &&
+                    ` (${formatPercentBps(quote.discountPercentBps)})`}
+                </Text>
                 <Text style={styles.totalValue}>
                   − {formatCurrency(quote.discountCents)}
                 </Text>
@@ -286,7 +299,7 @@ function QuotePdfDocument({
 
           {quote.notes && (
             <View style={styles.section} wrap={false}>
-              <Text style={styles.sectionTitle}>Observações</Text>
+              <Text style={brandStyles.sectionTitle}>Observações</Text>
               <View style={styles.notes}>
                 <Text>{quote.notes}</Text>
               </View>

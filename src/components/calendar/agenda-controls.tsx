@@ -23,6 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import type { CalendarEventType } from "@/lib/queries/calendar";
 import { cn } from "@/lib/utils";
 
 export type CalendarView = "dia" | "semana" | "mes" | "ano";
@@ -35,6 +36,13 @@ const VIEWS: { id: CalendarView; label: string }[] = [
 ];
 
 const ALL = "__all__";
+
+const TYPE_OPTIONS: { id: CalendarEventType; label: string }[] = [
+  { id: "project", label: "Projetos" },
+  { id: "milestone", label: "Etapas" },
+  { id: "task", label: "Tarefas" },
+  { id: "charge", label: "Cobranças" },
+];
 
 type SelectOption = { id: string; name: string };
 type ProjectOption = {
@@ -70,6 +78,7 @@ export function AgendaControls({
   date,
   companyId,
   projectId,
+  type,
   companies,
   projects,
 }: {
@@ -78,6 +87,8 @@ export function AgendaControls({
   date: string;
   companyId: string;
   projectId: string;
+  /** Tipo de evento ativo ("" = todos). */
+  type: string;
   companies: SelectOption[];
   projects: ProjectOption[];
 }) {
@@ -161,7 +172,7 @@ export function AgendaControls({
               className={cn(
                 "rounded-full px-3 py-1 text-xs font-medium transition-colors",
                 view === v.id
-                  ? "bg-[rgba(0,209,100,0.12)] text-[#00d164]"
+                  ? "bg-primary/10 text-primary"
                   : "text-muted-foreground hover:text-foreground",
               )}
             >
@@ -191,6 +202,31 @@ export function AgendaControls({
             </SelectContent>
           </Select>
         )}
+
+        <Select
+          value={type || ALL}
+          onValueChange={(v) =>
+            updateParams({ tipo: !v || v === ALL ? "" : v })
+          }
+        >
+          <SelectTrigger aria-label="Filtrar por tipo">
+            <SelectValue placeholder="Tipo">
+              {(value: string | null) =>
+                !value || value === ALL
+                  ? "Todos os tipos"
+                  : (TYPE_OPTIONS.find((t) => t.id === value)?.label ?? "Tipo")
+              }
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALL}>Todos os tipos</SelectItem>
+            {TYPE_OPTIONS.map((t) => (
+              <SelectItem key={t.id} value={t.id}>
+                {t.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
         <Select
           value={projectId || ALL}

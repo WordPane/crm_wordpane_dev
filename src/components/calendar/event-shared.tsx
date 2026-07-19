@@ -1,4 +1,5 @@
 import type { CalendarEvent, CalendarEventType } from "@/lib/queries/calendar";
+import { CHARGE_EVENT_COLOR } from "@/lib/queries/calendar";
 import { cn } from "@/lib/utils";
 
 /** Cabeçalho de colunas começando na segunda-feira (pt-BR). */
@@ -8,13 +9,15 @@ export const eventTypeLabels: Record<CalendarEventType, string> = {
   project: "Projeto",
   milestone: "Etapa",
   task: "Tarefa",
+  charge: "Cobrança",
 };
 
 /** Cor base por tipo de evento. */
 export const eventTypeColors: Record<CalendarEventType, string> = {
-  project: "#00d164",
+  project: "var(--green)",
   milestone: "#38bdf8",
   task: "#fbbf24",
+  charge: CHARGE_EVENT_COLOR,
 };
 
 export const OVERDUE_COLOR = "#ff6b6b";
@@ -43,19 +46,27 @@ export function capitalize(text: string): string {
 }
 
 /** Link para a visão de dia preservando os filtros ativos. */
-export function dayViewHref(date: string, filtersQuery: string): string {
+export function dayViewHref(
+  basePath: string,
+  date: string,
+  filtersQuery: string,
+): string {
   const params = new URLSearchParams(filtersQuery);
   params.set("view", "dia");
   params.set("data", date);
-  return `/admin/agenda?${params.toString()}`;
+  return `${basePath}?${params.toString()}`;
 }
 
 /** Link para a visão de mês preservando os filtros ativos. */
-export function monthViewHref(monthDate: string, filtersQuery: string): string {
+export function monthViewHref(
+  basePath: string,
+  monthDate: string,
+  filtersQuery: string,
+): string {
   const params = new URLSearchParams(filtersQuery);
   params.set("view", "mes");
   params.set("data", monthDate);
-  return `/admin/agenda?${params.toString()}`;
+  return `${basePath}?${params.toString()}`;
 }
 
 /** Chip com o tipo do evento (Projeto/Etapa/Tarefa) na cor correspondente. */
@@ -74,8 +85,8 @@ export function EventTypeChip({
       className={cn("chip", className)}
       style={{
         color,
-        borderColor: `${color}4d`,
-        backgroundColor: `${color}1a`,
+        borderColor: `color-mix(in srgb, ${color} 30%, transparent)`,
+        backgroundColor: `color-mix(in srgb, ${color} 10%, transparent)`,
       }}
     >
       <span

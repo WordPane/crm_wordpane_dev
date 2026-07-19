@@ -83,7 +83,7 @@ export default async function PortalFilesPage() {
                 <div className="min-w-0 flex-1">
                   <a
                     href={`/api/files/${file.id}`}
-                    className="block truncate text-sm font-medium text-foreground transition-colors hover:text-[#00d164]"
+                    className="block truncate text-sm font-medium text-foreground transition-colors hover:text-primary"
                   >
                     {file.fileName}
                   </a>

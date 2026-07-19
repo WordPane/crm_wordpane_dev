@@ -51,6 +51,11 @@ export function formatCurrency(cents: number): string {
   }).format(cents / 100);
 }
 
+/** 1050 → "10,5%" (pontos-base: percentual × 100). */
+export function formatPercentBps(bps: number): string {
+  return `${(bps / 100).toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%`;
+}
+
 /** 7 → "ORC-0007" */
 export function formatQuoteNumber(number: number): string {
   return `ORC-${String(number).padStart(4, "0")}`;

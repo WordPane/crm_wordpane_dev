@@ -70,7 +70,7 @@ export function PortalAvatarUpload({
     <div className="flex items-center gap-4">
       <Avatar className="size-16">
         {avatarUrl && <AvatarImage src={avatarUrl} alt={name} />}
-        <AvatarFallback className="bg-[rgba(0,209,100,0.12)] text-lg font-bold text-[#00d164]">
+        <AvatarFallback className="bg-primary/10 text-lg font-bold text-primary">
           {initials(name)}
         </AvatarFallback>
       </Avatar>

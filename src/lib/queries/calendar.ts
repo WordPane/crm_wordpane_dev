@@ -21,6 +21,7 @@ import {
 } from "@/lib/access/permissions";
 import { db } from "@/lib/db";
 import {
+  charges,
   companies,
   milestones,
   projects,
@@ -29,9 +30,21 @@ import {
   taskStatuses,
   type Project,
 } from "@/lib/db/schema";
+import { chargeStatusLabels } from "@/lib/validations/finance";
 import { milestoneStatusLabels } from "@/lib/validations/project";
+import { formatCurrency } from "@/lib/utils/format";
 
-export type CalendarEventType = "project" | "milestone" | "task";
+export const calendarEventTypes = [
+  "project",
+  "milestone",
+  "task",
+  "charge",
+] as const;
+
+export type CalendarEventType = (typeof calendarEventTypes)[number];
+
+/** Cor do tipo "cobrança" (ponto/chip no calendário). */
+export const CHARGE_EVENT_COLOR = "#a78bfa";
 
 export type CalendarEvent = {
   id: string;
@@ -57,6 +70,8 @@ export type CalendarEventFilters = {
   to: string;
   companyId?: string;
   projectId?: string;
+  /** Tipos exibidos (vazio/ausente = todos). */
+  types?: CalendarEventType[];
 };
 
 export type CalendarSummary = {
@@ -130,7 +145,7 @@ export async function getCalendarEvents(
   const { companyId, projectId } = await sanitizeFilters(scope, filters);
   const today = todayStr();
 
-  const [projectRows, milestoneRows, taskRows] = await Promise.all([
+  const [projectRows, milestoneRows, taskRows, chargeRows] = await Promise.all([
     db
       .select({
         id: projects.id,
@@ -196,12 +211,34 @@ export async function getCalendarEvents(
           ...scopeConditions(scope, companyId, projectId, tasks.projectId),
         ),
       ),
+    // Cobranças em aberto (pendentes/vencidas) — sem vínculo com projeto
+    projectId
+      ? Promise.resolve([])
+      : db
+          .select({
+            id: charges.id,
+            title: charges.description,
+            dueDate: charges.dueDate,
+            valueCents: charges.valueCents,
+            status: charges.status,
+            companyName: companyName,
+          })
+          .from(charges)
+          .innerJoin(companies, eq(charges.companyId, companies.id))
+          .where(
+            and(
+              inArray(charges.status, ["pending", "overdue"]),
+              between(charges.dueDate, filters.from, filters.to),
+              scope ? inArray(charges.companyId, scope) : undefined,
+              companyId ? eq(charges.companyId, companyId) : undefined,
+            ),
+          ),
   ]);
 
   const milestoneStatusColors: Record<string, string> = {
     pendente: "#9ca3af",
     em_andamento: "#38bdf8",
-    concluida: "#00d164",
+    concluida: "var(--green)",
   };
 
   const events: CalendarEvent[] = [
@@ -255,20 +292,41 @@ export async function getCalendarEvents(
         statusColor: r.statusColor ?? undefined,
       };
     }),
+    ...chargeRows.map((r): CalendarEvent => {
+      const date = r.dueDate;
+      return {
+        id: r.id,
+        date,
+        type: "charge",
+        title: r.title,
+        subtitle: `${r.companyName} · ${formatCurrency(r.valueCents)}`,
+        href: "/admin/financeiro",
+        done: false,
+        overdue: date < today,
+        statusName: chargeStatusLabels[r.status],
+        statusColor: CHARGE_EVENT_COLOR,
+      };
+    }),
   ];
 
   const typeOrder: Record<CalendarEventType, number> = {
     project: 0,
     milestone: 1,
     task: 2,
+    charge: 3,
   };
-  events.sort(
+  // Filtro por tipo (a query é a mesma; filtrar aqui mantém as 4 consultas paralelas)
+  const typeFilter = filters.types?.length ? filters.types : null;
+  const filtered = typeFilter
+    ? events.filter((event) => typeFilter.includes(event.type))
+    : events;
+  filtered.sort(
     (a, b) =>
       a.date.localeCompare(b.date) ||
       typeOrder[a.type] - typeOrder[b.type] ||
       a.title.localeCompare(b.title, "pt-BR"),
   );
-  return events;
+  return filtered;
 }
 
 /** Contagens de vencimentos não concluídos (escopo do usuário, sem filtros). */
@@ -294,7 +352,7 @@ export async function getCalendarSummary(
 
   const scopeCondition = scope ? [inArray(projects.companyId, scope)] : [];
 
-  const [projectRows, milestoneRows, taskRows] = await Promise.all([
+  const [projectRows, milestoneRows, taskRows, chargeRows] = await Promise.all([
     db
       .select({ dueDate: projects.dueDate })
       .from(projects)
@@ -332,13 +390,28 @@ export async function getCalendarSummary(
           ...scopeCondition,
         ),
       ),
+    db
+      .select({ dueDate: charges.dueDate })
+      .from(charges)
+      .where(
+        and(
+          inArray(charges.status, ["pending", "overdue"]),
+          lte(charges.dueDate, limit30),
+          ...(scope ? [inArray(charges.companyId, scope)] : []),
+        ),
+      ),
   ]);
 
   const tomorrow = format(addDays(new Date(), 1), "yyyy-MM-dd");
   const limit7 = format(addDays(new Date(), 7), "yyyy-MM-dd");
 
   const summary = { ...empty };
-  for (const { dueDate } of [...projectRows, ...milestoneRows, ...taskRows]) {
+  for (const { dueDate } of [
+    ...projectRows,
+    ...milestoneRows,
+    ...taskRows,
+    ...chargeRows,
+  ]) {
     const date = dueDate!;
     if (date < today) summary.vencidos += 1;
     else if (date === today) summary.hoje += 1;

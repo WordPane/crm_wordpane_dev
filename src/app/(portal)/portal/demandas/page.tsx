@@ -11,6 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ForbiddenError, requireUser } from "@/lib/access/permissions";
+import { getBranding } from "@/lib/brand/settings";
 import { listPortalDemands } from "@/lib/queries/portal";
 import { formatDate } from "@/lib/utils/format";
 
@@ -18,6 +19,7 @@ export const metadata: Metadata = { title: "Demandas" };
 
 export default async function PortalDemandsPage() {
   const user = await requireUser();
+  const brand = await getBranding();
 
   let demands;
   try {
@@ -33,7 +35,7 @@ export default async function PortalDemandsPage() {
         <div>
           <h1 className="text-2xl font-extrabold">Demandas</h1>
           <p className="text-sm text-muted-foreground">
-            Pedidos que você enviou para a equipe WordPane.
+            Pedidos que você enviou para a equipe {brand.appName}.
           </p>
         </div>
         <Button render={<Link href="/portal/demandas/nova" />}>
@@ -76,7 +78,7 @@ export default async function PortalDemandsPage() {
                 {demand.project && (
                   <Link
                     href={`/portal/projetos/${demand.project.id}`}
-                    className="inline-flex items-center gap-1 font-medium text-[#00d164] transition-colors hover:text-foreground"
+                    className="inline-flex items-center gap-1 font-medium text-primary transition-colors hover:text-foreground"
                   >
                     {demand.project.name}
                   </Link>
@@ -85,7 +87,7 @@ export default async function PortalDemandsPage() {
                 {demand.task?.visible && (
                   <Link
                     href={`/portal/projetos/${demand.task.projectId}/tarefas/${demand.task.id}`}
-                    className="inline-flex items-center gap-1 font-medium text-[#00d164] transition-colors hover:text-foreground"
+                    className="inline-flex items-center gap-1 font-medium text-primary transition-colors hover:text-foreground"
                   >
                     Ver tarefa vinculada
                     <ArrowRight className="size-3" />

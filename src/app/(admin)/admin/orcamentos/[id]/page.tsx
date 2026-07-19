@@ -33,6 +33,7 @@ import {
   formatCurrency,
   formatDate,
   formatDateTime,
+  formatPercentBps,
   formatQuoteNumber,
 } from "@/lib/utils/format";
 import { quoteStatusLabels } from "@/lib/validations/quote";
@@ -92,7 +93,7 @@ export default async function QuoteDetailPage({
               {" · duplicado de "}
               <Link
                 href={`/admin/orcamentos/${origin.id}`}
-                className="font-medium text-[#00d164] hover:underline"
+                className="font-medium text-primary hover:underline"
               >
                 {formatQuoteNumber(origin.number)}
               </Link>
@@ -194,7 +195,12 @@ export default async function QuoteDetailPage({
             <span>{formatCurrency(subtotalCents)}</span>
           </div>
           <div className="flex justify-between text-muted-foreground">
-            <span>Desconto</span>
+            <span>
+              Desconto
+              {quote.discountType === "percent" &&
+                quote.discountPercentBps > 0 &&
+                ` (${formatPercentBps(quote.discountPercentBps)})`}
+            </span>
             <span>− {formatCurrency(quote.discountCents)}</span>
           </div>
           <div className="flex justify-between text-base font-bold">
@@ -214,7 +220,7 @@ export default async function QuoteDetailPage({
               <span className="text-muted-foreground">Empresa</span>
               <Link
                 href={`/admin/clientes/${company.id}`}
-                className="font-medium text-[#00d164] hover:underline"
+                className="font-medium text-primary hover:underline"
               >
                 {company.name}
               </Link>
@@ -276,7 +282,7 @@ export default async function QuoteDetailPage({
               </div>
               <Link
                 href="/admin/financeiro"
-                className="inline-flex items-center gap-1 text-sm font-medium text-[#00d164] hover:underline"
+                className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
               >
                 Ver no financeiro
               </Link>

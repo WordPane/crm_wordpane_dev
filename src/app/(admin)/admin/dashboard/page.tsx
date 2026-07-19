@@ -90,7 +90,7 @@ function OpRow({
       </div>
       <div className="h-1.5 rounded-full bg-muted">
         <div
-          className={`h-full rounded-full transition-all ${alert ? "bg-[#ff6b6b]" : "bg-[#00d164]"}`}
+          className={`h-full rounded-full transition-all ${alert ? "bg-[#ff6b6b]" : "bg-primary"}`}
           style={{ width: `${pct}%` }}
         />
       </div>
@@ -161,13 +161,13 @@ export default async function AdminDashboardPage() {
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {financeCards.map((card) => (
           <Link key={card.label} href={card.href}>
-            <Card className="h-full transition-colors hover:border-[rgba(0,209,100,0.4)]">
+            <Card className="h-full transition-colors hover:border-primary/40">
               <CardContent className="flex items-center gap-4 py-5">
                 <span
                   className={`flex size-11 shrink-0 items-center justify-center rounded-xl ring-1 ${
                     card.alert
                       ? "bg-[rgba(255,107,107,0.1)] text-[#ff6b6b] ring-[rgba(255,107,107,0.3)]"
-                      : "bg-[rgba(0,209,100,0.08)] text-[#00d164] ring-[rgba(0,209,100,0.25)]"
+                      : "bg-primary/10 text-primary ring-primary/25"
                   }`}
                 >
                   <card.icon className="size-5" />
@@ -234,7 +234,7 @@ export default async function AdminDashboardPage() {
                       <div className="min-w-0 flex-1">
                         <Link
                           href={item.href}
-                          className="block truncate text-sm font-medium transition-colors hover:text-[#00d164]"
+                          className="block truncate text-sm font-medium transition-colors hover:text-primary"
                         >
                           {item.title}
                         </Link>
@@ -292,7 +292,7 @@ export default async function AdminDashboardPage() {
                     <div className="min-w-0 flex-1">
                       <Link
                         href="/admin/financeiro"
-                        className="block truncate text-sm font-medium transition-colors hover:text-[#00d164]"
+                        className="block truncate text-sm font-medium transition-colors hover:text-primary"
                       >
                         {charge.description}
                       </Link>
@@ -393,7 +393,7 @@ export default async function AdminDashboardPage() {
                     <div className="min-w-0 flex-1">
                       <a
                         href={file.href}
-                        className="block truncate text-sm font-medium transition-colors hover:text-[#00d164]"
+                        className="block truncate text-sm font-medium transition-colors hover:text-primary"
                       >
                         {file.fileName}
                       </a>
@@ -444,7 +444,7 @@ export default async function AdminDashboardPage() {
                         <span className="text-muted-foreground">em</span>{" "}
                         <Link
                           href={comment.href}
-                          className="font-medium transition-colors hover:text-[#00d164]"
+                          className="font-medium transition-colors hover:text-primary"
                         >
                           {comment.taskTitle}
                         </Link>

@@ -223,7 +223,7 @@ export default async function TaskDetailPage({
                 <dd>
                   <Link
                     href={`/admin/clientes/${company.id}`}
-                    className="transition-colors hover:text-[#00d164]"
+                    className="transition-colors hover:text-primary"
                   >
                     {company.name}
                   </Link>

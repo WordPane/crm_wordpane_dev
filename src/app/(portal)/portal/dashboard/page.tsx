@@ -101,7 +101,7 @@ export default async function PortalDashboardPage() {
                     <li key={quote.id}>
                       <Link
                         href={`/portal/orcamentos/${quote.id}`}
-                        className="flex items-center gap-2 text-sm transition-colors hover:text-[#00d164]"
+                        className="flex items-center gap-2 text-sm transition-colors hover:text-primary"
                       >
                         <span className="font-mono text-xs text-muted-foreground">
                           {formatQuoteNumber(quote.number)}
@@ -160,7 +160,7 @@ export default async function PortalDashboardPage() {
       {/* ─── Cards-resumo ─── */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Link href="/portal/projetos">
-          <Card className="h-full transition-colors hover:border-[rgba(0,209,100,0.4)]">
+          <Card className="h-full transition-colors hover:border-primary/40">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
                 <FolderKanban className="size-4" />
@@ -168,7 +168,7 @@ export default async function PortalDashboardPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-3xl font-extrabold text-[#00d164]">
+              <p className="text-3xl font-extrabold text-primary">
                 {data.activeProjects}
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
@@ -180,7 +180,7 @@ export default async function PortalDashboardPage() {
         </Link>
 
         <Link href="/portal/demandas">
-          <Card className="h-full transition-colors hover:border-[rgba(0,209,100,0.4)]">
+          <Card className="h-full transition-colors hover:border-primary/40">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
                 <Inbox className="size-4" />
@@ -188,7 +188,7 @@ export default async function PortalDashboardPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-3xl font-extrabold text-[#00d164]">
+              <p className="text-3xl font-extrabold text-primary">
                 {data.openDemands}
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
@@ -199,7 +199,7 @@ export default async function PortalDashboardPage() {
         </Link>
 
         <Link href="/portal/orcamentos">
-          <Card className="h-full transition-colors hover:border-[rgba(0,209,100,0.4)]">
+          <Card className="h-full transition-colors hover:border-primary/40">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
                 <FileText className="size-4" />
@@ -208,7 +208,7 @@ export default async function PortalDashboardPage() {
             </CardHeader>
             <CardContent>
               <p
-                className={`text-3xl font-extrabold ${data.pendingQuotes > 0 ? "text-amber-300" : "text-[#00d164]"}`}
+                className={`text-3xl font-extrabold ${data.pendingQuotes > 0 ? "text-amber-300" : "text-primary"}`}
               >
                 {data.pendingQuotes}
               </p>
@@ -222,7 +222,7 @@ export default async function PortalDashboardPage() {
         </Link>
 
         <Link href="/portal/financeiro">
-          <Card className="h-full transition-colors hover:border-[rgba(0,209,100,0.4)]">
+          <Card className="h-full transition-colors hover:border-primary/40">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
                 <Wallet className="size-4" />
@@ -231,7 +231,7 @@ export default async function PortalDashboardPage() {
             </CardHeader>
             <CardContent>
               <p
-                className={`text-3xl font-extrabold ${data.overdueChargesCount > 0 ? "text-[#ff6b6b]" : "text-[#00d164]"}`}
+                className={`text-3xl font-extrabold ${data.overdueChargesCount > 0 ? "text-[#ff6b6b]" : "text-primary"}`}
               >
                 {formatCurrency(data.openChargesCents)}
               </p>
@@ -275,7 +275,7 @@ export default async function PortalDashboardPage() {
                   <li key={task.id} className="flex items-center gap-2 text-sm">
                     <Link
                       href={`/portal/projetos/${task.projectId}/tarefas/${task.id}`}
-                      className="min-w-0 flex-1 truncate transition-colors hover:text-[#00d164]"
+                      className="min-w-0 flex-1 truncate transition-colors hover:text-primary"
                       title={`${task.projectName} · ${task.title}`}
                     >
                       {task.title}
@@ -358,7 +358,7 @@ export default async function PortalDashboardPage() {
                   : 0;
               return (
                 <Link key={project.id} href={`/portal/projetos/${project.id}`}>
-                  <Card className="h-full transition-colors hover:border-[rgba(0,209,100,0.4)]">
+                  <Card className="h-full transition-colors hover:border-primary/40">
                     <CardHeader>
                       <div className="flex min-w-0 items-start justify-between gap-2">
                         <CardTitle className="min-w-0 flex-1 break-words text-base">

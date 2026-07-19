@@ -63,7 +63,7 @@ export function ProjectsTable({
               <TableCell>
                 <Link
                   href={`/admin/projetos/${p.id}`}
-                  className="font-medium text-foreground transition-colors hover:text-[#00d164]"
+                  className="font-medium text-foreground transition-colors hover:text-primary"
                 >
                   {p.name}
                 </Link>

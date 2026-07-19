@@ -31,6 +31,11 @@ function centsToInput(cents: number): string {
   });
 }
 
+/** 1050 → "10,5" (input de percentual do formulário). */
+function bpsToInput(bps: number): string {
+  return (bps / 100).toLocaleString("pt-BR", { maximumFractionDigits: 2 });
+}
+
 export default async function EditQuotePage({
   params,
 }: {
@@ -58,7 +63,15 @@ export default async function EditQuotePage({
     companyId: quote.companyId,
     title: quote.title,
     validUntil: quote.validUntil ?? "",
-    discount: quote.discountCents > 0 ? centsToInput(quote.discountCents) : "",
+    discount:
+      quote.discountType === "percent"
+        ? quote.discountPercentBps > 0
+          ? bpsToInput(quote.discountPercentBps)
+          : ""
+        : quote.discountCents > 0
+          ? centsToInput(quote.discountCents)
+          : "",
+    discountType: quote.discountType,
     notes: quote.notes ?? "",
     items: items.map((item) => ({
       description: item.description,

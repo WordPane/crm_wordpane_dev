@@ -23,11 +23,14 @@ export function CalendarYear({
   events,
   year,
   filtersQuery,
+  basePath,
 }: {
   events: CalendarEvent[];
   year: number;
   /** Filtros ativos (empresa/projeto) já serializados, para preservar nos links. */
   filtersQuery: string;
+  /** Caminho da agenda ("/admin/agenda" ou "/portal/agenda"). */
+  basePath: string;
 }) {
   const byDate = new Map<string, { count: number; hasOverdue: boolean }>();
   for (const event of events) {
@@ -58,12 +61,12 @@ export function CalendarYear({
             key={monthIndex}
             className={cn(
               "rounded-xl bg-card p-3 ring-1 ring-foreground/10",
-              isCurrent && "ring-2 ring-[#00d164]",
+              isCurrent && "ring-2 ring-primary",
             )}
           >
             <Link
-              href={monthViewHref(format(monthDate, "yyyy-MM-dd"), filtersQuery)}
-              className="mb-2 block text-center text-sm font-semibold transition-colors hover:text-[#00d164]"
+              href={monthViewHref(basePath, format(monthDate, "yyyy-MM-dd"), filtersQuery)}
+              className="mb-2 block text-center text-sm font-semibold transition-colors hover:text-primary"
             >
               {capitalize(format(monthDate, "LLLL", { locale: ptBR }))}
             </Link>
@@ -90,7 +93,7 @@ export function CalendarYear({
                       className={cn(
                         "text-[0.6rem] leading-none",
                         isToday
-                          ? "font-bold text-[#00d164]"
+                          ? "font-bold text-primary"
                           : "text-muted-foreground",
                       )}
                     >
@@ -103,7 +106,7 @@ export function CalendarYear({
                           ? {
                               backgroundColor: entry.hasOverdue
                                 ? "#ff6b6b"
-                                : "#00d164",
+                                : "var(--green)",
                             }
                           : undefined
                       }
@@ -116,7 +119,7 @@ export function CalendarYear({
                 return entry ? (
                   <Link
                     key={dateStr}
-                    href={dayViewHref(dateStr, filtersQuery)}
+                    href={dayViewHref(basePath, dateStr, filtersQuery)}
                     title={`${entry.count} ${
                       entry.count === 1 ? "vencimento" : "vencimentos"
                     }`}

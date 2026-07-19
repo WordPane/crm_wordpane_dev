@@ -14,11 +14,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { brandAssetUrl } from "@/lib/brand/config";
+import { getBranding } from "@/lib/brand/settings";
 import { getQuoteByToken } from "@/lib/queries/quotes";
 import {
   formatCurrency,
   formatDate,
   formatDateTime,
+  formatPercentBps,
   formatQuoteNumber,
 } from "@/lib/utils/format";
 
@@ -38,6 +41,8 @@ export default async function PublicQuotePage({
   const detail = await getQuoteByToken(token);
   if (!detail) notFound();
 
+  const brand = await getBranding();
+
   const { quote, items, company } = detail;
   const number = formatQuoteNumber(quote.number);
   const subtotalCents = quote.totalCents + quote.discountCents;
@@ -48,7 +53,11 @@ export default async function PublicQuotePage({
       <div className="mx-auto max-w-3xl space-y-6">
         <div className="flex flex-col items-center gap-3 text-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brand/logo-white.png" alt="WordPane" className="h-8 w-auto" />
+          <img
+            src={brandAssetUrl(brand, "logo")}
+            alt={brand.appName}
+            className="h-8 w-auto"
+          />
           <p className="text-sm text-muted-foreground">
             Orçamento para {company.name}
           </p>
@@ -105,7 +114,12 @@ export default async function PublicQuotePage({
               <span>{formatCurrency(subtotalCents)}</span>
             </div>
             <div className="flex justify-between text-muted-foreground">
-              <span>Desconto</span>
+              <span>
+                Desconto
+                {quote.discountType === "percent" &&
+                  quote.discountPercentBps > 0 &&
+                  ` (${formatPercentBps(quote.discountPercentBps)})`}
+              </span>
               <span>− {formatCurrency(quote.discountCents)}</span>
             </div>
             <div className="flex justify-between text-base font-bold">
@@ -171,7 +185,8 @@ export default async function PublicQuotePage({
         </div>
 
         <p className="text-center text-xs text-muted-foreground/60">
-          © {new Date().getFullYear()} WordPane — Gestão de clientes e projetos
+          © {new Date().getFullYear()} {brand.appName} — Gestão de clientes e
+          projetos
         </p>
       </div>
     </main>

@@ -26,9 +26,11 @@ import {
 } from "@/components/ui/card";
 import { requireTeam, requireUser } from "@/lib/access/permissions";
 import {
+  calendarEventTypes,
   getCalendarEvents,
   getCalendarFilterOptions,
   getCalendarSummary,
+  type CalendarEventType,
 } from "@/lib/queries/calendar";
 
 export const metadata: Metadata = { title: "Agenda" };
@@ -82,6 +84,7 @@ export default async function AgendaPage({
     data?: string | string[];
     empresa?: string | string[];
     projeto?: string | string[];
+    tipo?: string | string[];
   }>;
 }) {
   const user = await requireUser();
@@ -92,6 +95,12 @@ export default async function AgendaPage({
   const reference = parseReferenceDate(first(params.data));
   const companyId = first(params.empresa);
   const projectId = first(params.projeto);
+  const typeParam = first(params.tipo);
+  const types: CalendarEventType[] | undefined = (
+    calendarEventTypes as readonly string[]
+  ).includes(typeParam)
+    ? [typeParam as CalendarEventType]
+    : undefined;
 
   const range = visibleRange(view, reference);
 
@@ -101,6 +110,7 @@ export default async function AgendaPage({
       to: format(range.to, "yyyy-MM-dd"),
       companyId: companyId || undefined,
       projectId: projectId || undefined,
+      types,
     }),
     getCalendarSummary(user),
     getCalendarFilterOptions(user),
@@ -110,6 +120,7 @@ export default async function AgendaPage({
   const filtersParams = new URLSearchParams();
   if (companyId) filtersParams.set("empresa", companyId);
   if (projectId) filtersParams.set("projeto", projectId);
+  if (types) filtersParams.set("tipo", types[0]);
   const filtersQuery = filtersParams.toString();
 
   const cards = [
@@ -128,7 +139,7 @@ export default async function AgendaPage({
       <div>
         <h1 className="text-2xl font-extrabold">Agenda</h1>
         <p className="text-sm text-muted-foreground">
-          Vencimentos de projetos, etapas e tarefas.
+          Vencimentos de projetos, etapas, tarefas e cobranças.
         </p>
       </div>
 
@@ -142,7 +153,7 @@ export default async function AgendaPage({
             </CardHeader>
             <CardContent>
               <p
-                className={`text-3xl font-extrabold ${card.alert ? "text-[#ff6b6b]" : "text-[#00d164]"}`}
+                className={`text-3xl font-extrabold ${card.alert ? "text-[#ff6b6b]" : "text-primary"}`}
               >
                 {card.value}
               </p>
@@ -156,6 +167,7 @@ export default async function AgendaPage({
         date={format(reference, "yyyy-MM-dd")}
         companyId={companyId}
         projectId={projectId}
+        type={types?.[0] ?? ""}
         companies={options.companies}
         projects={options.projects}
       />
@@ -165,6 +177,7 @@ export default async function AgendaPage({
           events={events}
           reference={reference}
           filtersQuery={filtersQuery}
+          basePath="/admin/agenda"
         />
       )}
       {view === "semana" && (
@@ -176,6 +189,7 @@ export default async function AgendaPage({
           events={events}
           year={reference.getFullYear()}
           filtersQuery={filtersQuery}
+          basePath="/admin/agenda"
         />
       )}
     </div>

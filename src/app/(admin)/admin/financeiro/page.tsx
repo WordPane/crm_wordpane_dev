@@ -114,7 +114,7 @@ export default async function FinancePage({
         <Card>
           <CardContent className="py-4">
             <p className="text-xs text-muted-foreground">Recebido no mês</p>
-            <p className="text-xl font-extrabold text-[#00d164]">
+            <p className="text-xl font-extrabold text-primary">
               {formatCurrency(summary.receivedThisMonthCents)}
             </p>
             <p className="text-xs text-muted-foreground">pagos e confirmados</p>

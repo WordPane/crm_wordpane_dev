@@ -194,7 +194,7 @@ export default async function PortalProjectDetailPage({
                           <li key={task.id}>
                             <Link
                               href={`/portal/projetos/${project.id}/tarefas/${task.id}`}
-                              className="flex flex-wrap items-center gap-2 rounded-xl bg-white/[0.02] p-3 ring-1 ring-foreground/10 transition-colors hover:ring-[rgba(0,209,100,0.4)]"
+                              className="flex flex-wrap items-center gap-2 rounded-xl bg-white/[0.02] p-3 ring-1 ring-foreground/10 transition-colors hover:ring-primary/40"
                             >
                               <ListChecks className="size-4 shrink-0 text-muted-foreground" />
                               <span className="min-w-0 flex-1 truncate text-sm font-medium">
@@ -230,7 +230,7 @@ export default async function PortalProjectDetailPage({
                       <li key={task.id}>
                         <Link
                           href={`/portal/projetos/${project.id}/tarefas/${task.id}`}
-                          className="flex flex-wrap items-center gap-2 rounded-xl bg-white/[0.02] p-3 ring-1 ring-foreground/10 transition-colors hover:ring-[rgba(0,209,100,0.4)]"
+                          className="flex flex-wrap items-center gap-2 rounded-xl bg-white/[0.02] p-3 ring-1 ring-foreground/10 transition-colors hover:ring-primary/40"
                         >
                           <ListChecks className="size-4 shrink-0 text-muted-foreground" />
                           <span className="min-w-0 flex-1 truncate text-sm font-medium">
@@ -286,7 +286,7 @@ export default async function PortalProjectDetailPage({
                       href={link.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex min-w-0 items-center gap-1.5 text-sm font-medium break-all text-foreground transition-colors hover:text-[#00d164]"
+                      className="inline-flex min-w-0 items-center gap-1.5 text-sm font-medium break-all text-foreground transition-colors hover:text-primary"
                     >
                       <ExternalLink className="size-3.5 shrink-0" />
                       {link.url}

@@ -17,12 +17,15 @@ export function CalendarMonth({
   events,
   reference,
   filtersQuery,
+  basePath,
 }: {
   events: CalendarEvent[];
   /** Qualquer data dentro do mês exibido. */
   reference: Date;
   /** Filtros ativos (empresa/projeto) já serializados, para preservar nos links. */
   filtersQuery: string;
+  /** Caminho da agenda ("/admin/agenda" ou "/portal/agenda"). */
+  basePath: string;
 }) {
   const gridStart = startOfWeek(startOfMonth(reference), { weekStartsOn: 1 });
   const days = Array.from({ length: 42 }, (_, i) => addDays(gridStart, i));
@@ -58,18 +61,20 @@ export function CalendarMonth({
                 !inMonth && "bg-white/[0.01]",
               )}
             >
-              <span
+              <Link
+                href={dayViewHref(basePath, dateStr, filtersQuery)}
+                title={`Ver ${format(day, "dd/MM/yyyy")}`}
                 className={cn(
-                  "flex size-6 items-center justify-center text-xs",
+                  "flex size-6 items-center justify-center rounded-full text-xs transition-colors hover:bg-primary/15 hover:text-primary",
                   isToday
-                    ? "rounded-full font-bold text-[#00d164] ring-2 ring-[#00d164]"
+                    ? "font-bold text-primary ring-2 ring-primary"
                     : inMonth
                       ? "text-foreground/80"
                       : "text-muted-foreground/40",
                 )}
               >
                 {format(day, "d")}
-              </span>
+              </Link>
 
               {visible.map((event) => {
                 const color = eventColor(event);
@@ -82,7 +87,7 @@ export function CalendarMonth({
                       "flex items-center gap-1 truncate rounded px-1 py-0.5 text-[0.68rem] leading-tight transition-opacity hover:opacity-80",
                       event.done && "opacity-50",
                     )}
-                    style={{ backgroundColor: `${color}1a` }}
+                    style={{ backgroundColor: `color-mix(in srgb, ${color} 10%, transparent)` }}
                   >
                     <span
                       className="size-1.5 shrink-0 rounded-full"
@@ -102,8 +107,8 @@ export function CalendarMonth({
 
               {hidden > 0 && (
                 <Link
-                  href={dayViewHref(dateStr, filtersQuery)}
-                  className="px-1 text-[0.68rem] font-medium text-muted-foreground transition-colors hover:text-[#00d164]"
+                  href={dayViewHref(basePath, dateStr, filtersQuery)}
+                  className="px-1 text-[0.68rem] font-medium text-muted-foreground transition-colors hover:text-primary"
                 >
                   +{hidden}
                 </Link>

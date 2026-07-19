@@ -51,6 +51,8 @@ export const ALLOWED_MIME_TYPES = new Set([
   "image/svg+xml",
   "image/webp",
   "image/gif",
+  "image/x-icon",
+  "image/vnd.microsoft.icon",
   "application/pdf",
   "application/zip",
   "application/x-zip-compressed",

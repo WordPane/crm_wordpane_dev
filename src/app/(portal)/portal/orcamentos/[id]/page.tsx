@@ -21,6 +21,7 @@ import {
   formatCurrency,
   formatDate,
   formatDateTime,
+  formatPercentBps,
   formatQuoteNumber,
 } from "@/lib/utils/format";
 
@@ -141,7 +142,12 @@ export default async function PortalQuoteDetailPage({
             <span>{formatCurrency(subtotalCents)}</span>
           </div>
           <div className="flex justify-between text-muted-foreground">
-            <span>Desconto</span>
+            <span>
+              Desconto
+              {quote.discountType === "percent" &&
+                quote.discountPercentBps > 0 &&
+                ` (${formatPercentBps(quote.discountPercentBps)})`}
+            </span>
             <span>− {formatCurrency(quote.discountCents)}</span>
           </div>
           <div className="flex justify-between text-base font-bold">

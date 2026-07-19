@@ -45,16 +45,26 @@ function revalidateQuote(id: string, companyId: string) {
   revalidatePath(`/admin/clientes/${companyId}`);
 }
 
-/** Soma dos itens em centavos, validando o desconto contra o subtotal. */
-function computeTotals(data: QuotePayload): { totalCents: number } | { error: string } {
+/** Soma dos itens em centavos, resolvendo e validando o desconto. */
+function computeTotals(
+  data: QuotePayload,
+): { discountCents: number; totalCents: number } | { error: string } {
   const subtotal = data.items.reduce(
     (sum, item) => sum + Math.round(item.quantity * item.unitPriceCents),
     0,
   );
-  if (data.discountCents > subtotal) {
+  // Percentual é resolvido no servidor contra o subtotal real
+  const discountCents =
+    data.discountType === "percent"
+      ? Math.round((subtotal * data.discountPercentBps) / 10000)
+      : data.discountCents;
+  if (discountCents > subtotal) {
     return { error: "O desconto não pode ser maior que o subtotal." };
   }
-  return { totalCents: quoteTotalCents(data.items, data.discountCents) };
+  return {
+    discountCents,
+    totalCents: quoteTotalCents(data.items, discountCents),
+  };
 }
 
 export async function createQuote(input: unknown): Promise<ActionResult> {
@@ -74,7 +84,9 @@ export async function createQuote(input: unknown): Promise<ActionResult> {
         title: data.title,
         notes: data.notes || null,
         validUntil: data.validUntil || null,
-        discountCents: data.discountCents,
+        discountCents: totals.discountCents,
+        discountType: data.discountType,
+        discountPercentBps: data.discountPercentBps,
         totalCents: totals.totalCents,
         createdBy: user.id,
       })
@@ -145,7 +157,9 @@ export async function updateQuote(
         title: data.title,
         notes: data.notes || null,
         validUntil: data.validUntil || null,
-        discountCents: data.discountCents,
+        discountCents: totals.discountCents,
+        discountType: data.discountType,
+        discountPercentBps: data.discountPercentBps,
         totalCents: totals.totalCents,
         updatedAt: new Date(),
       })
@@ -440,6 +454,8 @@ export async function duplicateQuote(quoteId: string): Promise<ActionResult> {
         notes: quote.notes,
         validUntil: quote.validUntil,
         discountCents: quote.discountCents,
+        discountType: quote.discountType,
+        discountPercentBps: quote.discountPercentBps,
         totalCents: quote.totalCents,
         createdBy: user.id,
         version: quote.version + 1,

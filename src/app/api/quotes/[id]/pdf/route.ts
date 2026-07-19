@@ -10,22 +10,61 @@ import {
   getSessionUser,
   isTeam,
 } from "@/lib/access/permissions";
+import { getBranding } from "@/lib/brand/settings";
+import type { BrandConfig } from "@/lib/brand/config";
 import { db } from "@/lib/db";
 import { companies, quoteItems, quotes } from "@/lib/db/schema";
 import { getIssuer } from "@/lib/issuer";
 import { renderQuotePdf } from "@/lib/pdf/quote-pdf";
+import { getStorage } from "@/lib/storage";
 import { formatQuoteNumber } from "@/lib/utils/format";
 
-/** Logo oficial como data URI (cache em módulo — arquivo estático). */
-let logoDataUri: string | null = null;
-function getLogoDataUri(): string {
-  if (!logoDataUri) {
-    const buffer = readFileSync(
-      path.join(process.cwd(), "public", "brand", "logo-white.png"),
-    );
-    logoDataUri = `data:image/png;base64,${buffer.toString("base64")}`;
+/** Logo da marca como data URI (cache de 60s por valor de origem). */
+let logoCache: { key: string; dataUri: string; expiresAt: number } | null = null;
+
+function mimeFor(source: string): string {
+  const ext = source.split(".").pop()?.toLowerCase() ?? "png";
+  return (
+    {
+      png: "image/png",
+      jpg: "image/jpeg",
+      jpeg: "image/jpeg",
+      svg: "image/svg+xml",
+      webp: "image/webp",
+    }[ext] ?? "image/png"
+  );
+}
+
+async function getLogoDataUri(brand: BrandConfig): Promise<string> {
+  const source = brand.logoUrl;
+  if (
+    logoCache &&
+    logoCache.key === source &&
+    logoCache.expiresAt > Date.now()
+  ) {
+    return logoCache.dataUri;
   }
-  return logoDataUri;
+
+  let dataUri: string;
+  if (source.startsWith("/")) {
+    // Asset estático em /public (marca padrão)
+    const buffer = readFileSync(path.join(process.cwd(), "public", source));
+    dataUri = `data:${mimeFor(source)};base64,${buffer.toString("base64")}`;
+  } else if (/^https?:\/\//i.test(source)) {
+    // URL pública (Vercel Blob)
+    const response = await fetch(source);
+    if (!response.ok) throw new Error("Não foi possível baixar a logo da marca.");
+    const buffer = Buffer.from(await response.arrayBuffer());
+    dataUri = `data:${response.headers.get("content-type") ?? "image/png"};base64,${buffer.toString("base64")}`;
+  } else {
+    // fileKey do storage local (dev)
+    const buffer = await getStorage().get(source);
+    if (!buffer) throw new Error("Logo da marca não encontrada no storage.");
+    dataUri = `data:${mimeFor(source)};base64,${buffer.toString("base64")}`;
+  }
+
+  logoCache = { key: source, dataUri, expiresAt: Date.now() + 60_000 };
+  return dataUri;
 }
 
 /**
@@ -125,6 +164,7 @@ export async function GET(
     ? addressParts.join(" — ")
     : null;
 
+  const brand = await getBranding();
   const buffer = await renderQuotePdf({
     quote: row.quote,
     items,
@@ -137,7 +177,8 @@ export async function GET(
       phone: row.companyPhone,
     },
     issuer: await getIssuer(),
-    logoSrc: getLogoDataUri(),
+    logoSrc: await getLogoDataUri(brand),
+    brand,
   });
 
   const download = new URL(request.url).searchParams.get("download") === "1";

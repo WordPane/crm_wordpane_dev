@@ -102,7 +102,7 @@ export function NotificationsList({
                   onClick={() => handleItemClick(item)}
                   className={cn(
                     "flex w-full items-start gap-4 px-4 py-4 text-left transition-colors hover:bg-white/[0.03] first:rounded-t-xl last:rounded-b-xl",
-                    unread && "bg-[rgba(0,209,100,0.04)]",
+                    unread && "bg-primary/5",
                   )}
                 >
                   <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-full bg-muted ring-1 ring-border">
@@ -130,7 +130,7 @@ export function NotificationsList({
                     </span>
                   </span>
                   {unread && (
-                    <span className="mt-2 size-2 shrink-0 rounded-full bg-[#00d164]" />
+                    <span className="mt-2 size-2 shrink-0 rounded-full bg-primary" />
                   )}
                 </button>
               );

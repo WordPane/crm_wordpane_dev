@@ -22,6 +22,10 @@ import { CalendarYear } from "@/components/calendar/calendar-year";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ForbiddenError, requireUser } from "@/lib/access/permissions";
 import {
+  calendarEventTypes,
+  type CalendarEventType,
+} from "@/lib/queries/calendar";
+import {
   getPortalCalendarEvents,
   getPortalCalendarSummary,
   listPortalCalendarProjects,
@@ -77,6 +81,7 @@ export default async function PortalAgendaPage({
     view?: string | string[];
     data?: string | string[];
     projeto?: string | string[];
+    tipo?: string | string[];
   }>;
 }) {
   const user = await requireUser();
@@ -85,6 +90,12 @@ export default async function PortalAgendaPage({
   const view = parseView(first(params.view));
   const reference = parseReferenceDate(first(params.data));
   const projectId = first(params.projeto);
+  const typeParam = first(params.tipo);
+  const types: CalendarEventType[] | undefined = (
+    calendarEventTypes as readonly string[]
+  ).includes(typeParam)
+    ? [typeParam as CalendarEventType]
+    : undefined;
   const range = visibleRange(view, reference);
 
   let events;
@@ -96,6 +107,7 @@ export default async function PortalAgendaPage({
         from: format(range.from, "yyyy-MM-dd"),
         to: format(range.to, "yyyy-MM-dd"),
         projectId: projectId || undefined,
+        types,
       }),
       getPortalCalendarSummary(user),
       listPortalCalendarProjects(user),
@@ -107,6 +119,7 @@ export default async function PortalAgendaPage({
 
   const filtersParams = new URLSearchParams();
   if (projectId) filtersParams.set("projeto", projectId);
+  if (types) filtersParams.set("tipo", types[0]);
   const filtersQuery = filtersParams.toString();
 
   const cards = [
@@ -121,7 +134,7 @@ export default async function PortalAgendaPage({
       <div>
         <h1 className="text-2xl font-extrabold">Agenda</h1>
         <p className="text-sm text-muted-foreground">
-          Vencimentos dos seus projetos, etapas e tarefas.
+          Vencimentos dos seus projetos, etapas, tarefas e cobranças.
         </p>
       </div>
 
@@ -135,7 +148,7 @@ export default async function PortalAgendaPage({
             </CardHeader>
             <CardContent>
               <p
-                className={`text-3xl font-extrabold ${card.alert ? "text-[#ff6b6b]" : "text-[#00d164]"}`}
+                className={`text-3xl font-extrabold ${card.alert ? "text-[#ff6b6b]" : "text-primary"}`}
               >
                 {card.value}
               </p>
@@ -149,6 +162,7 @@ export default async function PortalAgendaPage({
         date={format(reference, "yyyy-MM-dd")}
         companyId=""
         projectId={projectId}
+        type={types?.[0] ?? ""}
         companies={[]}
         projects={projects}
       />
@@ -158,6 +172,7 @@ export default async function PortalAgendaPage({
           events={events}
           reference={reference}
           filtersQuery={filtersQuery}
+          basePath="/portal/agenda"
         />
       )}
       {view === "semana" && (
@@ -169,6 +184,7 @@ export default async function PortalAgendaPage({
           events={events}
           year={reference.getFullYear()}
           filtersQuery={filtersQuery}
+          basePath="/portal/agenda"
         />
       )}
     </div>

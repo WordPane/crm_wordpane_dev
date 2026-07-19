@@ -1,5 +1,6 @@
 import { and, eq, inArray, or, type SQL } from "drizzle-orm";
 
+import { getBranding } from "@/lib/brand/settings";
 import { db } from "@/lib/db";
 import {
   adminCompanyAssignments,
@@ -100,12 +101,15 @@ export async function sendWelcomeEmail(input: {
   companyName: string;
 }): Promise<void> {
   try {
-    const settings = await getEmailSettings();
+    const [settings, brand] = await Promise.all([
+      getEmailSettings(),
+      getBranding(),
+    ]);
     const result = await sendEmail({
       to: input.to,
-      subject: "Seu acesso ao portal WordPane está ativo",
-      title: "Seu acesso ao portal WordPane está ativo",
-      intro: `Olá, ${input.name}! O acesso de ${input.companyName} ao portal WordPane foi liberado. Entre com o seu e-mail e a senha cadastrada para acompanhar projetos, demandas e arquivos.`,
+      subject: `Seu acesso ao portal ${brand.appName} está ativo`,
+      title: `Seu acesso ao portal ${brand.appName} está ativo`,
+      intro: `Olá, ${input.name}! O acesso de ${input.companyName} ao portal ${brand.appName} foi liberado. Entre com o seu e-mail e a senha cadastrada para acompanhar projetos, demandas e arquivos.`,
       rows: [
         { label: "Empresa", value: input.companyName },
         { label: "E-mail de acesso", value: input.to },

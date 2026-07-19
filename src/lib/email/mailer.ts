@@ -1,5 +1,8 @@
 import nodemailer, { type Transporter } from "nodemailer";
 
+import { brandAssetUrl } from "@/lib/brand/config";
+import { getBranding } from "@/lib/brand/settings";
+import { brandEmailColors } from "@/lib/brand/theme";
 import {
   getEmailSettings,
   type EmailSettings,
@@ -7,6 +10,7 @@ import {
 import {
   renderEmailTemplate,
   renderPlainTextFallback,
+  type EmailTemplateBrand,
   type EmailTemplateCta,
   type EmailTemplateRow,
 } from "@/lib/email/templates";
@@ -36,16 +40,31 @@ function createTransporter(settings: EmailSettings): Transporter {
 }
 
 /**
- * Envia e-mail transacional com o template WordPane.
+ * Envia e-mail transacional com o template da marca (white-label).
  * NUNCA lança exceção: falhas viram `{ ok: false, error }` + console.error.
  */
 export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult> {
   try {
-    const settings = await getEmailSettings();
+    const [settings, brandConfig] = await Promise.all([
+      getEmailSettings(),
+      getBranding(),
+    ]);
     if (!settings) {
       console.warn(`E-mail para ${input.to} não enviado: SMTP não configurado.`);
       return { ok: false, error: "SMTP não configurado." };
     }
+
+    const colors = brandEmailColors(brandConfig);
+    const brand: EmailTemplateBrand = {
+      appName: brandConfig.appName,
+      logoUrl: /^https?:\/\//i.test(brandConfig.logoUrl)
+        ? brandConfig.logoUrl
+        : `${settings.appUrl}${brandAssetUrl(brandConfig, "logo")}`,
+      primaryColor: colors.primary,
+      primaryAltColor: colors.primaryAlt,
+      backgroundColor: colors.background,
+      cardColor: colors.card,
+    };
 
     const transporter = createTransporter(settings);
     await transporter.sendMail({
@@ -54,12 +73,14 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
       subject: input.subject,
       html: renderEmailTemplate({
         appUrl: settings.appUrl,
+        brand,
         title: input.title,
         intro: input.intro,
         rows: input.rows,
         cta: input.cta,
       }),
       text: renderPlainTextFallback({
+        brand,
         title: input.title,
         intro: input.intro,
         rows: input.rows,

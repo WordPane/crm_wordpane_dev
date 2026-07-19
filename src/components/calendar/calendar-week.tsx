@@ -37,14 +37,14 @@ export function CalendarWeek({
               className={cn(
                 "flex min-h-40 flex-col gap-2 rounded-xl p-2 ring-1",
                 isToday
-                  ? "bg-[rgba(0,209,100,0.04)] ring-[rgba(0,209,100,0.4)]"
+                  ? "bg-primary/5 ring-primary/40"
                   : "bg-card ring-foreground/10",
               )}
             >
               <p
                 className={cn(
                   "px-1 text-xs font-semibold",
-                  isToday ? "text-[#00d164]" : "text-muted-foreground",
+                  isToday ? "text-primary" : "text-muted-foreground",
                 )}
               >
                 {WEEKDAY_SHORT[i]} {format(day, "dd/MM")}
@@ -75,7 +75,7 @@ export function CalendarWeek({
                       href={event.href}
                       title={`${event.title} · ${event.subtitle}`}
                       className={cn(
-                        "block truncate text-xs font-medium transition-colors hover:text-[#00d164]",
+                        "block truncate text-xs font-medium transition-colors hover:text-primary",
                         event.done && "line-through",
                       )}
                     >

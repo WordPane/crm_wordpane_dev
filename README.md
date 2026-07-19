@@ -44,10 +44,12 @@ npm install
 cp .env.example .env.local
 #    - DATABASE_URL: connection string do Neon
 #    - AUTH_SECRET: gere com `npx auth secret` (ou `openssl rand -base64 32`)
+#      NÃO regenere depois: invalida os segredos gravados (SMTP/Asaas)
 #    - BLOB_READ_WRITE_TOKEN: opcional em dev (ver seção Storage)
 
 # 3. Banco de dados
-npm run db:migrate   # aplica as migrações (drizzle/)
+npm run db:migrate          # aplica as migrações (drizzle/)
+npm run db:seed:minimal     # status de projeto/tarefa (obrigatórios)
 
 # 4. Rodar
 npm run dev          # http://localhost:3000
@@ -55,12 +57,33 @@ npm run dev          # http://localhost:3000
 
 ### Primeiro acesso
 
-O banco de produção inicia limpo (apenas os status configuráveis). A primeira
-conta super admin é criada diretamente no banco — em `/admin/equipe` você cria
-os demais usuários (equipe e clientes) pela interface.
+Com o banco limpo, a aplicação abre o **wizard `/setup`**: o passo 1 cria a
+conta do super admin e o passo 2 guia a configuração da marca, do emissor, do
+SMTP e do Asaas (tudo ajustável depois em `/admin/configuracoes`).
 
 Para popular com **dados de demonstração** em ambiente de desenvolvimento,
 rode `npm run db:seed` (empresa XPTO, projeto, demanda e usuários fictícios).
+
+## White-label e revenda (nova instância por cliente)
+
+O sistema é personalizável por instância, sem rebuild: nome, logo, favicon e
+cores (primária e fundo) ficam em `app_settings["brand.config"]` e são
+aplicados em runtime no admin, portal, login, orçamento público, e-mails e
+PDF do orçamento. A configuração é feita em **Admin → Configurações → Marca**
+(super admin) ou durante a instalação.
+
+Para instalar uma nova instância:
+
+```bash
+npm run setup   # pergunta DATABASE_URL/Blob/timezone, gera AUTH_SECRET e
+                # CRON_SECRET únicos, roda migrations + seed mínimo
+```
+
+Depois do deploy (na Vercel, cadastre as mesmas variáveis de ambiente), abra
+`https://SEU-DOMINIO/setup` para criar o super admin e personalizar a marca.
+Checklist pós-deploy: webhook do Asaas apontado para
+`https://SEU-DOMINIO/api/webhooks/asaas` (token em Configurações) e env
+`CRON_SECRET` cadastrada (cron de lembretes em `vercel.json`).
 
 ## Scripts
 
@@ -73,6 +96,8 @@ rode `npm run db:seed` (empresa XPTO, projeto, demanda e usuários fictícios).
 | `npm run db:generate` | Gera migração a partir do schema Drizzle |
 | `npm run db:migrate`  | Aplica migrações pendentes               |
 | `npm run db:seed`     | Popula o banco com dados demo            |
+| `npm run db:seed:minimal` | Apenas os dados obrigatórios (status) |
+| `npm run setup`       | Instalador de nova instância (white-label) |
 | `npm run db:studio`   | Drizzle Studio (inspeção do banco)       |
 
 ## Estrutura
@@ -144,4 +169,4 @@ src/
 - App mobile (companion do portal do cliente)
 - Integrações externas (webhooks, API pública com tokens)
 - Faturamento/contratos vinculados aos projetos
-- White-label por cliente (logo e cores no portal)
+- Multi-instância gerenciada (painel central das instâncias white-label)

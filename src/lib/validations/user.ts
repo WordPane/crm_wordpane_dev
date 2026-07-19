@@ -25,6 +25,19 @@ const passwordUpdate = z
   .optional()
   .or(z.literal(""));
 
+/** Criação do primeiro super admin (wizard /setup de novas instâncias). */
+export const bootstrapAdminSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1, "Informe o nome.")
+    .max(120, "Máximo de 120 caracteres."),
+  email: z.email("Informe um e-mail válido.").max(255),
+  password: passwordCreate,
+});
+
+export type BootstrapAdminValues = z.infer<typeof bootstrapAdminSchema>;
+
 const baseUserFields = {
   name: z
     .string()

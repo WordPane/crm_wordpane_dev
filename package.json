@@ -10,6 +10,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "tsx src/lib/db/seed.ts",
+    "db:seed:minimal": "tsx src/lib/db/seed-minimal.ts",
+    "setup": "tsx scripts/setup.ts",
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {

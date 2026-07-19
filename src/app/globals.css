@@ -53,7 +53,8 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-/* Tema WordPane — dark-only (fiel ao wordpane_dev) */
+/* Tema padrão (WordPane) — dark-only. Instâncias white-label recebem
+   overrides dessas variáveis via <style> injetado no layout raiz. */
 :root,
 .dark {
   --green: #00d164;
@@ -98,6 +99,7 @@
   --brand-gradient: linear-gradient(120deg, #00d164 0%, #31b068 100%);
   --glow-primary: 0 8px 28px rgba(0, 209, 100, 0.35);
   --glow-primary-hover: 0 12px 34px rgba(0, 209, 100, 0.45);
+  --hero-glow: rgba(0, 209, 100, 0.16);
 }
 
 @layer base {
@@ -123,11 +125,11 @@
   .gradient-text {
     background: linear-gradient(
       120deg,
-      #00d164 0%,
-      #8df5bb 25%,
-      #00d164 50%,
-      #31b068 75%,
-      #00d164 100%
+      var(--green) 0%,
+      var(--green-light) 25%,
+      var(--green) 50%,
+      var(--green-2) 75%,
+      var(--green) 100%
     );
     background-size: 300% 100%;
     -webkit-background-clip: text;
@@ -142,12 +144,12 @@
 
   /* Header/sidebar de vidro */
   .glass {
-    background: rgba(7, 25, 40, 0.82);
+    background: color-mix(in srgb, var(--navy) 82%, transparent);
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
   }
 
-  /* Chip verde translúcido (status/badges da marca) */
+  /* Chip translúcido da marca (status/badges) */
   .chip {
     display: inline-flex;
     align-items: center;
@@ -158,8 +160,8 @@
     font-weight: 600;
     letter-spacing: 0.04em;
     color: var(--green);
-    background: rgba(0, 209, 100, 0.08);
-    border: 1px solid rgba(0, 209, 100, 0.3);
+    background: color-mix(in srgb, var(--green) 8%, transparent);
+    border: 1px solid color-mix(in srgb, var(--green) 30%, transparent);
     white-space: nowrap;
   }
 
@@ -171,7 +173,7 @@
   .hero-glow {
     background: radial-gradient(
       circle at 50% 0%,
-      rgba(0, 209, 100, 0.16) 0%,
+      var(--hero-glow) 0%,
       transparent 60%
     );
   }

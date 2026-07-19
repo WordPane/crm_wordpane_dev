@@ -4,6 +4,7 @@ import {
   asc,
   between,
   eq,
+  inArray,
   isNotNull,
   isNull,
   lte,
@@ -18,6 +19,7 @@ import {
 } from "@/lib/access/permissions";
 import { db } from "@/lib/db";
 import {
+  charges,
   companies,
   milestones,
   projects,
@@ -25,11 +27,14 @@ import {
   tasks,
   taskStatuses,
 } from "@/lib/db/schema";
-import type {
-  CalendarEvent,
-  CalendarSummary,
+import {
+  CHARGE_EVENT_COLOR,
+  type CalendarEvent,
+  type CalendarSummary,
 } from "@/lib/queries/calendar";
+import { chargeStatusLabels } from "@/lib/validations/finance";
 import { milestoneStatusLabels } from "@/lib/validations/project";
+import { formatCurrency } from "@/lib/utils/format";
 
 /**
  * Agenda do portal: mesmos eventos da agenda interna, mas escopados à
@@ -50,13 +55,19 @@ function todayStr(): string {
 const milestoneStatusColors: Record<string, string> = {
   pendente: "#9ca3af",
   em_andamento: "#38bdf8",
-  concluida: "#00d164",
+  concluida: "var(--green)",
 };
 
 /** Eventos de vencimento (projetos, etapas e tarefas visíveis) da empresa. */
 export async function getPortalCalendarEvents(
   user: SessionUser,
-  filters: { from: string; to: string; projectId?: string },
+  filters: {
+    from: string;
+    to: string;
+    projectId?: string;
+    /** Tipos exibidos (vazio/ausente = todos). */
+    types?: CalendarEvent["type"][];
+  },
 ): Promise<CalendarEvent[]> {
   const companyId = requireClientCompanyId(user);
   const today = todayStr();
@@ -64,7 +75,7 @@ export async function getPortalCalendarEvents(
     ? eq(projects.id, filters.projectId)
     : undefined;
 
-  const [projectRows, milestoneRows, taskRows] = await Promise.all([
+  const [projectRows, milestoneRows, taskRows, chargeRows] = await Promise.all([
     db
       .select({
         id: projects.id,
@@ -130,6 +141,25 @@ export async function getPortalCalendarEvents(
           projectFilter,
         ),
       ),
+    // Cobranças em aberto da empresa — sem vínculo com projeto
+    filters.projectId
+      ? Promise.resolve([])
+      : db
+          .select({
+            id: charges.id,
+            title: charges.description,
+            dueDate: charges.dueDate,
+            valueCents: charges.valueCents,
+            status: charges.status,
+          })
+          .from(charges)
+          .where(
+            and(
+              eq(charges.companyId, companyId),
+              inArray(charges.status, ["pending", "overdue"]),
+              between(charges.dueDate, filters.from, filters.to),
+            ),
+          ),
   ]);
 
   const events: CalendarEvent[] = [
@@ -183,16 +213,36 @@ export async function getPortalCalendarEvents(
         statusColor: r.statusColor ?? undefined,
       };
     }),
+    ...chargeRows.map((r): CalendarEvent => {
+      const date = r.dueDate;
+      return {
+        id: r.id,
+        date,
+        type: "charge",
+        title: r.title,
+        subtitle: formatCurrency(r.valueCents),
+        href: "/portal/financeiro",
+        done: false,
+        overdue: date < today,
+        statusName: chargeStatusLabels[r.status],
+        statusColor: CHARGE_EVENT_COLOR,
+      };
+    }),
   ];
 
-  const typeOrder = { project: 0, milestone: 1, task: 2 } as const;
-  events.sort(
+  const typeOrder = { project: 0, milestone: 1, task: 2, charge: 3 } as const;
+  // Filtro por tipo (a query é a mesma; filtrar aqui mantém as 4 consultas paralelas)
+  const typeFilter = filters.types?.length ? filters.types : null;
+  const filtered = typeFilter
+    ? events.filter((event) => typeFilter.includes(event.type))
+    : events;
+  filtered.sort(
     (a, b) =>
       a.date.localeCompare(b.date) ||
       typeOrder[a.type] - typeOrder[b.type] ||
       a.title.localeCompare(b.title, "pt-BR"),
   );
-  return events;
+  return filtered;
 }
 
 /** Contagens de vencimentos não concluídos da empresa do cliente. */
@@ -212,7 +262,7 @@ export async function getPortalCalendarSummary(
     eq(taskStatuses.isFinal, false),
   );
 
-  const [projectRows, milestoneRows, taskRows] = await Promise.all([
+  const [projectRows, milestoneRows, taskRows, chargeRows] = await Promise.all([
     db
       .select({ dueDate: projects.dueDate })
       .from(projects)
@@ -251,13 +301,28 @@ export async function getPortalCalendarSummary(
           taskNotDone,
         ),
       ),
+    db
+      .select({ dueDate: charges.dueDate })
+      .from(charges)
+      .where(
+        and(
+          eq(charges.companyId, companyId),
+          inArray(charges.status, ["pending", "overdue"]),
+          lte(charges.dueDate, limit30),
+        ),
+      ),
   ]);
 
   const tomorrow = format(addDays(new Date(), 1), "yyyy-MM-dd");
   const limit7 = format(addDays(new Date(), 7), "yyyy-MM-dd");
 
   const summary = { vencidos: 0, hoje: 0, proximos7: 0, proximos30: 0 };
-  for (const { dueDate } of [...projectRows, ...milestoneRows, ...taskRows]) {
+  for (const { dueDate } of [
+    ...projectRows,
+    ...milestoneRows,
+    ...taskRows,
+    ...chargeRows,
+  ]) {
     const date = dueDate!;
     if (date < today) summary.vencidos += 1;
     else if (date === today) summary.hoje += 1;

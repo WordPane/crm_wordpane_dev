@@ -101,7 +101,7 @@ export function NotificationBell({
       >
         <Bell className="size-4" />
         {unread > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#00d164] px-1 text-[0.6rem] font-bold text-[#071928]">
+          <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[0.6rem] font-bold text-primary-foreground">
             {unread > 99 ? "99+" : unread}
           </span>
         )}
@@ -132,7 +132,7 @@ export function NotificationBell({
                   onClick={() => handleItemClick(item)}
                   className={cn(
                     "flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-white/[0.04]",
-                    isUnread && "bg-[rgba(0,209,100,0.05)]",
+                    isUnread && "bg-primary/5",
                   )}
                 >
                   <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-muted ring-1 ring-border">
@@ -152,7 +152,7 @@ export function NotificationBell({
                     </span>
                   </span>
                   {isUnread && (
-                    <span className="mt-1.5 size-2 shrink-0 rounded-full bg-[#00d164]" />
+                    <span className="mt-1.5 size-2 shrink-0 rounded-full bg-primary" />
                   )}
                 </button>
               );
@@ -164,7 +164,7 @@ export function NotificationBell({
           <Link
             href={viewAllHref}
             onClick={() => setOpen(false)}
-            className="block rounded-lg px-3 py-2 text-center text-sm font-medium text-[#00d164] transition-colors hover:bg-[rgba(0,209,100,0.08)]"
+            className="block rounded-lg px-3 py-2 text-center text-sm font-medium text-primary transition-colors hover:bg-primary/10"
           >
             Ver todas
           </Link>

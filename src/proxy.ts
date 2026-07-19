@@ -14,6 +14,9 @@ export default auth((req) => {
 
   if (isPublicQuote) return NextResponse.next();
 
+  // Wizard de instalação: a página faz a própria guarda de estado/sessão
+  if (path === "/setup") return NextResponse.next();
+
   if (!session?.user) {
     if (isPublic) return NextResponse.next();
     return NextResponse.redirect(new URL("/login", nextUrl));

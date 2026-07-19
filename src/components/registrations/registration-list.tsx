@@ -230,7 +230,7 @@ export function RegistrationList({
                             <div className="flex flex-wrap items-center gap-3">
                               {registration.status === "aprovado" ? (
                                 <>
-                                  <p className="rounded-lg border border-[#00d164]/40 bg-[#00d164]/10 px-3 py-2 text-sm text-[#00d164]">
+                                  <p className="rounded-lg border border-primary/40 bg-primary/10 px-3 py-2 text-sm text-primary">
                                     Aprovado — empresa e acesso criados
                                   </p>
                                   {registration.approvedCompanyId && (

@@ -6,6 +6,7 @@ import { notFound } from "next/navigation";
 import { QuoteStatusChip } from "@/components/chips";
 import { Card, CardContent } from "@/components/ui/card";
 import { ForbiddenError, requireUser } from "@/lib/access/permissions";
+import { getBranding } from "@/lib/brand/settings";
 import { listPortalQuotes } from "@/lib/queries/portal";
 import {
   formatCurrency,
@@ -17,6 +18,7 @@ export const metadata: Metadata = { title: "Orçamentos" };
 
 export default async function PortalQuotesPage() {
   const user = await requireUser();
+  const brand = await getBranding();
 
   let quotes;
   try {
@@ -31,7 +33,7 @@ export default async function PortalQuotesPage() {
       <div>
         <h1 className="text-2xl font-extrabold">Orçamentos</h1>
         <p className="text-sm text-muted-foreground">
-          Propostas enviadas pela equipe WordPane para a sua empresa.
+          Propostas enviadas pela equipe {brand.appName} para a sua empresa.
         </p>
       </div>
 

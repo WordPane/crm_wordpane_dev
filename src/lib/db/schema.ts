@@ -83,6 +83,10 @@ export const quoteStatusEnum = pgEnum("quote_status", [
   "approved",
   "rejected",
 ]);
+export const quoteDiscountTypeEnum = pgEnum("quote_discount_type", [
+  "amount",
+  "percent",
+]);
 export const serviceBillingEnum = pgEnum("service_billing", [
   "one_time",
   "recurring",
@@ -468,6 +472,11 @@ export const quotes = pgTable(
     status: quoteStatusEnum("status").notNull().default("draft"),
     validUntil: date("valid_until"),
     discountCents: integer("discount_cents").notNull().default(0),
+    discountType: quoteDiscountTypeEnum("discount_type")
+      .notNull()
+      .default("amount"),
+    /** Percentual × 100 quando discountType = "percent" (10,5% = 1050). */
+    discountPercentBps: integer("discount_percent_bps").notNull().default(0),
     totalCents: integer("total_cents").notNull().default(0),
     createdBy: uuid("created_by")
       .notNull()

@@ -65,7 +65,7 @@ function TaskRow({ task }: { task: ProjectTaskItem }) {
     <li className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2.5">
       <Link
         href={`/admin/tarefas/${task.id}`}
-        className="font-medium text-foreground transition-colors hover:text-[#00d164]"
+        className="font-medium text-foreground transition-colors hover:text-primary"
       >
         {task.title}
       </Link>

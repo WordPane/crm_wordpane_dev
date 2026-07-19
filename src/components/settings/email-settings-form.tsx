@@ -29,8 +29,10 @@ import {
 } from "@/server/actions/email-settings";
 
 export function EmailSettingsForm({
+  appName,
   settings,
 }: {
+  appName: string;
   settings: MaskedEmailSettings | null;
 }) {
   const router = useRouter();
@@ -47,7 +49,7 @@ export function EmailSettingsForm({
       user: settings?.user ?? "",
       password: "",
       fromEmail: settings?.fromEmail ?? "",
-      fromName: settings?.fromName ?? "WordPane CRM",
+      fromName: settings?.fromName ?? appName,
       appUrl:
         settings?.appUrl ??
         (typeof window !== "undefined" ? window.location.origin : ""),
@@ -196,7 +198,7 @@ export function EmailSettingsForm({
               <Label htmlFor="smtp-from-name">Nome do remetente *</Label>
               <Input
                 id="smtp-from-name"
-                placeholder="Ex.: WordPane CRM"
+                placeholder={`Ex.: ${appName}`}
                 aria-invalid={!!errors.fromName}
                 {...form.register("fromName")}
               />

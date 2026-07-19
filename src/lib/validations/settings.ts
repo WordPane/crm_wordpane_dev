@@ -61,6 +61,26 @@ export const asaasSettingsSchema = z.object({
 
 export type AsaasSettingsValues = z.infer<typeof asaasSettingsSchema>;
 
+/** Identidade visual white-label (app_settings["brand.config"]). */
+export const brandSettingsSchema = z.object({
+  appName: z
+    .string()
+    .trim()
+    .min(1, "Nome do sistema é obrigatório.")
+    .max(60, "Máximo de 60 caracteres."),
+  /** URL http (blob), fileKey do storage local ou path estático "/brand/...". */
+  logoUrl: z.string().trim().min(1, "Envie a logo.").max(500),
+  faviconUrl: z.string().trim().min(1, "Envie o favicon.").max(500),
+  primaryColor: z
+    .string()
+    .regex(/^#[0-9a-fA-F]{6}$/, "Cor inválida (use #RRGGBB)."),
+  backgroundColor: z
+    .string()
+    .regex(/^#[0-9a-fA-F]{6}$/, "Cor inválida (use #RRGGBB)."),
+});
+
+export type BrandSettingsValues = z.infer<typeof brandSettingsSchema>;
+
 /** Dados do emissor exibidos no PDF do orçamento (app_settings["issuer.info"]). */
 export const issuerSettingsSchema = z.object({
   displayName: z

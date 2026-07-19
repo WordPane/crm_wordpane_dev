@@ -16,9 +16,11 @@ import {
 import { updateOwnProfile } from "@/server/actions/profile";
 
 export function ProfileNameForm({
+  appName,
   defaultName,
   email,
 }: {
+  appName: string;
   defaultName: string;
   email: string;
 }) {
@@ -60,7 +62,7 @@ export function ProfileNameForm({
         <Label htmlFor="pf-email">E-mail</Label>
         <Input id="pf-email" value={email} disabled readOnly />
         <p className="text-xs text-muted-foreground">
-          O e-mail de acesso só pode ser alterado pela equipe WordPane.
+          O e-mail de acesso só pode ser alterado pela equipe {appName}.
         </p>
       </div>
 

@@ -12,6 +12,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { requireUser } from "@/lib/access/permissions";
+import { getBranding } from "@/lib/brand/settings";
 import { getPortalProfile } from "@/lib/queries/portal";
 
 export const metadata: Metadata = { title: "Perfil" };
@@ -20,6 +21,8 @@ export default async function PortalProfilePage() {
   const user = await requireUser();
   const profile = await getPortalProfile(user);
   if (!profile) notFound();
+
+  const brand = await getBranding();
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -49,11 +52,12 @@ export default async function PortalProfilePage() {
         <CardHeader>
           <CardTitle>Dados pessoais</CardTitle>
           <CardDescription>
-            Como a equipe WordPane identifica você.
+            Como a equipe {brand.appName} identifica você.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <PortalProfileForm
+            appName={brand.appName}
             email={profile.email}
             defaultValues={{
               name: profile.name,

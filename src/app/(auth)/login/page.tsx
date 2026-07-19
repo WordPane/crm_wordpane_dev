@@ -1,17 +1,31 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
+
+import { brandAssetUrl } from "@/lib/brand/config";
+import { getBranding } from "@/lib/brand/settings";
+import { hasSuperAdmin } from "@/lib/setup";
 
 import { LoginForm } from "./login-form";
 
 export const metadata: Metadata = { title: "Entrar" };
 
-export default function LoginPage() {
+export default async function LoginPage() {
+  // Instância nova sem super admin → wizard de configuração inicial
+  if (!(await hasSuperAdmin())) redirect("/setup");
+
+  const brand = await getBranding();
+
   return (
     <main className="hero-glow flex min-h-screen items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center gap-4 text-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brand/logo-white.png" alt="WordPane" className="h-9 w-auto" />
+          <img
+            src={brandAssetUrl(brand, "logo")}
+            alt={brand.appName}
+            className="h-9 w-auto"
+          />
           <p className="text-sm text-muted-foreground">
             Gestão de clientes, projetos e demandas
           </p>
@@ -33,7 +47,7 @@ export default function LoginPage() {
         </p>
 
         <p className="mt-6 text-center text-xs text-muted-foreground/60">
-          © {new Date().getFullYear()} WordPane — Uso interno e clientes
+          © {new Date().getFullYear()} {brand.appName} — Uso interno e clientes
         </p>
       </div>
     </main>

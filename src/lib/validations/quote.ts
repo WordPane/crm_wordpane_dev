@@ -11,12 +11,24 @@ export const quoteStatusLabels: Record<Quote["status"], string> = {
   rejected: "Recusado",
 };
 
+export const quoteDiscountTypes = ["amount", "percent"] as const;
+
+export const quoteDiscountTypeLabels: Record<Quote["discountType"], string> = {
+  amount: "R$",
+  percent: "%",
+};
+
 /** "1.234,56" → 123456 centavos. Null quando o formato é inválido. */
 export function parseCurrencyToCents(value: string): number | null {
   const cleaned = value.trim().replace(/\./g, "").replace(",", ".");
   if (!cleaned) return 0; // campo vazio = zero
   if (!/^\d+(\.\d{1,2})?$/.test(cleaned)) return null;
   return Math.round(Number(cleaned) * 100);
+}
+
+/** "10,5" → 1050 pontos-base (10,50%). Null quando o formato é inválido. */
+export function parsePercentToBps(value: string): number | null {
+  return parseCurrencyToCents(value); // mesmo formato: dígitos + até 2 casas
 }
 
 /** "1,5" → 1.5. Null quando inválida ou ≤ 0. */
@@ -57,7 +69,8 @@ export const quoteFormSchema = z.object({
     .min(1, "Informe o título do orçamento.")
     .max(220, "Título muito longo."),
   validUntil: z.string(), // "YYYY-MM-DD" ou ""
-  discount: z.string(), // "1.234,56" ou "" (sem desconto)
+  discount: z.string(), // "1.234,56" (R$) ou "10,5" (%) — "" = sem desconto
+  discountType: z.enum(quoteDiscountTypes),
   notes: z.string(),
   items: z
     .array(
@@ -79,6 +92,7 @@ export const emptyQuoteValues: QuoteFormValues = {
   title: "",
   validUntil: "",
   discount: "",
+  discountType: "amount",
   notes: "",
   items: [{ description: "", quantity: "1", unitPrice: "", serviceId: "" }],
 };
@@ -95,6 +109,13 @@ export const quotePayloadSchema = z.object({
     .or(z.literal("")),
   notes: z.string().trim().max(2000, "Observações muito longas.").optional(),
   discountCents: z.number().int().min(0, "Desconto inválido."),
+  discountType: z.enum(quoteDiscountTypes),
+  /** Percentual × 100 (10,5% = 1050). Obrigatório quando tipo = percent. */
+  discountPercentBps: z
+    .number()
+    .int()
+    .min(0, "Percentual inválido.")
+    .max(10000, "O desconto não pode passar de 100%."),
   items: z
     .array(
       z.object({

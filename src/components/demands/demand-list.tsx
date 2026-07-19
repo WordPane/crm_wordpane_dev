@@ -198,7 +198,7 @@ export function DemandList({
                             Projeto:{" "}
                             <Link
                               href={`/admin/projetos/${demand.projectId}`}
-                              className="font-medium text-[#00d164] hover:underline"
+                              className="font-medium text-primary hover:underline"
                             >
                               {demand.projectName}
                             </Link>

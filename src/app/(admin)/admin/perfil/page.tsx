@@ -12,6 +12,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { requireTeam, requireUser } from "@/lib/access/permissions";
+import { getBranding } from "@/lib/brand/settings";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 
@@ -29,6 +30,8 @@ export default async function AdminProfilePage() {
     .limit(1);
   if (!profile) notFound();
 
+  const brand = await getBranding();
+
   return (
     <div className="space-y-6">
       <div>
@@ -45,7 +48,11 @@ export default async function AdminProfilePage() {
             <CardDescription>Como você aparece para a equipe.</CardDescription>
           </CardHeader>
           <CardContent>
-            <ProfileNameForm defaultName={profile.name} email={profile.email} />
+            <ProfileNameForm
+              appName={brand.appName}
+              defaultName={profile.name}
+              email={profile.email}
+            />
           </CardContent>
         </Card>
 

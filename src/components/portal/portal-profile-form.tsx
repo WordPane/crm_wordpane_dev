@@ -18,9 +18,11 @@ import { updatePortalProfile } from "@/server/actions/portal";
 
 /** Dados pessoais do cliente (nome, telefone, cargo) — e-mail é fixo. */
 export function PortalProfileForm({
+  appName,
   email,
   defaultValues,
 }: {
+  appName: string;
   email: string;
   defaultValues: PortalProfileValues;
 }) {
@@ -66,7 +68,7 @@ export function PortalProfileForm({
         <Label htmlFor="pf-email">E-mail</Label>
         <Input id="pf-email" value={email} disabled />
         <p className="text-xs text-muted-foreground">
-          O e-mail de acesso é gerenciado pela equipe WordPane.
+          O e-mail de acesso é gerenciado pela equipe {appName}.
         </p>
       </div>
 

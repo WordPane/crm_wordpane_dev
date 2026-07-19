@@ -101,7 +101,7 @@ export default async function CompaniesPage({
                   <TableCell>
                     <Link
                       href={`/admin/clientes/${c.id}`}
-                      className="block font-medium text-foreground transition-colors hover:text-[#00d164]"
+                      className="block font-medium text-foreground transition-colors hover:text-primary"
                     >
                       {c.nomeFantasia || c.razaoSocial}
                       {c.nomeFantasia && (

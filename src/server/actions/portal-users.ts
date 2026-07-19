@@ -9,6 +9,7 @@ import {
   requireUser,
   type SessionUser,
 } from "@/lib/access/permissions";
+import { getBranding } from "@/lib/brand/settings";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import {
@@ -104,9 +105,9 @@ export async function updatePortalCompanyUser(
     // Proteção contra lockout: o admin não remove o próprio acesso à gestão
     if (target.id === user.id) {
       if (!data.isCompanyAdmin) {
+        const brand = await getBranding();
         return {
-          error:
-            "Você não pode remover o seu próprio acesso de admin. Peça a outro admin da empresa ou à equipe WordPane.",
+          error: `Você não pode remover o seu próprio acesso de admin. Peça a outro admin da empresa ou à equipe ${brand.appName}.`,
         };
       }
       if (data.status === "suspended") {

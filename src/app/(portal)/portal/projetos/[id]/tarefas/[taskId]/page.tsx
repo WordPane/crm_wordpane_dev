@@ -124,7 +124,7 @@ export default async function PortalTaskDetailPage({
                   {checklist.map((item) => (
                     <li key={item.id} className="flex items-center gap-2 py-1">
                       {item.done ? (
-                        <CheckCircle2 className="size-4 shrink-0 text-[#00d164]" />
+                        <CheckCircle2 className="size-4 shrink-0 text-primary" />
                       ) : (
                         <Circle className="size-4 shrink-0 text-muted-foreground" />
                       )}
@@ -205,7 +205,7 @@ export default async function PortalTaskDetailPage({
                 <dd>
                   <Link
                     href={`/portal/projetos/${project.id}`}
-                    className="transition-colors hover:text-[#00d164]"
+                    className="transition-colors hover:text-primary"
                   >
                     {project.name}
                   </Link>

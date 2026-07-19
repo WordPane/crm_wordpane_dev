@@ -32,7 +32,7 @@ export function CalendarDay({ events }: { events: CalendarEvent[] }) {
             <Link
               href={event.href}
               className={cn(
-                "block truncate text-sm font-medium transition-colors hover:text-[#00d164]",
+                "block truncate text-sm font-medium transition-colors hover:text-primary",
                 event.done && "line-through",
               )}
             >

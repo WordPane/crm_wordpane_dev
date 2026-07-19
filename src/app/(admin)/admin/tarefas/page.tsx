@@ -109,7 +109,7 @@ export default async function TasksPage({
                     <TableCell>
                       <Link
                         href={`/admin/tarefas/${t.id}`}
-                        className="font-medium text-foreground transition-colors hover:text-[#00d164]"
+                        className="font-medium text-foreground transition-colors hover:text-primary"
                       >
                         {t.title}
                       </Link>

@@ -40,8 +40,8 @@ export function RevenueChart({ data }: { data: RevenueMonth[] }) {
               <div
                 className={`w-full rounded-t-md transition-all ${
                   isLast
-                    ? "bg-gradient-to-t from-[#00d164]/50 to-[#00d164]"
-                    : "bg-gradient-to-t from-[#00d164]/15 to-[#00d164]/50"
+                    ? "bg-gradient-to-t from-primary/50 to-primary"
+                    : "bg-gradient-to-t from-primary/15 to-primary/50"
                 }`}
                 style={{ height: `${height}%` }}
                 title={`${month.label}: ${formatCurrency(month.cents)}`}

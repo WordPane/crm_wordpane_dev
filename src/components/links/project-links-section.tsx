@@ -110,7 +110,7 @@ export function ProjectLinksSection({
                       href={link.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex min-w-0 items-center gap-1.5 text-sm font-medium break-all text-foreground transition-colors hover:text-[#00d164]"
+                      className="inline-flex min-w-0 items-center gap-1.5 text-sm font-medium break-all text-foreground transition-colors hover:text-primary"
                     >
                       <ExternalLink className="size-3.5 shrink-0" />
                       {link.url}

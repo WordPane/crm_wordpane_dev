@@ -17,6 +17,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import type { UserRole } from "@/lib/auth/types";
+import { brandAssetUrl, type BrandConfig } from "@/lib/brand/config";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
@@ -36,7 +37,13 @@ const SUPER_ONLY_ITEMS = [
   { href: "/admin/configuracoes", label: "Configurações", icon: Settings },
 ] as const;
 
-export function AdminSidebar({ role }: { role: UserRole }) {
+export function AdminSidebar({
+  role,
+  brand,
+}: {
+  role: UserRole;
+  brand: BrandConfig;
+}) {
   const pathname = usePathname();
   const items =
     role === "super_admin" ? [...NAV_ITEMS, ...SUPER_ONLY_ITEMS] : NAV_ITEMS;
@@ -45,7 +52,11 @@ export function AdminSidebar({ role }: { role: UserRole }) {
     <aside className="glass fixed inset-y-0 left-0 z-40 flex w-60 flex-col border-r border-sidebar-border">
       <div className="flex h-16 items-center border-b border-sidebar-border px-5">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/brand/logo-white.png" alt="WordPane" className="h-7 w-auto" />
+        <img
+          src={brandAssetUrl(brand, "logo")}
+          alt={brand.appName}
+          className="h-7 w-auto"
+        />
       </div>
 
       <nav className="flex-1 space-y-1 overflow-y-auto p-3">
@@ -58,7 +69,7 @@ export function AdminSidebar({ role }: { role: UserRole }) {
               className={cn(
                 "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
                 active
-                  ? "bg-[rgba(0,209,100,0.08)] text-[#00d164]"
+                  ? "bg-primary/10 text-primary"
                   : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground",
               )}
             >
@@ -71,7 +82,7 @@ export function AdminSidebar({ role }: { role: UserRole }) {
 
       <div className="border-t border-sidebar-border p-4">
         <p className="text-[0.65rem] tracking-widest text-muted-foreground/50 uppercase">
-          WordPane CRM · Admin
+          {brand.appName} · Admin
         </p>
       </div>
     </aside>

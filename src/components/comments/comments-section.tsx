@@ -50,7 +50,7 @@ function renderCommentBody(body: string, mentionNames: string[]): ReactNode {
       return (
         <span
           key={index}
-          className="rounded-md bg-[rgba(0,209,100,0.12)] px-1 py-0.5 font-medium text-[#00d164]"
+          className="rounded-md bg-primary/10 px-1 py-0.5 font-medium text-primary"
         >
           {part}
         </span>

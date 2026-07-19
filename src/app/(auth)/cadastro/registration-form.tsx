@@ -118,7 +118,7 @@ export function RegistrationCard() {
   if (submitted) {
     return (
       <div className="flex flex-col items-center gap-4 py-8 text-center">
-        <CircleCheck className="size-12 text-[#00d164]" />
+        <CircleCheck className="size-12 text-primary" />
         <h1 className="text-lg font-bold">Cadastro recebido!</h1>
         <p className="max-w-md text-sm text-muted-foreground">
           Nossa equipe vai analisar e ativar seu acesso em breve. Quando estiver

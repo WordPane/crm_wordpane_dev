@@ -19,11 +19,14 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { formatCurrency } from "@/lib/utils/format";
+import { formatCurrency, formatPercentBps } from "@/lib/utils/format";
 import {
   emptyQuoteValues,
   parseCurrencyToCents,
+  parsePercentToBps,
   parseQuantity,
+  quoteDiscountTypeLabels,
+  quoteDiscountTypes,
   quoteFormSchema,
   type QuoteFormValues,
   type QuotePayload,
@@ -109,13 +112,24 @@ export function QuoteForm(props: QuoteFormProps) {
   // Totais ao vivo: refletem o que será salvo (pt-BR: vírgula = decimal)
   const watchedItems = useWatch({ control: form.control, name: "items" });
   const watchedDiscount = useWatch({ control: form.control, name: "discount" });
+  const watchedDiscountType = useWatch({
+    control: form.control,
+    name: "discountType",
+  });
   const subtotalCents = watchedItems.reduce((sum, item) => {
     const quantity = parseQuantity(item.quantity);
     const unitPriceCents = parseCurrencyToCents(item.unitPrice);
     if (quantity === null || unitPriceCents === null) return sum;
     return sum + Math.round(quantity * unitPriceCents);
   }, 0);
-  const discountCents = parseCurrencyToCents(watchedDiscount) ?? 0;
+  const discountBps =
+    watchedDiscountType === "percent"
+      ? (parsePercentToBps(watchedDiscount) ?? 0)
+      : 0;
+  const discountCents =
+    watchedDiscountType === "percent"
+      ? Math.round((subtotalCents * discountBps) / 10000)
+      : (parseCurrencyToCents(watchedDiscount) ?? 0);
   const totalCents = subtotalCents - discountCents;
 
   function onSubmit(values: QuoteFormValues) {
@@ -141,10 +155,27 @@ export function QuoteForm(props: QuoteFormProps) {
       });
     }
 
-    const parsedDiscount = parseCurrencyToCents(values.discount);
-    if (parsedDiscount === null) {
-      setError("Desconto inválido (ex.: 500,00).");
-      return;
+    let discountCents = 0;
+    let discountPercentBps = 0;
+    if (values.discountType === "percent") {
+      const bps = parsePercentToBps(values.discount);
+      if (bps === null || bps > 10000) {
+        setError("Percentual de desconto inválido (0 a 100).");
+        return;
+      }
+      discountPercentBps = bps;
+      discountCents = Math.round(
+        (items.reduce((s, i) => s + Math.round(i.quantity * i.unitPriceCents), 0) *
+          bps) /
+          10000,
+      );
+    } else {
+      const parsedDiscount = parseCurrencyToCents(values.discount);
+      if (parsedDiscount === null) {
+        setError("Desconto inválido (ex.: 500,00).");
+        return;
+      }
+      discountCents = parsedDiscount;
     }
 
     const payload: QuotePayload = {
@@ -152,7 +183,9 @@ export function QuoteForm(props: QuoteFormProps) {
       title: values.title,
       validUntil: values.validUntil,
       notes: values.notes,
-      discountCents: parsedDiscount,
+      discountCents,
+      discountType: values.discountType,
+      discountPercentBps,
       items,
     };
 
@@ -238,16 +271,45 @@ export function QuoteForm(props: QuoteFormProps) {
         </Field>
 
         <Field
-          label="Desconto (R$)"
+          label="Desconto"
           htmlFor="qf-discount"
           error={errors.discount?.message}
         >
-          <Input
-            id="qf-discount"
-            inputMode="decimal"
-            placeholder="0,00"
-            {...form.register("discount")}
-          />
+          <div className="flex gap-2">
+            <Input
+              id="qf-discount"
+              className="flex-1"
+              inputMode="decimal"
+              placeholder="0,00"
+              {...form.register("discount")}
+            />
+            <Controller
+              control={form.control}
+              name="discountType"
+              render={({ field }) => (
+                <Select
+                  value={field.value}
+                  onValueChange={(value) => field.onChange(value)}
+                >
+                  <SelectTrigger className="w-20" aria-label="Tipo de desconto">
+                    <SelectValue>
+                      {(value: string | null) => {
+                        const t = quoteDiscountTypes.find((t) => t === value);
+                        return t ? quoteDiscountTypeLabels[t] : "";
+                      }}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {quoteDiscountTypes.map((t) => (
+                      <SelectItem key={t} value={t}>
+                        {quoteDiscountTypeLabels[t]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
+          </div>
         </Field>
       </div>
 
@@ -388,7 +450,12 @@ export function QuoteForm(props: QuoteFormProps) {
             <span>{formatCurrency(subtotalCents)}</span>
           </div>
           <div className="flex justify-between text-muted-foreground">
-            <span>Desconto</span>
+            <span>
+              Desconto
+              {watchedDiscountType === "percent" &&
+                discountBps > 0 &&
+                ` (${formatPercentBps(discountBps)})`}
+            </span>
             <span>− {formatCurrency(discountCents)}</span>
           </div>
           <div className="flex justify-between border-t border-border pt-1 text-base font-bold">
