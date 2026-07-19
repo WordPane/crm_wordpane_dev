@@ -113,6 +113,21 @@ function describe(activity: ActivityItem): string {
   }
 }
 
+/** Frase completa para eventos sem autor (sistema/webhook/link público). */
+function describeSystem(activity: ActivityItem): string {
+  const m = activity.metadata ?? {};
+  if (activity.action === "charge.received") {
+    const company = str(m.company);
+    const description = str(m.description) ?? "";
+    const value = str(m.value) ?? "";
+    return company
+      ? `Recebemos o pagamento de ${company} — "${description}" (${value})`
+      : `Recebemos o pagamento de "${description}" (${value})`;
+  }
+  // Demais eventos sem autor já trazem o nome no texto (ex.: link público)
+  return describe(activity);
+}
+
 /** Timeline vertical de atividades (projeto ou tarefa). */
 export function ActivityTimeline({
   activities,
@@ -140,12 +155,18 @@ export function ActivityTimeline({
               <Icon className="size-3.5 text-muted-foreground" />
             </span>
             <p className="text-sm leading-snug">
-              <span className="font-medium">
-                {activity.actor?.name ?? "Alguém"}
-              </span>{" "}
-              <span className="text-muted-foreground">
-                {describe(activity)}
-              </span>
+              {activity.actor ? (
+                <>
+                  <span className="font-medium">{activity.actor.name}</span>{" "}
+                  <span className="text-muted-foreground">
+                    {describe(activity)}
+                  </span>
+                </>
+              ) : (
+                <span className="font-medium">
+                  {describeSystem(activity)}
+                </span>
+              )}
             </p>
             <p
               className="mt-0.5 text-xs text-muted-foreground"

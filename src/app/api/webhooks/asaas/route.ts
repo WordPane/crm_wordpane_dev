@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { logActivity } from "@/lib/activities";
@@ -6,6 +6,7 @@ import { getAsaasSettings } from "@/lib/asaas/settings";
 import { db } from "@/lib/db";
 import {
   charges,
+  companies,
   companyServices,
   webhookEvents,
   type Charge,
@@ -206,6 +207,13 @@ export async function POST(request: Request) {
       }
       case "PAYMENT_RECEIVED": {
         await setChargeStatus(charge.id, "received", new Date());
+        const [company] = await db
+          .select({
+            name: sql<string>`coalesce(${companies.nomeFantasia}, ${companies.razaoSocial})`,
+          })
+          .from(companies)
+          .where(eq(companies.id, charge.companyId))
+          .limit(1);
         await logActivity({
           actorId: null,
           companyId: charge.companyId,
@@ -215,6 +223,7 @@ export async function POST(request: Request) {
           metadata: {
             description: charge.description,
             value: formatCurrency(charge.valueCents),
+            company: company?.name ?? null,
           },
         });
         const team = await teamUsersOfCompany(charge.companyId);
