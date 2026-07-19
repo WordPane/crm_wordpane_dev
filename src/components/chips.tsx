@@ -4,12 +4,14 @@ import type {
   Demand,
   Milestone,
   Project,
+  Quote,
   User,
 } from "@/lib/db/schema";
 import {
   demandCategoryLabels,
   demandStatusLabels,
 } from "@/lib/validations/demand";
+import { quoteStatusLabels } from "@/lib/validations/quote";
 import { registrationStatusLabels } from "@/lib/validations/registration";
 import {
   milestoneStatusLabels,
@@ -153,6 +155,21 @@ export function DemandCategoryChip({ category }: { category: Demand["category"] 
   return (
     <span className="chip border-border bg-muted text-muted-foreground">
       {demandCategoryLabels[category]}
+    </span>
+  );
+}
+
+const quoteStatusClasses: Record<Quote["status"], string> = {
+  draft: "border-border bg-muted text-muted-foreground",
+  sent: "border-sky-400/30 bg-sky-400/10 text-sky-300",
+  approved: "",
+  rejected: "border-red-400/30 bg-red-400/10 text-red-300",
+};
+
+export function QuoteStatusChip({ status }: { status: Quote["status"] }) {
+  return (
+    <span className={cn("chip", quoteStatusClasses[status])}>
+      {quoteStatusLabels[status]}
     </span>
   );
 }

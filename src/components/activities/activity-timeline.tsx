@@ -1,6 +1,7 @@
 import {
   Building2,
   Clock,
+  FileText,
   Flag,
   FolderKanban,
   Inbox,
@@ -25,6 +26,7 @@ const ICONS: Record<string, LucideIcon> = {
   demand: Inbox,
   member: Users,
   company: Building2,
+  quote: FileText,
 };
 
 function str(value: unknown): string | null {
@@ -71,6 +73,20 @@ function describe(activity: ActivityItem): string {
       return `mudou o status da demanda "${str(m.title) ?? ""}" de "${str(m.from) ?? "—"}" para "${str(m.to) ?? "—"}"`;
     case "demand.converted":
       return `converteu a demanda "${str(m.title) ?? ""}" em tarefa`;
+    case "quote.created":
+      return `criou o orçamento ${str(m.number) ?? ""} "${str(m.title) ?? ""}"`;
+    case "quote.deleted":
+      return `excluiu o rascunho de orçamento ${str(m.number) ?? ""}`;
+    case "quote.sent":
+      return `enviou o orçamento ${str(m.number) ?? ""} ao cliente`;
+    case "quote.approved":
+      return `${str(m.name) ?? "O cliente"} aprovou o orçamento ${str(m.number) ?? ""}`;
+    case "quote.rejected":
+      return `${str(m.name) ?? "O cliente"} recusou o orçamento ${str(m.number) ?? ""}`;
+    case "quote.duplicated":
+      return `duplicou o orçamento ${str(m.from) ?? ""} como ${str(m.number) ?? ""} (v${typeof m.version === "number" ? m.version : "?"})`;
+    case "quote.project_created":
+      return `criou um projeto a partir do orçamento ${str(m.number) ?? ""}`;
     default:
       return activity.action;
   }

@@ -29,6 +29,20 @@
       "when": 1784393850178,
       "tag": "0003_mean_whirlwind",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1784427304698,
+      "tag": "0004_condemned_nocturne",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1784429613472,
+      "tag": "0005_great_anthem",
+      "breakpoints": true
     }
   ]
 }

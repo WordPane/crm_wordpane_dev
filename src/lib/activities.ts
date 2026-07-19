@@ -2,7 +2,8 @@ import { db } from "@/lib/db";
 import { activities } from "@/lib/db/schema";
 
 export type LogActivityInput = {
-  actorId: string;
+  /** Null quando a ação partiu de um link público (sem usuário autenticado). */
+  actorId: string | null;
   companyId?: string | null;
   projectId?: string | null;
   /** project | milestone | task | comment | attachment | demand | link | company | member */

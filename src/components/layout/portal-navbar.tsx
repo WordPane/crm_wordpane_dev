@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  FileText,
   FolderKanban,
   Inbox,
   LayoutDashboard,
@@ -33,11 +34,12 @@ const NAV_ITEMS = [
   { href: "/portal/dashboard", label: "Início", icon: LayoutDashboard },
   { href: "/portal/projetos", label: "Projetos", icon: FolderKanban },
   { href: "/portal/demandas", label: "Demandas", icon: Inbox },
+  { href: "/portal/orcamentos", label: "Orçamentos", icon: FileText },
   { href: "/portal/arquivos", label: "Arquivos", icon: Paperclip },
   { href: "/portal/perfil", label: "Perfil", icon: UserRound },
 ] as const;
 
-// Item extra para o admin da empresa (entre "Demandas" e "Arquivos")
+// Item extra para o admin da empresa (entre "Demandas" e "Orçamentos")
 const USERS_NAV_ITEM = {
   href: "/portal/usuarios",
   label: "Usuários",

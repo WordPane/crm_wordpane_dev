@@ -5,13 +5,16 @@ import {
   index,
   integer,
   jsonb,
+  numeric,
   pgEnum,
   pgTable,
+  serial,
   text,
   timestamp,
   uniqueIndex,
   uuid,
   varchar,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 
 // ─────────────────────────── Enums ───────────────────────────
@@ -73,6 +76,12 @@ export const registrationStatusEnum = pgEnum("registration_status", [
   "pendente",
   "aprovado",
   "recusado",
+]);
+export const quoteStatusEnum = pgEnum("quote_status", [
+  "draft",
+  "sent",
+  "approved",
+  "rejected",
 ]);
 
 // ─────────────────────────── Empresas (clientes) ───────────────────────────
@@ -401,6 +410,67 @@ export const demands = pgTable(
   ],
 );
 
+// ─────────────────────────── Orçamentos ───────────────────────────
+
+export const quotes = pgTable(
+  "quotes",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    number: serial("number").notNull(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    title: varchar("title", { length: 220 }).notNull(),
+    notes: text("notes"), // condições, prazos, observações exibidas no orçamento
+    status: quoteStatusEnum("status").notNull().default("draft"),
+    validUntil: date("valid_until"),
+    discountCents: integer("discount_cents").notNull().default(0),
+    totalCents: integer("total_cents").notNull().default(0),
+    createdBy: uuid("created_by")
+      .notNull()
+      .references(() => users.id),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    respondedAt: timestamp("responded_at", { withTimezone: true }),
+    respondedBy: uuid("responded_by").references(() => users.id),
+    responseNote: text("response_note"), // comentário/motivo do cliente
+    projectId: uuid("project_id").references(() => projects.id), // projeto gerado
+    publicToken: uuid("public_token").notNull().defaultRandom(), // link público de aprovação
+    version: integer("version").notNull().default(1), // revisão (duplicar = nova versão)
+    duplicatedFromId: uuid("duplicated_from_id").references(
+      (): AnyPgColumn => quotes.id,
+    ),
+    respondedName: varchar("responded_name", { length: 160 }), // nome informado no link público
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("quotes_number_key").on(t.number),
+    uniqueIndex("quotes_public_token_key").on(t.publicToken),
+    index("quotes_company_idx").on(t.companyId),
+    index("quotes_status_idx").on(t.status),
+  ],
+);
+
+export const quoteItems = pgTable(
+  "quote_items",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    quoteId: uuid("quote_id")
+      .notNull()
+      .references(() => quotes.id, { onDelete: "cascade" }),
+    description: text("description").notNull(),
+    quantity: numeric("quantity", { precision: 10, scale: 2 }).notNull(),
+    unitPriceCents: integer("unit_price_cents").notNull(),
+    totalCents: integer("total_cents").notNull(),
+    position: integer("position").notNull().default(0),
+  },
+  (t) => [index("quote_items_quote_idx").on(t.quoteId)],
+);
+
 // ─────────────────────────── Cadastro público (aprovação manual) ───────────────────────────
 
 export const clientRegistrations = pgTable(
@@ -650,6 +720,30 @@ export const demandsRelations = relations(demands, ({ one }) => ({
   author: one(users, { fields: [demands.createdBy], references: [users.id] }),
 }));
 
+export const quotesRelations = relations(quotes, ({ one, many }) => ({
+  company: one(companies, {
+    fields: [quotes.companyId],
+    references: [companies.id],
+  }),
+  creator: one(users, { fields: [quotes.createdBy], references: [users.id] }),
+  responder: one(users, {
+    fields: [quotes.respondedBy],
+    references: [users.id],
+  }),
+  project: one(projects, {
+    fields: [quotes.projectId],
+    references: [projects.id],
+  }),
+  items: many(quoteItems),
+}));
+
+export const quoteItemsRelations = relations(quoteItems, ({ one }) => ({
+  quote: one(quotes, {
+    fields: [quoteItems.quoteId],
+    references: [quotes.id],
+  }),
+}));
+
 export const projectLinksRelations = relations(projectLinks, ({ one }) => ({
   project: one(projects, {
     fields: [projectLinks.projectId],
@@ -689,6 +783,10 @@ export type TaskChecklistItem = typeof taskChecklistItems.$inferSelect;
 export type Comment = typeof comments.$inferSelect;
 export type Attachment = typeof attachments.$inferSelect;
 export type Demand = typeof demands.$inferSelect;
+export type Quote = typeof quotes.$inferSelect;
+export type NewQuote = typeof quotes.$inferInsert;
+export type QuoteItem = typeof quoteItems.$inferSelect;
+export type NewQuoteItem = typeof quoteItems.$inferInsert;
 export type ClientRegistration = typeof clientRegistrations.$inferSelect;
 export type NewClientRegistration = typeof clientRegistrations.$inferInsert;
 export type ProjectLink = typeof projectLinks.$inferSelect;

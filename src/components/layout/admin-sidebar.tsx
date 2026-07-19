@@ -3,6 +3,7 @@
 import {
   Building2,
   CalendarDays,
+  FileText,
   FolderKanban,
   Inbox,
   LayoutDashboard,
@@ -24,6 +25,7 @@ const NAV_ITEMS = [
   { href: "/admin/projetos", label: "Projetos", icon: FolderKanban },
   { href: "/admin/demandas", label: "Demandas", icon: Inbox },
   { href: "/admin/tarefas", label: "Tarefas", icon: ListChecks },
+  { href: "/admin/orcamentos", label: "Orçamentos", icon: FileText },
 ] as const;
 
 const SUPER_ONLY_ITEMS = [

@@ -8,13 +8,16 @@ import {
 } from "@/lib/db/schema";
 import { sendEmail } from "@/lib/email/mailer";
 import { getEmailSettings } from "@/lib/email/settings";
+import type { EmailTemplateRow } from "@/lib/email/templates";
 
 export type NotificationInput = {
-  /** comment | demand.created | demand.status | upload */
+  /** comment | demand.created | demand.status | upload | quote.sent | quote.approved | quote.rejected */
   type: string;
   title: string;
   body?: string | null;
   href?: string | null;
+  /** Linhas label/valor exibidas no corpo do e-mail (opcional). */
+  rows?: EmailTemplateRow[];
 };
 
 /** Insere notificações em lote (deduplica destinatários, ignora lista vazia). */
@@ -62,6 +65,7 @@ async function emailNotificationRecipients(
           subject: n.title,
           title: n.title,
           intro: n.body ?? n.title,
+          rows: n.rows,
           cta: n.href
             ? { label: "Ver no CRM", url: `${settings.appUrl}${n.href}` }
             : undefined,

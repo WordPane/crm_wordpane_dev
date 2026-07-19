@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 import {
@@ -16,6 +16,8 @@ import {
   projectLinks,
   projects,
   projectStatuses,
+  quoteItems,
+  quotes,
   taskChecklistItems,
   tasks,
   taskStatuses,
@@ -24,6 +26,8 @@ import {
   type Milestone,
   type Project,
   type ProjectLink,
+  type Quote,
+  type QuoteItem,
   type Task,
   type TaskChecklistItem,
   type User,
@@ -799,4 +803,90 @@ export async function listPortalFiles(
             ? { kind: "demand", label: r.demandTitle, href: "/portal/demandas" }
             : null,
   }));
+}
+
+// ─────────────────────────── Orçamentos ───────────────────────────
+
+export type PortalQuoteListItem = {
+  id: string;
+  number: number;
+  title: string;
+  status: Quote["status"];
+  totalCents: number;
+  validUntil: string | null;
+  sentAt: Date | null;
+  respondedAt: Date | null;
+};
+
+/**
+ * Orçamentos enviados à empresa do cliente (rascunhos nunca aparecem),
+ * mais recentes primeiro.
+ */
+export async function listPortalQuotes(
+  user: SessionUser,
+): Promise<PortalQuoteListItem[]> {
+  const companyId = requireClientCompanyId(user);
+
+  return db
+    .select({
+      id: quotes.id,
+      number: quotes.number,
+      title: quotes.title,
+      status: quotes.status,
+      totalCents: quotes.totalCents,
+      validUntil: quotes.validUntil,
+      sentAt: quotes.sentAt,
+      respondedAt: quotes.respondedAt,
+    })
+    .from(quotes)
+    .where(and(eq(quotes.companyId, companyId), ne(quotes.status, "draft")))
+    .orderBy(desc(quotes.number));
+}
+
+export type PortalQuoteDetail = {
+  quote: Quote;
+  items: QuoteItem[];
+  responderName: string | null;
+};
+
+/**
+ * Orçamento da empresa do cliente — null quando não existe, é de outra
+ * empresa ou ainda é rascunho (a página responde notFound).
+ */
+export async function getPortalQuote(
+  user: SessionUser,
+  id: string,
+): Promise<PortalQuoteDetail | null> {
+  const companyId = requireClientCompanyId(user);
+
+  const [quote] = await db
+    .select()
+    .from(quotes)
+    .where(
+      and(
+        eq(quotes.id, id),
+        eq(quotes.companyId, companyId),
+        ne(quotes.status, "draft"),
+      ),
+    )
+    .limit(1);
+
+  if (!quote) return null;
+
+  const [items, responder] = await Promise.all([
+    db
+      .select()
+      .from(quoteItems)
+      .where(eq(quoteItems.quoteId, id))
+      .orderBy(asc(quoteItems.position)),
+    quote.respondedBy
+      ? db
+          .select({ name: users.name })
+          .from(users)
+          .where(eq(users.id, quote.respondedBy))
+          .limit(1)
+      : Promise.resolve([]),
+  ]);
+
+  return { quote, items, responderName: responder[0]?.name ?? null };
 }

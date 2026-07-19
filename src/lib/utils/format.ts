@@ -29,6 +29,19 @@ export function isOverdue(value: Date | string | null | undefined): boolean {
   return isPast(d);
 }
 
+/** "R$ 1.234,56" — valores monetários são inteiros em centavos. */
+export function formatCurrency(cents: number): string {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(cents / 100);
+}
+
+/** 7 → "ORC-0007" */
+export function formatQuoteNumber(number: number): string {
+  return `ORC-${String(number).padStart(4, "0")}`;
+}
+
 /** "1,4 MB" */
 export function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;

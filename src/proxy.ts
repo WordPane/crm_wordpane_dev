@@ -9,6 +9,10 @@ export default auth((req) => {
   const isLogin = path === "/login";
   const isCadastro = path === "/cadastro";
   const isPublic = isLogin || isCadastro;
+  // Link público de orçamento: acessível com ou sem sessão
+  const isPublicQuote = path.startsWith("/orcamento");
+
+  if (isPublicQuote) return NextResponse.next();
 
   if (!session?.user) {
     if (isPublic) return NextResponse.next();
