@@ -229,6 +229,11 @@ export type PortalUpcomingTask = {
 export type PortalDashboardData = {
   activeProjects: number;
   openDemands: number;
+  /** Orçamentos enviados aguardando aprovação do cliente. */
+  pendingQuotes: number;
+  openChargesCount: number;
+  openChargesCents: number;
+  overdueChargesCount: number;
   upcomingTasks: PortalUpcomingTask[];
   projects: PortalProjectListItem[];
 };
@@ -239,47 +244,64 @@ export async function getPortalDashboard(
 ): Promise<PortalDashboardData> {
   const companyId = requireClientCompanyId(user);
 
-  const [projectList, upcomingRows, [openDemandsRow]] = await Promise.all([
-    listPortalProjects(user),
-    db
-      .select({
-        id: tasks.id,
-        title: tasks.title,
-        dueDate: tasks.dueDate,
-        projectId: projects.id,
-        projectName: projects.name,
-        statusId: taskStatuses.id,
-        statusName: taskStatuses.name,
-        statusColor: taskStatuses.color,
-        statusIsFinal: taskStatuses.isFinal,
-      })
-      .from(tasks)
-      .innerJoin(projects, eq(tasks.projectId, projects.id))
-      .leftJoin(taskStatuses, eq(tasks.statusId, taskStatuses.id))
-      .where(
-        and(
-          eq(projects.companyId, companyId),
-          eq(tasks.visibleToClient, true),
-          isNull(tasks.completedAt),
-          sql`${tasks.dueDate} >= current_date`,
+  const [projectList, upcomingRows, [openDemandsRow], [pendingQuotesRow], [openChargesRow]] =
+    await Promise.all([
+      listPortalProjects(user),
+      db
+        .select({
+          id: tasks.id,
+          title: tasks.title,
+          dueDate: tasks.dueDate,
+          projectId: projects.id,
+          projectName: projects.name,
+          statusId: taskStatuses.id,
+          statusName: taskStatuses.name,
+          statusColor: taskStatuses.color,
+          statusIsFinal: taskStatuses.isFinal,
+        })
+        .from(tasks)
+        .innerJoin(projects, eq(tasks.projectId, projects.id))
+        .leftJoin(taskStatuses, eq(tasks.statusId, taskStatuses.id))
+        .where(
+          and(
+            eq(projects.companyId, companyId),
+            eq(tasks.visibleToClient, true),
+            isNull(tasks.completedAt),
+            sql`${tasks.dueDate} >= current_date`,
+          ),
+        )
+        .orderBy(asc(tasks.dueDate), asc(tasks.createdAt))
+        .limit(5),
+      db
+        .select({ value: sql<number>`count(*)::int` })
+        .from(demands)
+        .where(
+          and(
+            eq(demands.companyId, companyId),
+            inArray(demands.status, ["aberta", "em_analise", "em_andamento"]),
+          ),
         ),
-      )
-      .orderBy(asc(tasks.dueDate), asc(tasks.createdAt))
-      .limit(5),
-    db
-      .select({ value: sql<number>`count(*)::int` })
-      .from(demands)
-      .where(
-        and(
-          eq(demands.companyId, companyId),
-          inArray(demands.status, ["aberta", "em_analise", "em_andamento"]),
-        ),
-      ),
-  ]);
+      db
+        .select({ value: sql<number>`count(*)::int` })
+        .from(quotes)
+        .where(and(eq(quotes.companyId, companyId), eq(quotes.status, "sent"))),
+      db
+        .select({
+          openCount: sql<number>`count(*) filter (where ${charges.status} in ('pending', 'overdue'))::int`,
+          openCents: sql<number>`coalesce(sum(${charges.valueCents}) filter (where ${charges.status} in ('pending', 'overdue')), 0)::int`,
+          overdueCount: sql<number>`count(*) filter (where ${charges.status} = 'overdue')::int`,
+        })
+        .from(charges)
+        .where(eq(charges.companyId, companyId)),
+    ]);
 
   return {
     activeProjects: projectList.filter((p) => !p.status?.isFinal).length,
     openDemands: openDemandsRow?.value ?? 0,
+    pendingQuotes: pendingQuotesRow?.value ?? 0,
+    openChargesCount: openChargesRow?.openCount ?? 0,
+    openChargesCents: openChargesRow?.openCents ?? 0,
+    overdueChargesCount: openChargesRow?.overdueCount ?? 0,
     upcomingTasks: upcomingRows
       .filter((r): r is typeof r & { dueDate: string } => r.dueDate !== null)
       .map((r) => ({

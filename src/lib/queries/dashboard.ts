@@ -11,11 +11,13 @@ import { db } from "@/lib/db";
 import {
   activities,
   attachments,
+  charges,
   comments,
   companies,
   demands,
   projects,
   projectStatuses,
+  quotes,
   tasks,
   taskStatuses,
   users,
@@ -30,6 +32,12 @@ export type DashboardCounts = {
   demandsInProgress: number;
   demandsDone: number;
   clientsActive: number;
+  /** Orçamentos enviados aguardando resposta do cliente. */
+  quotesPending: number;
+  chargesOpen: number;
+  chargesOverdue: number;
+  chargesOpenCents: number;
+  chargesReceivedMonthCents: number;
 };
 
 export type UpcomingItem = {
@@ -82,6 +90,11 @@ const EMPTY_DATA: AdminDashboardData = {
     demandsInProgress: 0,
     demandsDone: 0,
     clientsActive: 0,
+    quotesPending: 0,
+    chargesOpen: 0,
+    chargesOverdue: 0,
+    chargesOpenCents: 0,
+    chargesReceivedMonthCents: 0,
   },
   upcoming: [],
   activities: [],
@@ -97,7 +110,7 @@ export async function getAdminDashboard(
   const scope = await visibleCompanyIds(user);
   if (scope && scope.length === 0) return EMPTY_DATA;
 
-  const [projectCountRows, demandCountRows, clientCountRows] =
+  const [projectCountRows, demandCountRows, clientCountRows, quoteCountRows, chargeCountRows] =
     await Promise.all([
       db
         .select({
@@ -125,6 +138,24 @@ export async function getAdminDashboard(
             scope ? inArray(companies.id, scope) : undefined,
           ),
         ),
+      db
+        .select({ value: sql<number>`count(*)::int` })
+        .from(quotes)
+        .where(
+          and(
+            eq(quotes.status, "sent"),
+            scope ? inArray(quotes.companyId, scope) : undefined,
+          ),
+        ),
+      db
+        .select({
+          openCount: sql<number>`count(*) filter (where ${charges.status} in ('pending', 'overdue'))::int`,
+          openCents: sql<number>`coalesce(sum(${charges.valueCents}) filter (where ${charges.status} in ('pending', 'overdue')), 0)::int`,
+          overdueCount: sql<number>`count(*) filter (where ${charges.status} = 'overdue')::int`,
+          receivedMonthCents: sql<number>`coalesce(sum(${charges.valueCents}) filter (where ${charges.status} in ('received', 'confirmed') and date_trunc('month', ${charges.paidAt}) = date_trunc('month', current_date)), 0)::int`,
+        })
+        .from(charges)
+        .where(scope ? inArray(charges.companyId, scope) : undefined),
     ]);
 
   const [upcoming, activityRows, uploadRows, commentRows] = await Promise.all([
@@ -136,6 +167,7 @@ export async function getAdminDashboard(
 
   const projectCounts = projectCountRows[0];
   const demandCounts = demandCountRows[0];
+  const chargeCounts = chargeCountRows[0];
 
   return {
     counts: {
@@ -146,6 +178,11 @@ export async function getAdminDashboard(
       demandsInProgress: demandCounts?.inProgress ?? 0,
       demandsDone: demandCounts?.done ?? 0,
       clientsActive: clientCountRows[0]?.value ?? 0,
+      quotesPending: quoteCountRows[0]?.value ?? 0,
+      chargesOpen: chargeCounts?.openCount ?? 0,
+      chargesOverdue: chargeCounts?.overdueCount ?? 0,
+      chargesOpenCents: chargeCounts?.openCents ?? 0,
+      chargesReceivedMonthCents: chargeCounts?.receivedMonthCents ?? 0,
     },
     upcoming,
     activities: activityRows,

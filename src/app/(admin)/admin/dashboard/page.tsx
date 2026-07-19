@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/card";
 import { requireTeam, requireUser } from "@/lib/access/permissions";
 import { getAdminDashboard } from "@/lib/queries/dashboard";
-import { formatDate, formatFileSize, timeAgo } from "@/lib/utils/format";
+import { formatCurrency, formatDate, formatFileSize, timeAgo } from "@/lib/utils/format";
 
 export const metadata: Metadata = { title: "Dashboard" };
 
@@ -76,6 +76,34 @@ export default async function AdminDashboardPage() {
     { label: "Clientes ativos", value: counts.clientsActive },
   ];
 
+  const financeCards = [
+    {
+      label: "Recebido no mês",
+      value: formatCurrency(counts.chargesReceivedMonthCents),
+      alert: false,
+      href: "/admin/financeiro",
+    },
+    {
+      label: "Cobranças em aberto",
+      value: formatCurrency(counts.chargesOpenCents),
+      hint: `${counts.chargesOpen} ${counts.chargesOpen === 1 ? "cobrança" : "cobranças"}`,
+      alert: false,
+      href: "/admin/financeiro",
+    },
+    {
+      label: "Cobranças vencidas",
+      value: counts.chargesOverdue,
+      alert: counts.chargesOverdue > 0,
+      href: "/admin/financeiro?status=overdue",
+    },
+    {
+      label: "Orçamentos aguardando resposta",
+      value: counts.quotesPending,
+      alert: false,
+      href: "/admin/orcamentos?status=sent",
+    },
+  ];
+
   return (
     <div className="space-y-6">
       <div>
@@ -83,6 +111,32 @@ export default async function AdminDashboardPage() {
         <p className="text-sm text-muted-foreground">
           Olá, {user.name.split(" ")[0]} — visão geral da operação.
         </p>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {financeCards.map((card) => (
+          <Link key={card.label} href={card.href}>
+            <Card className="h-full transition-colors hover:border-[rgba(0,209,100,0.4)]">
+              <CardHeader>
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  {card.label}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p
+                  className={`text-3xl font-extrabold ${card.alert ? "text-[#ff6b6b]" : "text-[#00d164]"}`}
+                >
+                  {card.value}
+                </p>
+                {"hint" in card && card.hint && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {card.hint}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          </Link>
+        ))}
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

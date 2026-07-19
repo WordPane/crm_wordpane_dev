@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  CalendarDays,
   FileText,
   FolderKanban,
   Inbox,
@@ -16,6 +17,7 @@ import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
   { href: "/portal/dashboard", label: "Início", icon: LayoutDashboard },
+  { href: "/portal/agenda", label: "Agenda", icon: CalendarDays },
   { href: "/portal/projetos", label: "Projetos", icon: FolderKanban },
   { href: "/portal/demandas", label: "Demandas", icon: Inbox },
   { href: "/portal/orcamentos", label: "Orçamentos", icon: FileText },
@@ -23,7 +25,7 @@ const NAV_ITEMS = [
   { href: "/portal/arquivos", label: "Arquivos", icon: Paperclip },
 ] as const;
 
-// Item extra para o admin da empresa (entre "Orçamentos" e "Financeiro")
+// Item extra para o admin da empresa (entre "Demandas" e "Orçamentos")
 const USERS_NAV_ITEM = {
   href: "/portal/usuarios",
   label: "Usuários",

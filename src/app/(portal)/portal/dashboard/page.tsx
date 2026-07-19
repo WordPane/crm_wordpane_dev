@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Calendar, FolderKanban, Inbox, Plus } from "lucide-react";
+import { Calendar, FileText, FolderKanban, Inbox, Plus, Wallet } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -15,7 +15,7 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { ForbiddenError, requireUser } from "@/lib/access/permissions";
 import { getPortalCompany, getPortalDashboard } from "@/lib/queries/portal";
-import { formatDate } from "@/lib/utils/format";
+import { formatCurrency, formatDate } from "@/lib/utils/format";
 import { projectTypeLabels } from "@/lib/validations/project";
 
 export const metadata: Metadata = { title: "Início" };
@@ -55,79 +55,133 @@ export default async function PortalDashboardPage() {
       </div>
 
       {/* ─── Cards-resumo ─── */}
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-              <FolderKanban className="size-4" />
-              Projetos ativos
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-extrabold text-[#00d164]">
-              {data.activeProjects}
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              de {data.projects.length}{" "}
-              {data.projects.length === 1 ? "projeto no total" : "projetos no total"}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-              <Inbox className="size-4" />
-              Demandas em aberto
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-extrabold text-[#00d164]">
-              {data.openDemands}
-            </p>
-            <Link
-              href="/portal/demandas"
-              className="mt-1 inline-block text-xs text-muted-foreground transition-colors hover:text-foreground"
-            >
-              Ver todas as demandas →
-            </Link>
-          </CardContent>
-        </Card>
-
-        <Card className="sm:col-span-2 lg:col-span-1">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-              <Calendar className="size-4" />
-              Próximos prazos
-            </CardTitle>
-            <CardDescription>Tarefas com entrega prevista</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {data.upcomingTasks.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                Nenhum prazo futuro no momento.
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <Link href="/portal/projetos">
+          <Card className="h-full transition-colors hover:border-[rgba(0,209,100,0.4)]">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                <FolderKanban className="size-4" />
+                Projetos ativos
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-3xl font-extrabold text-[#00d164]">
+                {data.activeProjects}
               </p>
-            ) : (
-              <ul className="space-y-2.5">
-                {data.upcomingTasks.map((task) => (
-                  <li key={task.id} className="flex items-center gap-2 text-sm">
-                    <Link
-                      href={`/portal/projetos/${task.projectId}/tarefas/${task.id}`}
-                      className="min-w-0 flex-1 truncate transition-colors hover:text-[#00d164]"
-                      title={`${task.projectName} · ${task.title}`}
-                    >
-                      {task.title}
-                    </Link>
-                    <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-                      {formatDate(task.dueDate)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
+              <p className="mt-1 text-xs text-muted-foreground">
+                de {data.projects.length}{" "}
+                {data.projects.length === 1 ? "projeto no total" : "projetos no total"}
+              </p>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link href="/portal/demandas">
+          <Card className="h-full transition-colors hover:border-[rgba(0,209,100,0.4)]">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                <Inbox className="size-4" />
+                Demandas em aberto
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-3xl font-extrabold text-[#00d164]">
+                {data.openDemands}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                acompanhe pela aba Demandas
+              </p>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link href="/portal/orcamentos">
+          <Card className="h-full transition-colors hover:border-[rgba(0,209,100,0.4)]">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                <FileText className="size-4" />
+                Orçamentos para aprovar
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p
+                className={`text-3xl font-extrabold ${data.pendingQuotes > 0 ? "text-amber-300" : "text-[#00d164]"}`}
+              >
+                {data.pendingQuotes}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {data.pendingQuotes > 0
+                  ? "aguardando sua resposta"
+                  : "nenhum pendente"}
+              </p>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link href="/portal/financeiro">
+          <Card className="h-full transition-colors hover:border-[rgba(0,209,100,0.4)]">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                <Wallet className="size-4" />
+                Cobranças em aberto
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p
+                className={`text-3xl font-extrabold ${data.overdueChargesCount > 0 ? "text-[#ff6b6b]" : "text-[#00d164]"}`}
+              >
+                {formatCurrency(data.openChargesCents)}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {data.openChargesCount}{" "}
+                {data.openChargesCount === 1 ? "cobrança" : "cobranças"}
+                {data.overdueChargesCount > 0 &&
+                  ` · ${data.overdueChargesCount} vencida${data.overdueChargesCount > 1 ? "s" : ""}`}
+              </p>
+            </CardContent>
+          </Card>
+        </Link>
       </div>
+
+      {/* ─── Próximos prazos ─── */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+            <Calendar className="size-4" />
+            Próximos prazos
+          </CardTitle>
+          <CardDescription>
+            Tarefas com entrega prevista — veja também na{" "}
+            <Link href="/portal/agenda" className="underline underline-offset-2 hover:text-foreground">
+              agenda
+            </Link>
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {data.upcomingTasks.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Nenhum prazo futuro no momento.
+            </p>
+          ) : (
+            <ul className="space-y-2.5">
+              {data.upcomingTasks.map((task) => (
+                <li key={task.id} className="flex items-center gap-2 text-sm">
+                  <Link
+                    href={`/portal/projetos/${task.projectId}/tarefas/${task.id}`}
+                    className="min-w-0 flex-1 truncate transition-colors hover:text-[#00d164]"
+                    title={`${task.projectName} · ${task.title}`}
+                  >
+                    {task.title}
+                  </Link>
+                  <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+                    {formatDate(task.dueDate)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
 
       {/* ─── Projetos ─── */}
       <section className="space-y-4">

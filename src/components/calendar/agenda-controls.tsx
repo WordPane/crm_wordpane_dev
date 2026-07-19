@@ -170,25 +170,27 @@ export function AgendaControls({
           ))}
         </div>
 
-        <Select value={companyId || ALL} onValueChange={onCompanyChange}>
-          <SelectTrigger aria-label="Filtrar por empresa">
-            <SelectValue placeholder="Empresa">
-              {(value: string | null) =>
-                !value || value === ALL
-                  ? "Todas as empresas"
-                  : (companies.find((c) => c.id === value)?.name ?? "Empresa")
-              }
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL}>Todas as empresas</SelectItem>
-            {companies.map((c) => (
-              <SelectItem key={c.id} value={c.id}>
-                {c.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {companies.length > 0 && (
+          <Select value={companyId || ALL} onValueChange={onCompanyChange}>
+            <SelectTrigger aria-label="Filtrar por empresa">
+              <SelectValue placeholder="Empresa">
+                {(value: string | null) =>
+                  !value || value === ALL
+                    ? "Todas as empresas"
+                    : (companies.find((c) => c.id === value)?.name ?? "Empresa")
+                }
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL}>Todas as empresas</SelectItem>
+              {companies.map((c) => (
+                <SelectItem key={c.id} value={c.id}>
+                  {c.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
 
         <Select
           value={projectId || ALL}
