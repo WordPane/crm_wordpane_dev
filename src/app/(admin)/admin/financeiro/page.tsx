@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ChargeStatusChip } from "@/components/chips";
 import { CancelChargeButton } from "@/components/finance/cancel-charge-button";
 import { ChargeFilters } from "@/components/finance/charge-filters";
+import { EditChargeButton } from "@/components/finance/edit-charge-button";
 import { EmitInvoiceButton } from "@/components/finance/emit-invoice-button";
 import { ResendChargeButton } from "@/components/finance/resend-charge-button";
 import { Button } from "@/components/ui/button";
@@ -255,6 +256,13 @@ export default async function FinancePage({
                       {(charge.status === "pending" ||
                         charge.status === "overdue") && (
                         <>
+                          <EditChargeButton
+                            chargeId={charge.id}
+                            description={charge.description}
+                            valueCents={charge.valueCents}
+                            billingType={charge.billingType}
+                            currentDueDate={charge.dueDate}
+                          />
                           <ResendChargeButton chargeId={charge.id} />
                           <CancelChargeButton
                             chargeId={charge.id}

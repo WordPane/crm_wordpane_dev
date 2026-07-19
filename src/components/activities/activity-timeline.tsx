@@ -102,6 +102,8 @@ function describe(activity: ActivityItem): string {
       return `recebeu o pagamento de "${str(m.description) ?? ""}" (${str(m.value) ?? ""})`;
     case "charge.cancelled":
       return `cancelou a cobrança "${str(m.description) ?? ""}"`;
+    case "charge.updated":
+      return `editou a cobrança "${str(m.description) ?? ""}"`;
     case "service.activated":
       return `ativou o serviço "${str(m.service) ?? ""}" (${str(m.value) ?? ""})`;
     case "service.deactivated":

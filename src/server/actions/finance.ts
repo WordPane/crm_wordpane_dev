@@ -17,6 +17,7 @@ import {
   deletePayment,
   deleteSubscription,
   ensureCustomer,
+  updatePayment,
 } from "@/lib/asaas/client";
 import { db } from "@/lib/db";
 import {
@@ -42,6 +43,7 @@ import {
   chargeFormSchema,
   chargeFromQuoteSchema,
   serviceFormSchema,
+  updateChargeSchema,
 } from "@/lib/validations/finance";
 import { parseCurrencyToCents } from "@/lib/validations/quote";
 import { actionError, type ActionResult } from "@/server/actions/utils";
@@ -283,6 +285,76 @@ export async function cancelCharge(chargeId: string): Promise<ActionResult> {
       entityId: chargeId,
       action: "charge.cancelled",
       metadata: { description: charge.description },
+    });
+
+    revalidateFinance(charge.companyId);
+    return { success: true };
+  } catch (error) {
+    return financeError(error);
+  }
+}
+
+/**
+ * Edita descrição, valor, meio de pagamento e vencimento da cobrança
+ * (no Asaas e local). O Asaas só permite alterar cobranças
+ * aguardando pagamento ou vencidas.
+ */
+export async function updateCharge(input: unknown): Promise<ActionResult> {
+  try {
+    const user = await requireUser();
+    requireTeam(user);
+    const data = updateChargeSchema.parse(input);
+
+    const valueCents = parseCurrencyToCents(data.value);
+    if (valueCents === null || valueCents <= 0) {
+      return { error: "Valor inválido (ex.: 1.500,00)." };
+    }
+
+    const [charge] = await db
+      .select()
+      .from(charges)
+      .where(eq(charges.id, data.chargeId))
+      .limit(1);
+    if (!charge) return { error: "Cobrança não encontrada." };
+    await assertCompanyAccess(user, charge.companyId);
+    if (charge.status !== "pending" && charge.status !== "overdue") {
+      return { error: "Só é possível editar cobranças em aberto." };
+    }
+    const unchanged =
+      charge.description === data.description &&
+      charge.billingType === data.billingType &&
+      charge.dueDate === data.dueDate &&
+      charge.valueCents === valueCents;
+    if (unchanged) return { success: true };
+
+    if (charge.asaasPaymentId) {
+      await updatePayment({
+        asaasPaymentId: charge.asaasPaymentId,
+        billingType: data.billingType,
+        valueCents,
+        dueDate: data.dueDate,
+        description: data.description,
+      });
+    }
+
+    await db
+      .update(charges)
+      .set({
+        description: data.description,
+        billingType: data.billingType,
+        valueCents,
+        dueDate: data.dueDate,
+        updatedAt: new Date(),
+      })
+      .where(eq(charges.id, data.chargeId));
+
+    await logActivity({
+      actorId: user.id,
+      companyId: charge.companyId,
+      entityType: "charge",
+      entityId: data.chargeId,
+      action: "charge.updated",
+      metadata: { description: data.description },
     });
 
     revalidateFinance(charge.companyId);

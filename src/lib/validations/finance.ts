@@ -123,3 +123,18 @@ export const chargeFromQuoteSchema = z.object({
 });
 
 export type ChargeFromQuoteValues = z.infer<typeof chargeFromQuoteSchema>;
+
+/** Edição de uma cobrança em aberto (descrição, valor, meio de pagamento, vencimento). */
+export const updateChargeSchema = z.object({
+  chargeId: z.uuid("Cobrança inválida."),
+  description: z
+    .string()
+    .trim()
+    .min(1, "Descreva a cobrança.")
+    .max(500, "Máximo de 500 caracteres."),
+  value: z.string().trim().min(1, "Informe o valor."),
+  billingType: z.enum(chargeBillingTypes),
+  dueDate: dateString,
+});
+
+export type UpdateChargeValues = z.infer<typeof updateChargeSchema>;

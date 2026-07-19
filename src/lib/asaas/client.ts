@@ -200,6 +200,27 @@ export async function deletePayment(asaasPaymentId: string): Promise<void> {
   await request(settings, "DELETE", `/payments/${asaasPaymentId}`);
 }
 
+/**
+ * Atualiza uma cobrança no Asaas (descrição, valor, meio de pagamento,
+ * vencimento). A API só permite atualizar cobranças aguardando
+ * pagamento ou vencidas.
+ */
+export async function updatePayment(input: {
+  asaasPaymentId: string;
+  billingType: LocalBillingType;
+  valueCents: number;
+  dueDate: string; // YYYY-MM-DD
+  description: string;
+}): Promise<void> {
+  const settings = await requireSettings();
+  await request(settings, "PUT", `/payments/${input.asaasPaymentId}`, {
+    billingType: asaasBillingType[input.billingType],
+    value: input.valueCents / 100,
+    dueDate: input.dueDate,
+    description: input.description,
+  });
+}
+
 export async function getPixQrCode(
   asaasPaymentId: string,
 ): Promise<AsaasPixQrCode> {
