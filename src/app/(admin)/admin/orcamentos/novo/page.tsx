@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/card";
 import { requireTeam, requireUser } from "@/lib/access/permissions";
 import { listCompanies } from "@/lib/queries/companies";
+import { listActiveServices } from "@/lib/queries/finance";
 
 export const metadata: Metadata = { title: "Novo orçamento" };
 
@@ -26,7 +27,10 @@ export default async function NewQuotePage({
   const { empresa } = await searchParams;
   const defaultCompanyId = (Array.isArray(empresa) ? empresa[0] : empresa) ?? "";
 
-  const companies = await listCompanies(user);
+  const [companies, services] = await Promise.all([
+    listCompanies(user),
+    listActiveServices(user),
+  ]);
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -55,6 +59,11 @@ export default async function NewQuotePage({
             companies={companies.map((c) => ({
               id: c.id,
               name: c.nomeFantasia || c.razaoSocial,
+            }))}
+            services={services.map((s) => ({
+              id: s.id,
+              name: s.name,
+              defaultValueCents: s.defaultValueCents,
             }))}
             defaultCompanyId={defaultCompanyId}
           />

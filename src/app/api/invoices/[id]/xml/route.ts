@@ -66,8 +66,16 @@ export async function GET(
     );
   }
 
-  const buffer = await getStorage().get(row.invoice.xmlKey);
+  const buffer = row.invoice.xmlKey
+    ? await getStorage().get(row.invoice.xmlKey)
+    : null;
+
+  // Arquivo indisponível no storage (ex.: NF emitida em outro ambiente) —
+  // cai para a URL original do Asaas
   if (!buffer) {
+    if (row.invoice.asaasXmlUrl) {
+      return NextResponse.redirect(row.invoice.asaasXmlUrl);
+    }
     return NextResponse.json(
       { error: "Arquivo não encontrado no armazenamento." },
       { status: 404 },

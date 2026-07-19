@@ -31,13 +31,33 @@ import {
 import { createQuote, updateQuote } from "@/server/actions/quotes";
 
 type SelectOption = { id: string; name: string };
+/** Serviço do catálogo para o seletor de itens (preenche descrição e valor). */
+type QuoteServiceOption = {
+  id: string;
+  name: string;
+  defaultValueCents: number;
+};
+
+/** 123456 → "1.234,56" (formato dos inputs monetários do formulário). */
+function centsToInput(cents: number): string {
+  return (cents / 100).toLocaleString("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
 
 type QuoteFormProps =
-  | { mode: "create"; companies: SelectOption[]; defaultCompanyId?: string }
+  | {
+      mode: "create";
+      companies: SelectOption[];
+      services: QuoteServiceOption[];
+      defaultCompanyId?: string;
+    }
   | {
       mode: "edit";
       quoteId: string;
       companies: SelectOption[];
+      services: QuoteServiceOption[];
       defaultValues: QuoteFormValues;
     };
 
@@ -62,6 +82,8 @@ function Field({
     </div>
   );
 }
+
+const MANUAL = "__manual__";
 
 export function QuoteForm(props: QuoteFormProps) {
   const router = useRouter();
@@ -115,6 +137,7 @@ export function QuoteForm(props: QuoteFormProps) {
         description: item.description.trim(),
         quantity,
         unitPriceCents,
+        serviceId: item.serviceId || "",
       });
     }
 
@@ -236,7 +259,7 @@ export function QuoteForm(props: QuoteFormProps) {
             variant="outline"
             size="sm"
             onClick={() =>
-              append({ description: "", quantity: "1", unitPrice: "" })
+              append({ description: "", quantity: "1", unitPrice: "", serviceId: "" })
             }
           >
             <Plus />
@@ -267,6 +290,55 @@ export function QuoteForm(props: QuoteFormProps) {
                 className="flex flex-wrap items-start gap-2 rounded-xl bg-muted/40 p-3 ring-1 ring-foreground/10"
               >
                 <div className="min-w-48 flex-1 space-y-1">
+                  {props.services.length > 0 && (
+                    <Select
+                      value={watchedItems[index]?.serviceId || MANUAL}
+                      onValueChange={(value) => {
+                        const serviceId = !value || value === MANUAL ? "" : value;
+                        form.setValue(`items.${index}.serviceId`, serviceId);
+                        if (serviceId) {
+                          const service = props.services.find(
+                            (s) => s.id === serviceId,
+                          );
+                          if (service) {
+                            form.setValue(
+                              `items.${index}.description`,
+                              service.name,
+                              { shouldValidate: true },
+                            );
+                            form.setValue(
+                              `items.${index}.unitPrice`,
+                              centsToInput(service.defaultValueCents),
+                            );
+                          }
+                        }
+                      }}
+                    >
+                      <SelectTrigger
+                        className="h-7 text-xs"
+                        aria-label="Serviço do catálogo"
+                      >
+                        <SelectValue placeholder="Do catálogo (opcional)">
+                          {(value: string | null) =>
+                            !value || value === MANUAL
+                              ? "Do catálogo (opcional)"
+                              : (props.services.find((s) => s.id === value)
+                                  ?.name ?? "Do catálogo (opcional)")
+                          }
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={MANUAL}>
+                          Digitar manualmente
+                        </SelectItem>
+                        {props.services.map((s) => (
+                          <SelectItem key={s.id} value={s.id}>
+                            {s.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
                   <Input
                     placeholder={`Descrição do item ${index + 1}`}
                     aria-invalid={!!errors.items?.[index]?.description}

@@ -501,6 +501,9 @@ export const quoteItems = pgTable(
     quoteId: uuid("quote_id")
       .notNull()
       .references(() => quotes.id, { onDelete: "cascade" }),
+    serviceId: uuid("service_id").references(() => services.id, {
+      onDelete: "set null",
+    }), // serviço do catálogo que originou o item (descrição/preço são snapshot)
     description: text("description").notNull(),
     quantity: numeric("quantity", { precision: 10, scale: 2 }).notNull(),
     unitPriceCents: integer("unit_price_cents").notNull(),

@@ -83,6 +83,7 @@ export async function createQuote(input: unknown): Promise<ActionResult> {
     await db.insert(quoteItems).values(
       data.items.map((item, index) => ({
         quoteId: quote.id,
+        serviceId: item.serviceId || null,
         description: item.description,
         quantity: String(item.quantity),
         unitPriceCents: item.unitPriceCents,
@@ -155,6 +156,7 @@ export async function updateQuote(
     await db.insert(quoteItems).values(
       data.items.map((item, index) => ({
         quoteId,
+        serviceId: item.serviceId || null,
         description: item.description,
         quantity: String(item.quantity),
         unitPriceCents: item.unitPriceCents,

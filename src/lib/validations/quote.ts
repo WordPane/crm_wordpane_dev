@@ -65,6 +65,8 @@ export const quoteFormSchema = z.object({
         description: z.string().trim().min(1, "Descreva o item."),
         quantity: z.string().trim().min(1, "Informe a quantidade."),
         unitPrice: z.string().trim().min(1, "Informe o valor unitário."),
+        /** Serviço do catálogo que originou o item ("" = manual). */
+        serviceId: z.string(),
       }),
     )
     .min(1, "Adicione ao menos um item."),
@@ -78,7 +80,7 @@ export const emptyQuoteValues: QuoteFormValues = {
   validUntil: "",
   discount: "",
   notes: "",
-  items: [{ description: "", quantity: "1", unitPrice: "" }],
+  items: [{ description: "", quantity: "1", unitPrice: "", serviceId: "" }],
 };
 
 // ─────────────────────────── Payload da action (valores já em centavos) ───────────────────────────
@@ -102,6 +104,7 @@ export const quotePayloadSchema = z.object({
           .number()
           .int()
           .min(0, "Valor unitário inválido."),
+        serviceId: z.uuid().optional().or(z.literal("")),
       }),
     )
     .min(1, "Adicione ao menos um item."),

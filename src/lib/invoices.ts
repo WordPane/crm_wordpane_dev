@@ -10,6 +10,7 @@ import {
   charges,
   companyServices,
   invoices,
+  quoteItems,
   services,
   type Charge,
 } from "@/lib/db/schema";
@@ -64,6 +65,25 @@ export async function emitInvoiceForCharge(
         .limit(1);
       if (linked?.serviceCode) serviceCode = linked.serviceCode;
       if (linked?.serviceName) serviceName = linked.serviceName;
+    } else if (charge.quoteId) {
+      // Cobrança de orçamento: usa o código se TODOS os itens com
+      // catálogo forem do mesmo serviço; senão, padrão do emissor
+      const rows = await db
+        .select({
+          code: services.serviceCode,
+          name: services.name,
+        })
+        .from(quoteItems)
+        .innerJoin(services, eq(quoteItems.serviceId, services.id))
+        .where(eq(quoteItems.quoteId, charge.quoteId));
+      const codes = [
+        ...new Set(rows.map((r) => r.code).filter((c): c is string => !!c)),
+      ];
+      if (codes.length === 1) {
+        serviceCode = codes[0];
+        serviceName =
+          rows.find((r) => r.code === codes[0])?.name ?? serviceName;
+      }
     }
 
     const [invoice] = await db

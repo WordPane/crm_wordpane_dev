@@ -17,6 +17,7 @@ import {
   requireUser,
 } from "@/lib/access/permissions";
 import { listCompanies } from "@/lib/queries/companies";
+import { listActiveServices } from "@/lib/queries/finance";
 import { getQuoteById } from "@/lib/queries/quotes";
 import type { QuoteFormValues } from "@/lib/validations/quote";
 
@@ -39,9 +40,10 @@ export default async function EditQuotePage({
   requireTeam(user);
 
   const { id } = await params;
-  const [detail, companies] = await Promise.all([
+  const [detail, companies, services] = await Promise.all([
     getQuoteById(id),
     listCompanies(user),
+    listActiveServices(user),
   ]);
   if (!detail) notFound();
   await assertCompanyAccess(user, detail.quote.companyId);
@@ -62,6 +64,7 @@ export default async function EditQuotePage({
       description: item.description,
       quantity: item.quantity.replace(".", ","),
       unitPrice: centsToInput(item.unitPriceCents),
+      serviceId: item.serviceId ?? "",
     })),
   };
 
@@ -93,6 +96,11 @@ export default async function EditQuotePage({
             companies={companies.map((c) => ({
               id: c.id,
               name: c.nomeFantasia || c.razaoSocial,
+            }))}
+            services={services.map((s) => ({
+              id: s.id,
+              name: s.name,
+              defaultValueCents: s.defaultValueCents,
             }))}
             defaultValues={defaultValues}
           />
