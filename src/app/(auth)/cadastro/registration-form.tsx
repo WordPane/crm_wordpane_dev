@@ -171,6 +171,7 @@ export function RegistrationCard() {
                     onValueChange={(value) => {
                       field.onChange(value);
                       form.setValue("cnpj", "");
+                      if (value === "pf") form.setValue("nomeFantasia", "");
                     }}
                   >
                     <SelectTrigger className="w-full">
@@ -252,17 +253,19 @@ export function RegistrationCard() {
                 {...form.register("razaoSocial")}
               />
             </Field>
-            <Field
-              label="Nome fantasia"
-              htmlFor="nomeFantasia"
-              error={errors.nomeFantasia?.message}
-            >
-              <Input
-                id="nomeFantasia"
-                placeholder="Nome de fachada"
-                {...form.register("nomeFantasia")}
-              />
-            </Field>
+            {personType !== "pf" && (
+              <Field
+                label="Nome fantasia"
+                htmlFor="nomeFantasia"
+                error={errors.nomeFantasia?.message}
+              >
+                <Input
+                  id="nomeFantasia"
+                  placeholder="Nome de fachada"
+                  {...form.register("nomeFantasia")}
+                />
+              </Field>
+            )}
             <Field
               label="Telefone"
               htmlFor="telefone"

@@ -222,6 +222,14 @@ export default async function FinancePage({
                           NF emitindo...
                         </span>
                       )}
+                      {charge.invoice?.status === "error" && (
+                        <span
+                          className="text-xs whitespace-nowrap text-red-300"
+                          title={charge.invoice.errorMessage ?? ""}
+                        >
+                          NF com erro
+                        </span>
+                      )}
                       {(charge.status === "received" ||
                         charge.status === "confirmed") &&
                         (!charge.invoice ||

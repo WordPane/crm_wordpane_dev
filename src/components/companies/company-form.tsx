@@ -176,6 +176,7 @@ export function CompanyForm(props: CompanyFormProps) {
                     field.onChange(value);
                     // Troca de tipo invalida o documento digitado
                     form.setValue("cnpj", "");
+                    if (value === "pf") form.setValue("nomeFantasia", "");
                   }}
                 >
                   <SelectTrigger className="w-full">
@@ -253,17 +254,19 @@ export function CompanyForm(props: CompanyFormProps) {
               {...form.register("razaoSocial")}
             />
           </Field>
-          <Field
-            label="Nome fantasia"
-            htmlFor="nomeFantasia"
-            error={errors.nomeFantasia?.message}
-          >
-            <Input
-              id="nomeFantasia"
-              placeholder="Nome de fachada"
-              {...form.register("nomeFantasia")}
-            />
-          </Field>
+          {personType !== "pf" && (
+            <Field
+              label="Nome fantasia"
+              htmlFor="nomeFantasia"
+              error={errors.nomeFantasia?.message}
+            >
+              <Input
+                id="nomeFantasia"
+                placeholder="Nome de fachada"
+                {...form.register("nomeFantasia")}
+              />
+            </Field>
+          )}
           {personType !== "pf" && (
             <Field
               label="Inscrição estadual"

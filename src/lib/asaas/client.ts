@@ -110,8 +110,8 @@ export type LocalCycle = keyof typeof asaasCycle;
 /**
  * Garante que a empresa existe como customer no Asaas e retorna o id.
  * Persiste `companies.asaasCustomerId` para não duplicar (a API não deduplica).
- * Sincroniza os dados cadastrais a cada uso: CPF/CNPJ preenchido depois da
- * primeira cobrança é enviado ao Asaas (obrigatório para boleto/fatura).
+ * Sincroniza os dados cadastrais a cada uso: CPF/CNPJ e endereço completo
+ * (obrigatórios para boleto/fatura e para emissão de NFS-e).
  */
 export async function ensureCustomer(companyId: string): Promise<string> {
   const [company] = await db
@@ -121,9 +121,20 @@ export async function ensureCustomer(companyId: string): Promise<string> {
     .limit(1);
   if (!company) throw new AsaasError("Empresa não encontrada.");
 
-  const name = company.nomeFantasia || company.razaoSocial;
-  const cpfCnpj = company.cnpj?.replace(/\D/g, "") || undefined;
-  const email = company.email ?? undefined;
+  const customerData = {
+    name: company.nomeFantasia || company.razaoSocial,
+    cpfCnpj: company.cnpj?.replace(/\D/g, "") || undefined,
+    email: company.email ?? undefined,
+    phone: company.telefone?.replace(/\D/g, "") || undefined,
+    // Endereço: exigido na emissão de NFS-e (CEP válido é obrigatório)
+    postalCode: company.cep?.replace(/\D/g, "") || undefined,
+    address: company.logradouro ?? undefined,
+    addressNumber: company.numero ?? undefined,
+    complement: company.complemento ?? undefined,
+    province: company.bairro ?? undefined,
+    city: company.cidade ?? undefined,
+    state: company.estado ?? undefined,
+  };
 
   const settings = await requireSettings();
   let customerId = company.asaasCustomerId;
@@ -143,9 +154,7 @@ export async function ensureCustomer(companyId: string): Promise<string> {
         "POST",
         "/customers",
         {
-          name,
-          cpfCnpj,
-          email,
+          ...customerData,
           externalReference: company.id,
           notificationDisabled: false,
         },
@@ -159,12 +168,8 @@ export async function ensureCustomer(companyId: string): Promise<string> {
       .where(eq(companies.id, company.id));
   }
 
-  // Mantém o cadastro do Asaas em dia (CPF/CNPJ, nome, e-mail)
-  await request(settings, "PUT", `/customers/${customerId}`, {
-    name,
-    cpfCnpj,
-    email,
-  });
+  // Mantém o cadastro do Asaas em dia (documento, contato e endereço)
+  await request(settings, "PUT", `/customers/${customerId}`, customerData);
 
   return customerId;
 }

@@ -569,7 +569,11 @@ export async function emitChargeInvoice(chargeId: string): Promise<ActionResult>
       await db.delete(invoices).where(eq(invoices.id, failed.id));
     }
 
-    await emitInvoiceForCharge(charge);
+    const result = await emitInvoiceForCharge(charge);
+    if (!result.ok) {
+      revalidateFinance(charge.companyId);
+      return { error: result.error };
+    }
 
     revalidateFinance(charge.companyId);
     return { success: true };

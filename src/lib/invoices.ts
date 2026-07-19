@@ -18,18 +18,27 @@ import { formatCurrency } from "@/lib/utils/format";
 
 /**
  * Emite a NFS-e da cobrança paga (idempotente: 1 NF por cobrança).
- * Erros ficam registrados na própria nota — nunca quebram o webhook.
+ * Erros ficam registrados na própria nota e também retornados —
+ * o webhook ignora o retorno; a emissão manual o exibe ao usuário.
  */
-export async function emitInvoiceForCharge(charge: Charge): Promise<void> {
+export async function emitInvoiceForCharge(
+  charge: Charge,
+): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
-    if (!charge.asaasPaymentId) return;
+    if (!charge.asaasPaymentId) {
+      return { ok: false, error: "Cobrança sem vínculo com o Asaas." };
+    }
 
     const [existing] = await db
-      .select({ id: invoices.id })
+      .select({ id: invoices.id, status: invoices.status })
       .from(invoices)
       .where(eq(invoices.chargeId, charge.id))
       .limit(1);
-    if (existing) return;
+    if (existing) {
+      return existing.status === "error"
+        ? { ok: false, error: "Já existe uma nota com erro para esta cobrança." }
+        : { ok: true };
+    }
 
     const issuer = await getIssuer();
 
@@ -51,6 +60,7 @@ export async function emitInvoiceForCharge(charge: Charge): Promise<void> {
         .update(invoices)
         .set({ asaasInvoiceId: created.id, updatedAt: new Date() })
         .where(eq(invoices.id, invoice.id));
+      return { ok: true };
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Erro desconhecido.";
@@ -59,9 +69,14 @@ export async function emitInvoiceForCharge(charge: Charge): Promise<void> {
         .set({ status: "error", errorMessage: message, updatedAt: new Date() })
         .where(eq(invoices.id, invoice.id));
       console.error(`Falha ao emitir NF da cobrança ${charge.id}:`, error);
+      return { ok: false, error: message };
     }
   } catch (error) {
     console.error(`Falha ao preparar NF da cobrança ${charge.id}:`, error);
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Erro desconhecido.",
+    };
   }
 }
 

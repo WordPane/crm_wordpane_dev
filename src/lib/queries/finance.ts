@@ -34,7 +34,12 @@ export type ChargeListItem = {
   quoteId: string | null;
   company: { id: string; name: string };
   /** Nota fiscal da cobrança (quando emitida). */
-  invoice: { id: string; status: string; number: string | null } | null;
+  invoice: {
+    id: string;
+    status: string;
+    number: string | null;
+    errorMessage: string | null;
+  } | null;
 };
 
 /** Cobranças no escopo do usuário (mais recentes primeiro), filtráveis. */
@@ -68,6 +73,7 @@ export async function listCharges(
       invoiceId: invoices.id,
       invoiceStatus: invoices.status,
       invoiceNumber: invoices.number,
+      invoiceError: invoices.errorMessage,
     })
     .from(charges)
     .innerJoin(companies, eq(charges.companyId, companies.id))
@@ -89,7 +95,12 @@ export async function listCharges(
     company: { id: r.companyId, name: r.companyName },
     invoice:
       r.invoiceId && r.invoiceStatus
-        ? { id: r.invoiceId, status: r.invoiceStatus, number: r.invoiceNumber }
+        ? {
+            id: r.invoiceId,
+            status: r.invoiceStatus,
+            number: r.invoiceNumber,
+            errorMessage: r.invoiceError,
+          }
         : null,
   }));
 }
