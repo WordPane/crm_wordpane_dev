@@ -11,6 +11,7 @@ import {
   Settings,
   UserPlus,
   Users,
+  Wallet,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -26,6 +27,7 @@ const NAV_ITEMS = [
   { href: "/admin/demandas", label: "Demandas", icon: Inbox },
   { href: "/admin/tarefas", label: "Tarefas", icon: ListChecks },
   { href: "/admin/orcamentos", label: "Orçamentos", icon: FileText },
+  { href: "/admin/financeiro", label: "Financeiro", icon: Wallet },
 ] as const;
 
 const SUPER_ONLY_ITEMS = [

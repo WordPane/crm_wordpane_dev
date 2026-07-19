@@ -10,6 +10,7 @@ import {
   MessageSquare,
   Paperclip,
   Users,
+  Wallet,
   type LucideIcon,
 } from "lucide-react";
 
@@ -27,6 +28,8 @@ const ICONS: Record<string, LucideIcon> = {
   member: Users,
   company: Building2,
   quote: FileText,
+  charge: Wallet,
+  service: Wallet,
 };
 
 function str(value: unknown): string | null {
@@ -93,6 +96,16 @@ function describe(activity: ActivityItem): string {
       return `duplicou o orçamento ${str(m.from) ?? ""} como ${str(m.number) ?? ""} (v${typeof m.version === "number" ? m.version : "?"})`;
     case "quote.project_created":
       return `criou um projeto a partir do orçamento ${str(m.number) ?? ""}`;
+    case "charge.created":
+      return `criou a cobrança "${str(m.description) ?? ""}" (${str(m.value) ?? ""})`;
+    case "charge.received":
+      return `recebeu o pagamento de "${str(m.description) ?? ""}" (${str(m.value) ?? ""})`;
+    case "charge.cancelled":
+      return `cancelou a cobrança "${str(m.description) ?? ""}"`;
+    case "service.activated":
+      return `ativou o serviço "${str(m.service) ?? ""}" (${str(m.value) ?? ""})`;
+    case "service.deactivated":
+      return `cancelou a assinatura de "${str(m.service) ?? ""}"`;
     default:
       return activity.action;
   }

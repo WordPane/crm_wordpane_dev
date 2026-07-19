@@ -51,3 +51,12 @@ export const emailSettingsSchema = z.object({
 });
 
 export type EmailSettingsValues = z.infer<typeof emailSettingsSchema>;
+
+/** Configuração do Asaas gravada em app_settings (chave "asaas.config"). */
+export const asaasSettingsSchema = z.object({
+  environment: z.enum(["sandbox", "production"]),
+  // Vazio = mantém a API key atual
+  apiKey: z.string().max(255, "Máximo de 255 caracteres.").optional().or(z.literal("")),
+});
+
+export type AsaasSettingsValues = z.infer<typeof asaasSettingsSchema>;

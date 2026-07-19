@@ -9,8 +9,10 @@ import { db } from "@/lib/db";
 import {
   activities,
   attachments,
+  charges,
   comments,
   companies,
+  companyServices,
   demands,
   milestones,
   projectLinks,
@@ -18,10 +20,12 @@ import {
   projectStatuses,
   quoteItems,
   quotes,
+  services,
   taskChecklistItems,
   tasks,
   taskStatuses,
   users,
+  type Charge,
   type Demand,
   type Milestone,
   type Project,
@@ -898,4 +902,81 @@ export async function getPortalQuote(
   ]);
 
   return { quote, items, responderName: responder[0]?.name ?? null };
+}
+
+// ─────────────────────────── Financeiro ───────────────────────────
+
+export type PortalChargeItem = {
+  id: string;
+  description: string;
+  valueCents: number;
+  billingType: Charge["billingType"];
+  dueDate: string;
+  status: Charge["status"];
+  invoiceUrl: string | null;
+  bankSlipUrl: string | null;
+  paidAt: Date | null;
+  createdAt: Date;
+  asaasPaymentId: string | null;
+};
+
+/** Cobranças da empresa do cliente (mais recentes primeiro). */
+export async function listPortalCharges(
+  user: SessionUser,
+): Promise<PortalChargeItem[]> {
+  const companyId = requireClientCompanyId(user);
+
+  return db
+    .select({
+      id: charges.id,
+      description: charges.description,
+      valueCents: charges.valueCents,
+      billingType: charges.billingType,
+      dueDate: charges.dueDate,
+      status: charges.status,
+      invoiceUrl: charges.invoiceUrl,
+      bankSlipUrl: charges.bankSlipUrl,
+      paidAt: charges.paidAt,
+      createdAt: charges.createdAt,
+      asaasPaymentId: charges.asaasPaymentId,
+    })
+    .from(charges)
+    .where(eq(charges.companyId, companyId))
+    .orderBy(desc(charges.createdAt));
+}
+
+export type PortalSubscriptionItem = {
+  id: string;
+  valueCents: number;
+  billingType: Charge["billingType"];
+  createdAt: Date;
+  serviceName: string;
+  serviceCycle: "weekly" | "monthly" | "quarterly" | "semiannually" | "yearly";
+};
+
+/** Assinaturas ativas da empresa do cliente (serviços recorrentes). */
+export async function listPortalSubscriptions(
+  user: SessionUser,
+): Promise<PortalSubscriptionItem[]> {
+  const companyId = requireClientCompanyId(user);
+
+  return db
+    .select({
+      id: companyServices.id,
+      valueCents: companyServices.valueCents,
+      billingType: companyServices.billingType,
+      createdAt: companyServices.createdAt,
+      serviceName: services.name,
+      serviceCycle: services.cycle,
+    })
+    .from(companyServices)
+    .innerJoin(services, eq(companyServices.serviceId, services.id))
+    .where(
+      and(
+        eq(companyServices.companyId, companyId),
+        eq(companyServices.status, "active"),
+        eq(services.billing, "recurring"),
+      ),
+    )
+    .orderBy(asc(services.name));
 }

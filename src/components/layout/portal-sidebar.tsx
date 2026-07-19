@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   Paperclip,
   Users,
+  Wallet,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -18,10 +19,11 @@ const NAV_ITEMS = [
   { href: "/portal/projetos", label: "Projetos", icon: FolderKanban },
   { href: "/portal/demandas", label: "Demandas", icon: Inbox },
   { href: "/portal/orcamentos", label: "Orçamentos", icon: FileText },
+  { href: "/portal/financeiro", label: "Financeiro", icon: Wallet },
   { href: "/portal/arquivos", label: "Arquivos", icon: Paperclip },
 ] as const;
 
-// Item extra para o admin da empresa (entre "Orçamentos" e "Arquivos")
+// Item extra para o admin da empresa (entre "Orçamentos" e "Financeiro")
 const USERS_NAV_ITEM = {
   href: "/portal/usuarios",
   label: "Usuários",

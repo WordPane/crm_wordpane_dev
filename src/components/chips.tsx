@@ -1,4 +1,5 @@
 import type {
+  Charge,
   ClientRegistration,
   Company,
   Demand,
@@ -11,6 +12,7 @@ import {
   demandCategoryLabels,
   demandStatusLabels,
 } from "@/lib/validations/demand";
+import { chargeStatusLabels } from "@/lib/validations/finance";
 import { quoteStatusLabels } from "@/lib/validations/quote";
 import { registrationStatusLabels } from "@/lib/validations/registration";
 import {
@@ -170,6 +172,23 @@ export function QuoteStatusChip({ status }: { status: Quote["status"] }) {
   return (
     <span className={cn("chip", quoteStatusClasses[status])}>
       {quoteStatusLabels[status]}
+    </span>
+  );
+}
+
+const chargeStatusClasses: Record<Charge["status"], string> = {
+  pending: "border-sky-400/30 bg-sky-400/10 text-sky-300",
+  confirmed: "border-amber-400/30 bg-amber-400/10 text-amber-300",
+  received: "",
+  overdue: "border-red-400/30 bg-red-400/10 text-red-300",
+  refunded: "border-border bg-muted text-muted-foreground",
+  cancelled: "border-border bg-muted text-muted-foreground",
+};
+
+export function ChargeStatusChip({ status }: { status: Charge["status"] }) {
+  return (
+    <span className={cn("chip", chargeStatusClasses[status])}>
+      {chargeStatusLabels[status]}
     </span>
   );
 }

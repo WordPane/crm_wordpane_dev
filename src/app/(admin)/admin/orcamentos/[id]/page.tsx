@@ -3,7 +3,8 @@ import { ArrowLeft, Download, Eye, FolderKanban, Pencil } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { QuoteStatusChip } from "@/components/chips";
+import { ChargeStatusChip, QuoteStatusChip } from "@/components/chips";
+import { ChargeFromQuoteButton } from "@/components/finance/charge-from-quote-button";
 import {
   CopyPublicLinkButton,
   CreateProjectButton,
@@ -27,6 +28,7 @@ import {
   requireUser,
 } from "@/lib/access/permissions";
 import { getQuoteById } from "@/lib/queries/quotes";
+import { getChargeByQuoteId } from "@/lib/queries/finance";
 import {
   formatCurrency,
   formatDate,
@@ -55,6 +57,8 @@ export default async function QuoteDetailPage({
   await assertCompanyAccess(user, detail.quote.companyId);
 
   const { quote, items, company, creator, responder, project, origin } = detail;
+  const charge =
+    quote.status === "approved" ? await getChargeByQuoteId(quote.id) : null;
   const number = formatQuoteNumber(quote.number);
   const subtotalCents = quote.totalCents + quote.discountCents;
 
@@ -113,6 +117,9 @@ export default async function QuoteDetailPage({
         )}
         {quote.status === "approved" && !project && (
           <CreateProjectButton quoteId={quote.id} />
+        )}
+        {quote.status === "approved" && !charge && (
+          <ChargeFromQuoteButton quoteId={quote.id} />
         )}
         {project && (
           <Button
@@ -247,6 +254,32 @@ export default async function QuoteDetailPage({
                   “{quote.responseNote}”
                 </p>
               )}
+            </CardContent>
+          </Card>
+        )}
+
+        {charge && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Cobrança</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Status</span>
+                <ChargeStatusChip status={charge.status} />
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Valor</span>
+                <span className="font-medium">
+                  {formatCurrency(charge.valueCents)}
+                </span>
+              </div>
+              <Link
+                href="/admin/financeiro"
+                className="inline-flex items-center gap-1 text-sm font-medium text-[#00d164] hover:underline"
+              >
+                Ver no financeiro
+              </Link>
             </CardContent>
           </Card>
         )}

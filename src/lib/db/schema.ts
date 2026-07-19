@@ -83,6 +83,31 @@ export const quoteStatusEnum = pgEnum("quote_status", [
   "approved",
   "rejected",
 ]);
+export const serviceBillingEnum = pgEnum("service_billing", [
+  "one_time",
+  "recurring",
+]);
+export const subscriptionCycleEnum = pgEnum("subscription_cycle", [
+  "weekly",
+  "monthly",
+  "quarterly",
+  "semiannually",
+  "yearly",
+]);
+export const chargeBillingTypeEnum = pgEnum("charge_billing_type", [
+  "pix",
+  "boleto",
+  "credit_card",
+  "undefined",
+]);
+export const chargeStatusEnum = pgEnum("charge_status", [
+  "pending",
+  "confirmed",
+  "received",
+  "overdue",
+  "refunded",
+  "cancelled",
+]);
 
 // ─────────────────────────── Empresas (clientes) ───────────────────────────
 
@@ -108,6 +133,7 @@ export const companies = pgTable(
     email: varchar("email", { length: 255 }),
     status: companyStatusEnum("status").notNull().default("ativo"),
     observacoes: text("observacoes"),
+    asaasCustomerId: varchar("asaas_customer_id", { length: 40 }), // cliente no Asaas (criado sob demanda)
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -475,6 +501,103 @@ export const quoteItems = pgTable(
   (t) => [index("quote_items_quote_idx").on(t.quoteId)],
 );
 
+// ─────────────────────────── Financeiro ───────────────────────────
+
+/** Catálogo de serviços oferecidos (desenvolvimento, manutenção etc.). */
+export const services = pgTable("services", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: varchar("name", { length: 160 }).notNull(),
+  description: text("description"),
+  defaultValueCents: integer("default_value_cents").notNull(),
+  billing: serviceBillingEnum("billing").notNull().default("one_time"),
+  cycle: subscriptionCycleEnum("cycle").notNull().default("monthly"), // só se recurring
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+/** Serviço ativado para uma empresa (assinatura no Asaas quando recorrente). */
+export const companyServices = pgTable(
+  "company_services",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    serviceId: uuid("service_id")
+      .notNull()
+      .references(() => services.id, { onDelete: "cascade" }),
+    valueCents: integer("value_cents").notNull(), // valor negociado (override do padrão)
+    billingType: chargeBillingTypeEnum("billing_type").notNull(),
+    status: varchar("status", { length: 20 }).notNull().default("active"), // active | cancelled
+    asaasSubscriptionId: varchar("asaas_subscription_id", { length: 40 }),
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+    createdBy: uuid("created_by").references(() => users.id),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("company_services_company_idx").on(t.companyId),
+    index("company_services_service_idx").on(t.serviceId),
+  ],
+);
+
+/** Cobranças (faturas) — avulsas, de orçamento ou geradas por assinatura. */
+export const charges = pgTable(
+  "charges",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    quoteId: uuid("quote_id").references(() => quotes.id, {
+      onDelete: "set null",
+    }), // fatura originada de orçamento aprovado
+    companyServiceId: uuid("company_service_id").references(
+      () => companyServices.id,
+      { onDelete: "set null" },
+    ), // origem recorrente
+    description: text("description").notNull(),
+    valueCents: integer("value_cents").notNull(),
+    billingType: chargeBillingTypeEnum("billing_type").notNull(),
+    dueDate: date("due_date").notNull(),
+    status: chargeStatusEnum("status").notNull().default("pending"),
+    asaasPaymentId: varchar("asaas_payment_id", { length: 40 }),
+    invoiceUrl: text("invoice_url"),
+    bankSlipUrl: text("bank_slip_url"),
+    paidAt: timestamp("paid_at", { withTimezone: true }),
+    createdBy: uuid("created_by").references(() => users.id), // null = via webhook
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("charges_asaas_payment_key").on(t.asaasPaymentId),
+    index("charges_company_idx").on(t.companyId),
+    index("charges_status_idx").on(t.status),
+    index("charges_due_idx").on(t.dueDate),
+  ],
+);
+
+/** Dedup de webhooks do Asaas (entrega at-least-once). */
+export const webhookEvents = pgTable("webhook_events", {
+  id: text("id").primaryKey(), // evt_... do Asaas
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
 // ─────────────────────────── Cadastro público (aprovação manual) ───────────────────────────
 
 export const clientRegistrations = pgTable(
@@ -752,6 +875,38 @@ export const quoteItemsRelations = relations(quoteItems, ({ one }) => ({
   }),
 }));
 
+export const servicesRelations = relations(services, ({ many }) => ({
+  companyServices: many(companyServices),
+}));
+
+export const companyServicesRelations = relations(
+  companyServices,
+  ({ one, many }) => ({
+    company: one(companies, {
+      fields: [companyServices.companyId],
+      references: [companies.id],
+    }),
+    service: one(services, {
+      fields: [companyServices.serviceId],
+      references: [services.id],
+    }),
+    charges: many(charges),
+  }),
+);
+
+export const chargesRelations = relations(charges, ({ one }) => ({
+  company: one(companies, {
+    fields: [charges.companyId],
+    references: [companies.id],
+  }),
+  quote: one(quotes, { fields: [charges.quoteId], references: [quotes.id] }),
+  companyService: one(companyServices, {
+    fields: [charges.companyServiceId],
+    references: [companyServices.id],
+  }),
+  creator: one(users, { fields: [charges.createdBy], references: [users.id] }),
+}));
+
 export const projectLinksRelations = relations(projectLinks, ({ one }) => ({
   project: one(projects, {
     fields: [projectLinks.projectId],
@@ -795,6 +950,11 @@ export type Quote = typeof quotes.$inferSelect;
 export type NewQuote = typeof quotes.$inferInsert;
 export type QuoteItem = typeof quoteItems.$inferSelect;
 export type NewQuoteItem = typeof quoteItems.$inferInsert;
+export type Service = typeof services.$inferSelect;
+export type NewService = typeof services.$inferInsert;
+export type CompanyService = typeof companyServices.$inferSelect;
+export type Charge = typeof charges.$inferSelect;
+export type NewCharge = typeof charges.$inferInsert;
 export type ClientRegistration = typeof clientRegistrations.$inferSelect;
 export type NewClientRegistration = typeof clientRegistrations.$inferInsert;
 export type ProjectLink = typeof projectLinks.$inferSelect;
