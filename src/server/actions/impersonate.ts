@@ -21,9 +21,13 @@ function sessionCookieName(): string {
     : "authjs.session-token";
 }
 
+/** Cookie com a sessão original do super admin durante a impersonação. */
+const BACKUP_COOKIE = "wordpane.impersonator";
+
 /**
  * Auto-login do super admin em um usuário cliente (impersonação):
  * grava um JWT de sessão daquele usuário e redireciona ao portal.
+ * A sessão original fica em cookie de backup para ser restaurada ao sair.
  * O evento fica registrado na timeline da empresa.
  */
 export async function impersonateUser(userId: string): Promise<never> {
@@ -45,6 +49,20 @@ export async function impersonateUser(userId: string): Promise<never> {
   }
 
   const cookieName = sessionCookieName();
+  const jar = await cookies();
+
+  // Guarda a sessão do super admin para restaurar ao sair da impersonação
+  const currentToken = jar.get(cookieName)?.value;
+  if (currentToken) {
+    jar.set(BACKUP_COOKIE, currentToken, {
+      httpOnly: true,
+      sameSite: "lax",
+      path: "/",
+      secure: cookieName.startsWith("__Secure-"),
+      maxAge: SESSION_MAX_AGE,
+    });
+  }
+
   const token = await encode({
     token: {
       id: target.id,
@@ -60,7 +78,6 @@ export async function impersonateUser(userId: string): Promise<never> {
     maxAge: SESSION_MAX_AGE,
   });
 
-  const jar = await cookies();
   jar.set(cookieName, token, {
     httpOnly: true,
     sameSite: "lax",
@@ -90,4 +107,29 @@ export async function impersonateUser(userId: string): Promise<never> {
   });
 
   redirect("/portal/dashboard");
+}
+
+/**
+ * Encerra a impersonação: restaura a sessão original do super admin
+ * e volta para o admin. Sem backup, vai para o login.
+ */
+export async function stopImpersonation(): Promise<never> {
+  const cookieName = sessionCookieName();
+  const jar = await cookies();
+  const backup = jar.get(BACKUP_COOKIE)?.value;
+
+  jar.delete(BACKUP_COOKIE);
+
+  if (backup) {
+    jar.set(cookieName, backup, {
+      httpOnly: true,
+      sameSite: "lax",
+      path: "/",
+      secure: cookieName.startsWith("__Secure-"),
+      maxAge: SESSION_MAX_AGE,
+    });
+    redirect("/admin/dashboard");
+  }
+
+  redirect("/login");
 }

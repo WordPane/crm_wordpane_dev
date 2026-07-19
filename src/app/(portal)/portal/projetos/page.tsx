@@ -62,8 +62,10 @@ export default async function PortalProjectsPage() {
               <Link key={project.id} href={`/portal/projetos/${project.id}`}>
                 <Card className="h-full transition-colors hover:border-[rgba(0,209,100,0.4)]">
                   <CardHeader>
-                    <div className="flex items-start justify-between gap-2">
-                      <CardTitle className="text-base">{project.name}</CardTitle>
+                    <div className="flex min-w-0 items-start justify-between gap-2">
+                      <CardTitle className="min-w-0 flex-1 break-words text-base">
+                        {project.name}
+                      </CardTitle>
                       {project.status && (
                         <StatusColorChip
                           name={project.status.name}

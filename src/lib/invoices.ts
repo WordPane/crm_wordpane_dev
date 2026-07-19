@@ -1,10 +1,7 @@
 import { format } from "date-fns";
 import { eq } from "drizzle-orm";
 
-import {
-  createInvoice,
-  downloadInvoiceFile,
-} from "@/lib/asaas/client";
+import { createInvoice } from "@/lib/asaas/client";
 import { db } from "@/lib/db";
 import {
   charges,
@@ -20,7 +17,6 @@ import {
   notifyUsers,
   teamUsersOfCompany,
 } from "@/lib/notifications";
-import { getStorage } from "@/lib/storage";
 import { formatCurrency } from "@/lib/utils/format";
 
 /**
@@ -125,8 +121,9 @@ export async function emitInvoiceForCharge(
 }
 
 /**
- * INVOICE_AUTHORIZED: baixa o PDF e o XML para o storage interno
- * (acesso imediato e autenticado) e notifica equipe + cliente.
+ * INVOICE_AUTHORIZED: grava número e URLs oficiais do Asaas
+ * (PDF/XML são servidos pelo próprio Asaas — nada é armazenado localmente)
+ * e notifica equipe + cliente.
  */
 export async function processInvoiceAuthorized(payload: {
   id: string;
@@ -141,26 +138,11 @@ export async function processInvoiceAuthorized(payload: {
     .limit(1);
   if (!invoice || invoice.status === "authorized") return;
 
-  const storage = getStorage();
-  let pdfKey = invoice.pdfKey;
-  let xmlKey = invoice.xmlKey;
-
-  if (payload.pdfUrl && !pdfKey) {
-    const pdf = await downloadInvoiceFile(payload.pdfUrl);
-    pdfKey = (await storage.put(`invoices/${invoice.id}.pdf`, pdf, "application/pdf")).fileKey;
-  }
-  if (payload.xmlUrl && !xmlKey) {
-    const xml = await downloadInvoiceFile(payload.xmlUrl);
-    xmlKey = (await storage.put(`invoices/${invoice.id}.xml`, xml, "application/xml")).fileKey;
-  }
-
   await db
     .update(invoices)
     .set({
       status: "authorized",
       number: payload.number != null ? String(payload.number) : null,
-      pdfKey,
-      xmlKey,
       asaasPdfUrl: payload.pdfUrl ?? null,
       asaasXmlUrl: payload.xmlUrl ?? null,
       errorMessage: null,

@@ -80,7 +80,7 @@ export default async function PortalProjectDetailPage({
           Voltar para projetos
         </Link>
         <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-2xl font-extrabold">{project.name}</h1>
+          <h1 className="text-2xl font-extrabold break-words">{project.name}</h1>
           {status && <StatusColorChip name={status.name} color={status.color} />}
         </div>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">

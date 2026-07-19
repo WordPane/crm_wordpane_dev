@@ -71,7 +71,7 @@ export default async function PortalTaskDetailPage({
           <span className="text-foreground">{task.title}</span>
         </nav>
         <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-2xl font-extrabold">{task.title}</h1>
+          <h1 className="text-2xl font-extrabold break-words">{task.title}</h1>
           {status && <StatusColorChip name={status.name} color={status.color} />}
           <PriorityChip priority={task.priority} />
           <span

@@ -92,7 +92,7 @@ export function StatusColorChip({
 }) {
   return (
     <span
-      className="chip"
+      className="chip shrink-0"
       style={{
         color,
         borderColor: `${color}4d`,

@@ -1,18 +1,32 @@
+import { TZDate } from "@date-fns/tz";
 import { format, formatDistanceToNow, isPast, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
-/** "22/07/2026" — aceita Date ou string ISO/date. */
+/**
+ * Fuso de exibição da aplicação. A Vercel reserva a env TZ, então o fuso é
+ * fixado no código (sobrescrevível via APP_TIMEZONE se um dia precisar).
+ */
+const APP_TIMEZONE = process.env.APP_TIMEZONE ?? "America/Sao_Paulo";
+
+/** String de coluna `date` (YYYY-MM-DD, sem hora)? */
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+
+/** "22/07/2026" — timestamps convertidos para America/Sao_Paulo. */
 export function formatDate(value: Date | string | null | undefined): string {
   if (!value) return "—";
+  // Colunas `date` (sem hora): exibir o dia literal, sem conversão de fuso
+  if (typeof value === "string" && DATE_ONLY.test(value)) {
+    return format(parseISO(value), "dd/MM/yyyy");
+  }
   const d = typeof value === "string" ? parseISO(value) : value;
-  return format(d, "dd/MM/yyyy");
+  return format(new TZDate(d, APP_TIMEZONE), "dd/MM/yyyy");
 }
 
-/** "22/07/2026 às 14:35" — aceita Date ou string ISO. */
+/** "22/07/2026 às 14:35" — sempre em America/Sao_Paulo. */
 export function formatDateTime(value: Date | string | null | undefined): string {
   if (!value) return "—";
   const d = typeof value === "string" ? parseISO(value) : value;
-  return format(d, "dd/MM/yyyy 'às' HH:mm");
+  return format(new TZDate(d, APP_TIMEZONE), "dd/MM/yyyy 'às' HH:mm");
 }
 
 /** "há 2 dias" em pt-BR. */

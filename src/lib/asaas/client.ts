@@ -279,27 +279,6 @@ export async function createInvoice(input: {
   });
 }
 
-/** Baixa um arquivo da nota (pdfUrl/xmlUrl do Asaas) para o storage interno. */
-export async function downloadInvoiceFile(url: string): Promise<Buffer> {
-  let response = await fetch(url, { cache: "no-store" });
-  if (response.status === 401 || response.status === 403) {
-    const settings = await requireSettings();
-    response = await fetch(url, {
-      headers: {
-        access_token: settings.apiKey,
-        "User-Agent": "wordpane-crm",
-      },
-      cache: "no-store",
-    });
-  }
-  if (!response.ok) {
-    throw new AsaasError(
-      `Falha ao baixar o arquivo da nota fiscal (HTTP ${response.status}).`,
-    );
-  }
-  return Buffer.from(await response.arrayBuffer());
-}
-
 // ─────────────────────────── Teste de conexão ───────────────────────────
 
 /** Valida a API key com uma chamada barata (lista 1 cliente). */

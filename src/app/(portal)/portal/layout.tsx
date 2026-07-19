@@ -9,6 +9,7 @@ import { requireUser } from "@/lib/access/permissions";
 import { countUnread, listNotifications } from "@/lib/queries/notifications";
 import { getPortalCompany, getPortalProfile } from "@/lib/queries/portal";
 import { logout } from "@/server/actions/auth";
+import { stopImpersonation } from "@/server/actions/impersonate";
 
 export default async function PortalLayout({
   children,
@@ -58,12 +59,12 @@ export default async function PortalLayout({
         {user.impersonatedBy && (
           <div className="flex items-center justify-center gap-3 bg-amber-400 px-4 py-2 text-sm font-medium text-amber-950">
             Você está acessando como {user.name} (impersonação do super admin).
-            <form action={logout}>
+            <form action={stopImpersonation}>
               <button
                 type="submit"
                 className="font-semibold underline underline-offset-2"
               >
-                Sair
+                Voltar ao meu acesso
               </button>
             </form>
           </div>

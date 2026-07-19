@@ -9,11 +9,11 @@ import {
 } from "@/lib/access/permissions";
 import { db } from "@/lib/db";
 import { charges, invoices } from "@/lib/db/schema";
-import { getStorage } from "@/lib/storage";
 
 /**
- * GET /api/invoices/[id]/pdf — PDF da nota fiscal (storage interno).
- * Equipe com acesso à empresa ou cliente da mesma empresa.
+ * GET /api/invoices/[id]/pdf — redireciona para o PDF oficial do Asaas.
+ * Autenticação antes do redirect: equipe com acesso à empresa ou cliente
+ * da mesma empresa.
  */
 export async function GET(
   _request: Request,
@@ -55,39 +55,12 @@ export async function GET(
     );
   }
 
-  // Fallback: ainda não baixamos o arquivo — redireciona para a URL do Asaas
-  if (!row.invoice.pdfKey) {
-    if (row.invoice.asaasPdfUrl) {
-      return NextResponse.redirect(row.invoice.asaasPdfUrl);
-    }
+  if (!row.invoice.asaasPdfUrl) {
     return NextResponse.json(
       { error: "PDF da nota ainda não disponível." },
       { status: 404 },
     );
   }
 
-  const buffer = row.invoice.pdfKey
-    ? await getStorage().get(row.invoice.pdfKey)
-    : null;
-
-  // Arquivo indisponível no storage (ex.: NF emitida em outro ambiente) —
-  // cai para a URL original do Asaas
-  if (!buffer) {
-    if (row.invoice.asaasPdfUrl) {
-      return NextResponse.redirect(row.invoice.asaasPdfUrl);
-    }
-    return NextResponse.json(
-      { error: "Arquivo não encontrado no armazenamento." },
-      { status: 404 },
-    );
-  }
-
-  const filename = `nota-fiscal-${row.invoice.number ?? row.invoice.id}.pdf`;
-  return new Response(new Uint8Array(buffer), {
-    headers: {
-      "Content-Type": "application/pdf",
-      "Content-Disposition": `inline; filename*=UTF-8''${encodeURIComponent(filename)}`,
-      "Cache-Control": "private, no-store",
-    },
-  });
+  return NextResponse.redirect(row.invoice.asaasPdfUrl);
 }
