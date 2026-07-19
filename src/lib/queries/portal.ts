@@ -231,6 +231,13 @@ export type PortalDashboardData = {
   openDemands: number;
   /** Orçamentos enviados aguardando aprovação do cliente. */
   pendingQuotes: number;
+  /** Detalhes dos orçamentos pendentes (cards de atenção). */
+  pendingQuotesList: {
+    id: string;
+    number: number;
+    title: string;
+    totalCents: number;
+  }[];
   openChargesCount: number;
   openChargesCents: number;
   overdueChargesCount: number;
@@ -244,7 +251,7 @@ export async function getPortalDashboard(
 ): Promise<PortalDashboardData> {
   const companyId = requireClientCompanyId(user);
 
-  const [projectList, upcomingRows, [openDemandsRow], [pendingQuotesRow], [openChargesRow]] =
+  const [projectList, upcomingRows, [openDemandsRow], [pendingQuotesRow], pendingQuotesList, [openChargesRow]] =
     await Promise.all([
       listPortalProjects(user),
       db
@@ -287,6 +294,17 @@ export async function getPortalDashboard(
         .where(and(eq(quotes.companyId, companyId), eq(quotes.status, "sent"))),
       db
         .select({
+          id: quotes.id,
+          number: quotes.number,
+          title: quotes.title,
+          totalCents: quotes.totalCents,
+        })
+        .from(quotes)
+        .where(and(eq(quotes.companyId, companyId), eq(quotes.status, "sent")))
+        .orderBy(desc(quotes.number))
+        .limit(3),
+      db
+        .select({
           openCount: sql<number>`count(*) filter (where ${charges.status} in ('pending', 'overdue'))::int`,
           openCents: sql<number>`coalesce(sum(${charges.valueCents}) filter (where ${charges.status} in ('pending', 'overdue')), 0)::int`,
           overdueCount: sql<number>`count(*) filter (where ${charges.status} = 'overdue')::int`,
@@ -299,6 +317,7 @@ export async function getPortalDashboard(
     activeProjects: projectList.filter((p) => !p.status?.isFinal).length,
     openDemands: openDemandsRow?.value ?? 0,
     pendingQuotes: pendingQuotesRow?.value ?? 0,
+    pendingQuotesList,
     openChargesCount: openChargesRow?.openCount ?? 0,
     openChargesCents: openChargesRow?.openCents ?? 0,
     overdueChargesCount: openChargesRow?.overdueCount ?? 0,

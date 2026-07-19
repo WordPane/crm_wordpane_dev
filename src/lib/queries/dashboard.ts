@@ -1,4 +1,5 @@
-import { differenceInCalendarDays, parseISO } from "date-fns";
+import { differenceInCalendarDays, format, parseISO, startOfMonth, subMonths } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { and, asc, desc, eq, inArray, isNotNull, isNull, or, sql, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
@@ -73,12 +74,36 @@ export type DashboardComment = {
   href: string;
 };
 
+/** Receita mensal (cobranças pagas) para o gráfico da dashboard. */
+export type RevenueMonth = {
+  /** "2026-07" */
+  key: string;
+  /** "jul" */
+  label: string;
+  cents: number;
+};
+
 export type AdminDashboardData = {
   counts: DashboardCounts;
+  revenueByMonth: RevenueMonth[];
+  /** Próximas cobranças em aberto (a receber), por vencimento. */
+  receivables: ReceivableItem[];
   upcoming: UpcomingItem[];
   activities: ActivityItem[];
   uploads: DashboardUpload[];
   comments: DashboardComment[];
+};
+
+/** Cobrança em aberto para o card "A receber". */
+export type ReceivableItem = {
+  id: string;
+  description: string;
+  valueCents: number;
+  dueDate: string;
+  companyName: string;
+  status: "pending" | "overdue";
+  /** Dias até o vencimento; negativo = vencida. */
+  daysLeft: number;
 };
 
 const EMPTY_DATA: AdminDashboardData = {
@@ -96,6 +121,8 @@ const EMPTY_DATA: AdminDashboardData = {
     chargesOpenCents: 0,
     chargesReceivedMonthCents: 0,
   },
+  revenueByMonth: [],
+  receivables: [],
   upcoming: [],
   activities: [],
   uploads: [],
@@ -158,12 +185,15 @@ export async function getAdminDashboard(
         .where(scope ? inArray(charges.companyId, scope) : undefined),
     ]);
 
-  const [upcoming, activityRows, uploadRows, commentRows] = await Promise.all([
-    listUpcoming(scope),
-    listRecentActivities(scope),
-    listRecentUploads(scope),
-    listRecentComments(scope),
-  ]);
+  const [upcoming, activityRows, uploadRows, commentRows, revenueByMonth, receivables] =
+    await Promise.all([
+      listUpcoming(scope),
+      listRecentActivities(scope),
+      listRecentUploads(scope),
+      listRecentComments(scope),
+      listRevenueByMonth(scope),
+      listReceivables(scope),
+    ]);
 
   const projectCounts = projectCountRows[0];
   const demandCounts = demandCountRows[0];
@@ -184,11 +214,49 @@ export async function getAdminDashboard(
       chargesOpenCents: chargeCounts?.openCents ?? 0,
       chargesReceivedMonthCents: chargeCounts?.receivedMonthCents ?? 0,
     },
+    revenueByMonth,
+    receivables,
     upcoming,
     activities: activityRows,
     uploads: uploadRows,
     comments: commentRows,
   };
+}
+
+/** Próximas cobranças em aberto (pending/overdue) por vencimento — limite 6. */
+async function listReceivables(
+  scope: string[] | null,
+): Promise<ReceivableItem[]> {
+  const conditions: SQL[] = [
+    inArray(charges.status, ["pending", "overdue"]),
+  ];
+  if (scope) conditions.push(inArray(charges.companyId, scope));
+
+  const rows = await db
+    .select({
+      id: charges.id,
+      description: charges.description,
+      valueCents: charges.valueCents,
+      dueDate: charges.dueDate,
+      status: charges.status,
+      companyName: sql<string>`coalesce(${companies.nomeFantasia}, ${companies.razaoSocial})`,
+    })
+    .from(charges)
+    .innerJoin(companies, eq(charges.companyId, companies.id))
+    .where(and(...conditions))
+    .orderBy(asc(charges.dueDate))
+    .limit(6);
+
+  const today = new Date();
+  return rows.map((r) => ({
+    id: r.id,
+    description: r.description,
+    valueCents: r.valueCents,
+    dueDate: r.dueDate,
+    companyName: r.companyName,
+    status: r.status as "pending" | "overdue",
+    daysLeft: differenceInCalendarDays(parseISO(r.dueDate), today),
+  }));
 }
 
 /** Projetos e tarefas com prazo vencido ou nos próximos 30 dias (limite 10). */
@@ -268,6 +336,40 @@ async function listUpcoming(
   return items
     .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
     .slice(0, 10);
+}
+
+/** Receita dos últimos 6 meses (cobranças pagas, agrupadas por mês de pagamento). */
+async function listRevenueByMonth(
+  scope: string[] | null,
+): Promise<RevenueMonth[]> {
+  const conditions: SQL[] = [
+    inArray(charges.status, ["received", "confirmed"]),
+    isNotNull(charges.paidAt),
+    sql`${charges.paidAt} >= date_trunc('month', current_date) - interval '5 months'`,
+  ];
+  if (scope) conditions.push(inArray(charges.companyId, scope));
+
+  const rows = await db
+    .select({
+      key: sql<string>`to_char(date_trunc('month', ${charges.paidAt}), 'YYYY-MM')`,
+      cents: sql<number>`coalesce(sum(${charges.valueCents}), 0)::int`,
+    })
+    .from(charges)
+    .where(and(...conditions))
+    .groupBy(sql`date_trunc('month', ${charges.paidAt})`);
+
+  const byMonth = new Map(rows.map((r) => [r.key, r.cents]));
+
+  // Série completa dos 6 meses (zero onde não houve receita)
+  return Array.from({ length: 6 }, (_, index) => {
+    const month = startOfMonth(subMonths(new Date(), 5 - index));
+    const key = format(month, "yyyy-MM");
+    return {
+      key,
+      label: format(month, "MMM", { locale: ptBR }).replace(".", ""),
+      cents: byMonth.get(key) ?? 0,
+    };
+  });
 }
 
 /** Últimas 10 atividades das empresas do escopo, com o autor. */

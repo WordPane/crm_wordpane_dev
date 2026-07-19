@@ -1,15 +1,21 @@
 import type { Metadata } from "next";
 import {
+  ArrowDownToLine,
   CalendarClock,
+  Clock3,
+  FileText,
   FolderKanban,
   ListChecks,
   MessageSquare,
   Paperclip,
+  TriangleAlert,
+  Wallet,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
 
 import { ActivityTimeline } from "@/components/activities/activity-timeline";
+import { RevenueChart } from "@/components/dashboard/revenue-chart";
 import {
   Card,
   CardContent,
@@ -55,31 +61,62 @@ function EmptySection({
   );
 }
 
+/** Linha de stat com mini barra de proporção (card Operação). */
+function OpRow({
+  label,
+  value,
+  total,
+  alert = false,
+}: {
+  label: string;
+  value: number;
+  total: number;
+  alert?: boolean;
+}) {
+  const pct = total > 0 ? Math.max(Math.round((value / total) * 100), value > 0 ? 4 : 0) : 0;
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between text-sm">
+        <span className="text-muted-foreground">{label}</span>
+        <span
+          className={
+            alert && value > 0
+              ? "font-semibold text-[#ff6b6b]"
+              : "font-semibold"
+          }
+        >
+          {value}
+        </span>
+      </div>
+      <div className="h-1.5 rounded-full bg-muted">
+        <div
+          className={`h-full rounded-full transition-all ${alert ? "bg-[#ff6b6b]" : "bg-[#00d164]"}`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
 export default async function AdminDashboardPage() {
   const user = await requireUser();
   requireTeam(user);
 
-  const { counts, upcoming, activities, uploads, comments } =
-    await getAdminDashboard(user);
-
-  const cards = [
-    { label: "Projetos em andamento", value: counts.projectsActive },
-    { label: "Projetos concluídos", value: counts.projectsDone },
-    {
-      label: "Projetos atrasados",
-      value: counts.projectsOverdue,
-      alert: counts.projectsOverdue > 0,
-    },
-    { label: "Demandas abertas", value: counts.demandsOpen },
-    { label: "Demandas em andamento", value: counts.demandsInProgress },
-    { label: "Demandas concluídas", value: counts.demandsDone },
-    { label: "Clientes ativos", value: counts.clientsActive },
-  ];
+  const {
+    counts,
+    revenueByMonth,
+    receivables,
+    upcoming,
+    activities,
+    uploads,
+    comments,
+  } = await getAdminDashboard(user);
 
   const financeCards = [
     {
       label: "Recebido no mês",
       value: formatCurrency(counts.chargesReceivedMonthCents),
+      icon: ArrowDownToLine,
       alert: false,
       href: "/admin/financeiro",
     },
@@ -87,22 +124,29 @@ export default async function AdminDashboardPage() {
       label: "Cobranças em aberto",
       value: formatCurrency(counts.chargesOpenCents),
       hint: `${counts.chargesOpen} ${counts.chargesOpen === 1 ? "cobrança" : "cobranças"}`,
+      icon: Clock3,
       alert: false,
       href: "/admin/financeiro",
     },
     {
       label: "Cobranças vencidas",
       value: counts.chargesOverdue,
+      icon: TriangleAlert,
       alert: counts.chargesOverdue > 0,
       href: "/admin/financeiro?status=overdue",
     },
     {
-      label: "Orçamentos aguardando resposta",
+      label: "Orçamentos aguardando",
       value: counts.quotesPending,
+      icon: FileText,
       alert: false,
       href: "/admin/orcamentos?status=sent",
     },
   ];
+
+  const projectsTotal = counts.projectsActive + counts.projectsDone;
+  const demandsTotal =
+    counts.demandsOpen + counts.demandsInProgress + counts.demandsDone;
 
   return (
     <div className="space-y-6">
@@ -113,51 +157,54 @@ export default async function AdminDashboardPage() {
         </p>
       </div>
 
+      {/* ─── KPIs financeiros ─── */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {financeCards.map((card) => (
           <Link key={card.label} href={card.href}>
             <Card className="h-full transition-colors hover:border-[rgba(0,209,100,0.4)]">
-              <CardHeader>
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  {card.label}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p
-                  className={`text-3xl font-extrabold ${card.alert ? "text-[#ff6b6b]" : "text-[#00d164]"}`}
+              <CardContent className="flex items-center gap-4 py-5">
+                <span
+                  className={`flex size-11 shrink-0 items-center justify-center rounded-xl ring-1 ${
+                    card.alert
+                      ? "bg-[rgba(255,107,107,0.1)] text-[#ff6b6b] ring-[rgba(255,107,107,0.3)]"
+                      : "bg-[rgba(0,209,100,0.08)] text-[#00d164] ring-[rgba(0,209,100,0.25)]"
+                  }`}
                 >
-                  {card.value}
-                </p>
-                {"hint" in card && card.hint && (
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {card.hint}
+                  <card.icon className="size-5" />
+                </span>
+                <div className="min-w-0">
+                  <p className="truncate text-xs text-muted-foreground">
+                    {card.label}
                   </p>
-                )}
+                  <p
+                    className={`truncate text-2xl font-extrabold ${card.alert ? "text-[#ff6b6b]" : ""}`}
+                  >
+                    {card.value}
+                  </p>
+                  {"hint" in card && card.hint && (
+                    <p className="text-xs text-muted-foreground">{card.hint}</p>
+                  )}
+                </div>
               </CardContent>
             </Card>
           </Link>
         ))}
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {cards.map((card) => (
-          <Card key={card.label}>
-            <CardHeader>
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                {card.label}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p
-                className={`text-3xl font-extrabold ${card.alert ? "text-[#ff6b6b]" : "text-[#00d164]"}`}
-              >
-                {card.value}
-              </p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      {/* ─── Receita (largura total) ─── */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Receita</CardTitle>
+          <CardDescription>
+            Cobranças pagas nos últimos 6 meses.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <RevenueChart data={revenueByMonth} />
+        </CardContent>
+      </Card>
 
+      {/* ─── Vencimentos + atividades ─── */}
       <div className="grid gap-4 xl:grid-cols-2">
         <Card>
           <CardHeader>
@@ -215,7 +262,111 @@ export default async function AdminDashboardPage() {
             <ActivityTimeline activities={activities} />
           </CardContent>
         </Card>
+      </div>
 
+      {/* ─── A receber + operação ─── */}
+      <div className="grid gap-4 xl:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>A receber</CardTitle>
+            <CardDescription>
+              Cobranças em aberto por ordem de vencimento.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {receivables.length === 0 ? (
+              <EmptySection
+                icon={Wallet}
+                message="Nenhuma cobrança em aberto no momento."
+              />
+            ) : (
+              <ul className="divide-y divide-border">
+                {receivables.map((charge) => (
+                  <li
+                    key={charge.id}
+                    className="flex items-center gap-3 py-3 first:pt-0 last:pb-0"
+                  >
+                    <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted ring-1 ring-border">
+                      <Wallet className="size-3.5 text-muted-foreground" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <Link
+                        href="/admin/financeiro"
+                        className="block truncate text-sm font-medium transition-colors hover:text-[#00d164]"
+                      >
+                        {charge.description}
+                      </Link>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {charge.companyName} · {formatCurrency(charge.valueCents)}
+                      </p>
+                    </div>
+                    <DueChip daysLeft={charge.daysLeft} />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Operação</CardTitle>
+            <CardDescription>
+              Distribuição de projetos e demandas.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <div className="space-y-3">
+              <p className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">
+                Projetos
+              </p>
+              <OpRow
+                label="Em andamento"
+                value={counts.projectsActive}
+                total={projectsTotal}
+              />
+              <OpRow
+                label="Atrasados"
+                value={counts.projectsOverdue}
+                total={projectsTotal}
+                alert
+              />
+              <OpRow
+                label="Concluídos"
+                value={counts.projectsDone}
+                total={projectsTotal}
+              />
+            </div>
+            <div className="space-y-3">
+              <p className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">
+                Demandas
+              </p>
+              <OpRow
+                label="Abertas"
+                value={counts.demandsOpen}
+                total={demandsTotal}
+              />
+              <OpRow
+                label="Em andamento"
+                value={counts.demandsInProgress}
+                total={demandsTotal}
+              />
+              <OpRow
+                label="Concluídas"
+                value={counts.demandsDone}
+                total={demandsTotal}
+              />
+            </div>
+            <div className="flex items-center justify-between border-t border-border pt-3 text-sm">
+              <span className="text-muted-foreground">Clientes ativos</span>
+              <span className="font-semibold">{counts.clientsActive}</span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ─── Secundário ─── */}
+      <div className="grid gap-4 xl:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>Últimos uploads</CardTitle>
