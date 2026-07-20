@@ -198,11 +198,21 @@ export async function deleteQuote(quoteId: string): Promise<ActionResult> {
       .limit(1);
     if (!quote) return { error: "Orçamento não encontrado." };
     await assertCompanyAccess(user, quote.companyId);
-    if (quote.status !== "draft") {
+    // Super admin exclui em qualquer status; demais membros só rascunho
+    if (quote.status !== "draft" && user.role !== "super_admin") {
       return { error: "Só é possível excluir orçamentos em rascunho." };
     }
 
-    await db.delete(quotes).where(eq(quotes.id, quoteId));
+    await db.transaction(async (tx) => {
+      // Versões duplicadas deste orçamento: desvincula (FK sem cascade).
+      // Cobranças geradas são desvinculadas pelo banco (set null);
+      // itens são removidos em cascade.
+      await tx
+        .update(quotes)
+        .set({ duplicatedFromId: null })
+        .where(eq(quotes.duplicatedFromId, quoteId));
+      await tx.delete(quotes).where(eq(quotes.id, quoteId));
+    });
 
     await logActivity({
       actorId: user.id,
@@ -216,7 +226,7 @@ export async function deleteQuote(quoteId: string): Promise<ActionResult> {
       },
     });
 
-    revalidatePath("/admin/orcamentos");
+    revalidateQuote(quoteId, quote.companyId);
     return { success: true };
   } catch (error) {
     return actionError(error);

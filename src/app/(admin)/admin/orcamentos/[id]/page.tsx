@@ -116,6 +116,13 @@ export default async function QuoteDetailPage({
             <DeleteQuoteButton quoteId={quote.id} quoteNumber={number} />
           </>
         )}
+        {quote.status !== "draft" && user.role === "super_admin" && (
+          <DeleteQuoteButton
+            quoteId={quote.id}
+            quoteNumber={number}
+            status={quote.status}
+          />
+        )}
         {quote.status === "approved" && !project && (
           <CreateProjectButton quoteId={quote.id} />
         )}

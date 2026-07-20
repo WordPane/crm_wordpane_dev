@@ -49,13 +49,15 @@ export function SendQuoteButton({
   );
 }
 
-/** Exclui o rascunho (com confirmação). */
+/** Exclui o orçamento (com confirmação). Não-rascunho só para super admin. */
 export function DeleteQuoteButton({
   quoteId,
   quoteNumber,
+  status = "draft",
 }: {
   quoteId: string;
   quoteNumber: string;
+  status?: string;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -70,7 +72,11 @@ export function DeleteQuoteButton({
         open={open}
         onOpenChange={setOpen}
         title="Excluir orçamento"
-        description={`Tem certeza que deseja excluir o rascunho ${quoteNumber}? Esta ação não pode ser desfeita.`}
+        description={
+          status === "draft"
+            ? `Tem certeza que deseja excluir o rascunho ${quoteNumber}? Esta ação não pode ser desfeita.`
+            : `Tem certeza que deseja excluir o orçamento ${quoteNumber}? Projeto e cobranças gerados a partir dele serão mantidos (desvinculados). Esta ação não pode ser desfeita.`
+        }
         onConfirm={async () => {
           const result = await deleteQuote(quoteId);
           if ("error" in result) return result.error;
