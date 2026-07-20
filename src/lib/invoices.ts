@@ -1,7 +1,7 @@
 import { format } from "date-fns";
 import { eq } from "drizzle-orm";
 
-import { createInvoice } from "@/lib/asaas/client";
+import { createInvoice, ensureCustomer } from "@/lib/asaas/client";
 import { db } from "@/lib/db";
 import {
   charges,
@@ -88,6 +88,9 @@ export async function emitInvoiceForCharge(
       .returning({ id: invoices.id });
 
     try {
+      // Sincroniza o cadastro do cliente no Asaas antes de emitir: o
+      // endereço (exigido na NFS-e) pode ter sido corrigido após a cobrança
+      await ensureCustomer(charge.companyId);
       const created = await createInvoice({
         paymentId: charge.asaasPaymentId,
         description: charge.description,

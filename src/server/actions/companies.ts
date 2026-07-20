@@ -9,6 +9,7 @@ import {
   requireTeam,
   requireUser,
 } from "@/lib/access/permissions";
+import { ensureCustomer } from "@/lib/asaas/client";
 import { db } from "@/lib/db";
 import { adminCompanyAssignments, companies } from "@/lib/db/schema";
 import { companyFormSchema } from "@/lib/validations/company";
@@ -76,7 +77,7 @@ export async function updateCompany(
     await assertCompanyAccess(user, id);
     const data = companyFormSchema.parse(input);
 
-    await db
+    const [updated] = await db
       .update(companies)
       .set({
         razaoSocial: data.razaoSocial,
@@ -100,7 +101,19 @@ export async function updateCompany(
         observacoes: nullIfEmpty(data.observacoes),
         updatedAt: new Date(),
       })
-      .where(eq(companies.id, id));
+      .where(eq(companies.id, id))
+      .returning({ asaasCustomerId: companies.asaasCustomerId });
+
+    // Empresa já vinculada ao Asaas: sincroniza o cadastro lá também
+    // (endereço é exigido na emissão de NFS-e). Best-effort — a emissão
+    // da nota sincroniza de novo, então falha aqui não bloqueia o cadastro.
+    if (updated?.asaasCustomerId) {
+      try {
+        await ensureCustomer(id);
+      } catch (error) {
+        console.error(`Falha ao sincronizar empresa ${id} no Asaas:`, error);
+      }
+    }
 
     revalidatePath("/admin/clientes");
     revalidatePath(`/admin/clientes/${id}`);
