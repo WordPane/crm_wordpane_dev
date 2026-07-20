@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, lte, sql, type SQL } from "drizzle-orm";
 
 import {
   requireTeam,
@@ -6,6 +6,7 @@ import {
   type SessionUser,
 } from "@/lib/access/permissions";
 import { db } from "@/lib/db";
+import type { PeriodRange } from "@/lib/utils/period";
 import {
   charges,
   companies,
@@ -42,10 +43,38 @@ export type ChargeListItem = {
   } | null;
 };
 
+/** Coluna de data usada pelo filtro de período. */
+export type PeriodDateBase = "vencimento" | "pagamento";
+
+/** Condições do filtro de período sobre a cobrança (vencimento ou pagamento). */
+function periodConditions(
+  period: PeriodRange,
+  dateBase: PeriodDateBase = "vencimento",
+): SQL[] {
+  if (dateBase === "pagamento") {
+    // paidAt é timestamp: cobre o dia inteiro (fuso local do servidor)
+    return [
+      gte(charges.paidAt, new Date(`${period.from}T00:00:00`)),
+      lte(charges.paidAt, new Date(`${period.to}T23:59:59.999`)),
+    ];
+  }
+  return [
+    gte(charges.dueDate, period.from),
+    lte(charges.dueDate, period.to),
+  ];
+}
+
 /** Cobranças no escopo do usuário (mais recentes primeiro), filtráveis. */
 export async function listCharges(
   user: SessionUser,
-  filters: { status?: Charge["status"]; companyId?: string } = {},
+  filters: {
+    status?: Charge["status"];
+    companyId?: string;
+    /** Intervalo de datas (yyyy-MM-dd, inclusive). */
+    period?: PeriodRange;
+    /** Coluna do filtro de período: vencimento (padrão) ou pagamento. */
+    dateBase?: PeriodDateBase;
+  } = {},
 ): Promise<ChargeListItem[]> {
   requireTeam(user);
   const scope = await visibleCompanyIds(user);
@@ -55,6 +84,9 @@ export async function listCharges(
   if (scope) conditions.push(inArray(charges.companyId, scope));
   if (filters.companyId) conditions.push(eq(charges.companyId, filters.companyId));
   if (filters.status) conditions.push(eq(charges.status, filters.status));
+  if (filters.period) {
+    conditions.push(...periodConditions(filters.period, filters.dateBase));
+  }
 
   const rows = await db
     .select({
@@ -103,6 +135,58 @@ export async function listCharges(
           }
         : null,
   }));
+}
+
+export type InvoiceDownloadItem = {
+  id: string;
+  number: string | null;
+  pdfUrl: string | null;
+  xmlUrl: string | null;
+  companyName: string;
+  chargeDescription: string;
+};
+
+/**
+ * Notas autorizadas (com PDF/XML do Asaas) dentro dos mesmos filtros da
+ * lista de cobranças — base para o ZIP enviado à contabilidade.
+ */
+export async function listAuthorizedInvoices(
+  user: SessionUser,
+  filters: {
+    status?: Charge["status"];
+    companyId?: string;
+    period?: PeriodRange;
+    dateBase?: PeriodDateBase;
+  } = {},
+): Promise<InvoiceDownloadItem[]> {
+  requireTeam(user);
+  const scope = await visibleCompanyIds(user);
+  if (scope && scope.length === 0) return [];
+
+  const conditions: SQL[] = [eq(invoices.status, "authorized")];
+  if (scope) conditions.push(inArray(charges.companyId, scope));
+  if (filters.companyId) conditions.push(eq(charges.companyId, filters.companyId));
+  if (filters.status) conditions.push(eq(charges.status, filters.status));
+  if (filters.period) {
+    conditions.push(...periodConditions(filters.period, filters.dateBase));
+  }
+
+  const rows = await db
+    .select({
+      id: invoices.id,
+      number: invoices.number,
+      pdfUrl: invoices.asaasPdfUrl,
+      xmlUrl: invoices.asaasXmlUrl,
+      companyName: companyName,
+      chargeDescription: charges.description,
+    })
+    .from(invoices)
+    .innerJoin(charges, eq(invoices.chargeId, charges.id))
+    .innerJoin(companies, eq(charges.companyId, companies.id))
+    .where(and(...conditions))
+    .orderBy(asc(charges.dueDate));
+
+  return rows.filter((r) => r.pdfUrl ?? r.xmlUrl);
 }
 
 export type FinanceSummary = {

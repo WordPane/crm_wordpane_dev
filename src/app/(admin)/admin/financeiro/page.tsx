@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ChargeStatusChip } from "@/components/chips";
 import { CancelChargeButton } from "@/components/finance/cancel-charge-button";
 import { ChargeFilters } from "@/components/finance/charge-filters";
+import { DownloadInvoicesButton } from "@/components/finance/download-invoices-button";
 import { EditChargeButton } from "@/components/finance/edit-charge-button";
 import { EmitInvoiceButton } from "@/components/finance/emit-invoice-button";
 import { ResendChargeButton } from "@/components/finance/resend-charge-button";
@@ -23,6 +24,7 @@ import type { Charge } from "@/lib/db/schema";
 import { listCompanies } from "@/lib/queries/companies";
 import { financeSummary, listCharges } from "@/lib/queries/finance";
 import { formatCurrency, formatDate, isOverdue } from "@/lib/utils/format";
+import { parsePeriod } from "@/lib/utils/period";
 import {
   chargeBillingTypeLabels,
   chargeStatuses,
@@ -40,6 +42,8 @@ export default async function FinancePage({
   searchParams: Promise<{
     status?: string | string[];
     empresa?: string | string[];
+    periodo?: string | string[];
+    base?: string | string[];
   }>;
 }) {
   const user = await requireUser();
@@ -51,11 +55,15 @@ export default async function FinancePage({
     ? (statusParam as Charge["status"])
     : "";
   const companyId = first(params.empresa);
+  const periodo = first(params.periodo);
+  const base = first(params.base) === "pagamento" ? "pagamento" : "";
 
   const [items, summary, companies] = await Promise.all([
     listCharges(user, {
       status: status || undefined,
       companyId: companyId || undefined,
+      period: parsePeriod(periodo || undefined) ?? undefined,
+      dateBase: base === "pagamento" ? "pagamento" : "vencimento",
     }),
     financeSummary(user),
     listCompanies(user),
@@ -122,14 +130,19 @@ export default async function FinancePage({
         </Card>
       </div>
 
-      <ChargeFilters
-        status={status}
-        companyId={companyId}
-        companies={companies.map((c) => ({
-          id: c.id,
-          name: c.nomeFantasia || c.razaoSocial,
-        }))}
-      />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <ChargeFilters
+          status={status}
+          companyId={companyId}
+          periodo={periodo}
+          base={base}
+          companies={companies.map((c) => ({
+            id: c.id,
+            name: c.nomeFantasia || c.razaoSocial,
+          }))}
+        />
+        <DownloadInvoicesButton />
+      </div>
 
       {items.length === 0 ? (
         <Card>
@@ -137,7 +150,7 @@ export default async function FinancePage({
             <Wallet className="size-12 text-muted-foreground/40" />
             <p className="font-medium">Nenhuma cobrança encontrada</p>
             <p className="text-sm text-muted-foreground">
-              {status || companyId
+              {status || companyId || periodo
                 ? "Ajuste os filtros para ver mais resultados."
                 : "Crie a primeira cobrança para um cliente."}
             </p>
