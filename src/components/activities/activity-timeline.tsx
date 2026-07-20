@@ -85,7 +85,7 @@ function describe(activity: ActivityItem): string {
     case "quote.created":
       return `criou o orçamento ${str(m.number) ?? ""} "${str(m.title) ?? ""}"`;
     case "quote.deleted":
-      return `excluiu o rascunho de orçamento ${str(m.number) ?? ""}`;
+      return `excluiu o orçamento ${str(m.number) ?? ""}`;
     case "quote.sent":
       return `enviou o orçamento ${str(m.number) ?? ""} ao cliente`;
     case "quote.approved":
@@ -102,12 +102,18 @@ function describe(activity: ActivityItem): string {
       return `recebeu o pagamento de "${str(m.description) ?? ""}" (${str(m.value) ?? ""})`;
     case "charge.cancelled":
       return `cancelou a cobrança "${str(m.description) ?? ""}"`;
+    case "charge.deleted":
+      return `excluiu a fatura "${str(m.description) ?? ""}"`;
     case "charge.updated":
       return `editou a cobrança "${str(m.description) ?? ""}"`;
     case "service.activated":
       return `ativou o serviço "${str(m.service) ?? ""}" (${str(m.value) ?? ""})`;
     case "service.deactivated":
       return `cancelou a assinatura de "${str(m.service) ?? ""}"`;
+    case "company.created":
+      return m.origin === "cadastro_publico"
+        ? "aprovou o cadastro público e criou a empresa"
+        : "criou a empresa";
     case "auth.impersonated":
       return `${str(m.admin) ?? "O super admin"} acessou o portal como ${str(m.user) ?? ""}`;
     default:
