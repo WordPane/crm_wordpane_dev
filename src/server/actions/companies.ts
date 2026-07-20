@@ -46,6 +46,7 @@ export async function createCompany(input: unknown): Promise<ActionResult> {
         site: nullIfEmpty(data.site),
         email: nullIfEmpty(data.email),
         status: data.status,
+        invoiceEmission: data.invoiceEmission,
         observacoes: nullIfEmpty(data.observacoes),
       })
       .returning({ id: companies.id });
@@ -98,6 +99,7 @@ export async function updateCompany(
         site: nullIfEmpty(data.site),
         email: nullIfEmpty(data.email),
         status: data.status,
+        invoiceEmission: data.invoiceEmission,
         observacoes: nullIfEmpty(data.observacoes),
         updatedAt: new Date(),
       })

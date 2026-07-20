@@ -23,6 +23,8 @@ import { cn } from "@/lib/utils";
 import {
   companyFormSchema,
   emptyCompanyValues,
+  invoiceEmissionLabels,
+  invoiceEmissions,
   personTypeLabels,
   personTypes,
   type CompanyFormValues,
@@ -480,6 +482,52 @@ export function CompanyForm(props: CompanyFormProps) {
               {...form.register("site")}
             />
           </Field>
+        </div>
+      </section>
+
+      {/* ─── Nota fiscal ─── */}
+      <section className="space-y-4">
+        <SectionTitle>Nota fiscal</SectionTitle>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field
+            label="Emissão automática de NFS-e *"
+            error={errors.invoiceEmission?.message}
+          >
+            <Controller
+              control={form.control}
+              name="invoiceEmission"
+              render={({ field }) => (
+                <Select
+                  value={field.value}
+                  onValueChange={(value) => field.onChange(value)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Selecione">
+                      {(value: string | null) =>
+                        value
+                          ? invoiceEmissionLabels[
+                              value as (typeof invoiceEmissions)[number]
+                            ]
+                          : "Selecione"
+                      }
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {invoiceEmissions.map((option) => (
+                      <SelectItem key={option} value={option}>
+                        {invoiceEmissionLabels[option]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
+          </Field>
+          <p className="self-end pb-2 text-xs text-muted-foreground">
+            Define se a nota é emitida automaticamente quando a cobrança é
+            gerada ou somente após o pagamento. A emissão manual continua
+            disponível no financeiro.
+          </p>
         </div>
       </section>
 

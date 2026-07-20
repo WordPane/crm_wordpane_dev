@@ -175,6 +175,19 @@ export function RegistrationList({
                             <DetailItem label="Site">
                               {registration.site}
                             </DetailItem>
+                            <DetailItem label="Endereço">
+                              {[
+                                [registration.logradouro, registration.numero]
+                                  .filter(Boolean)
+                                  .join(", "),
+                                registration.complemento,
+                                registration.bairro,
+                                location,
+                                registration.cep,
+                              ]
+                                .filter((part) => part?.trim())
+                                .join(" · ")}
+                            </DetailItem>
                           </div>
                           {registration.mensagem && (
                             <div className="space-y-1">

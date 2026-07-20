@@ -12,7 +12,9 @@ import {
   type Charge,
 } from "@/lib/db/schema";
 import {
+  cancelInvoiceForCharge,
   emitInvoiceForCharge,
+  emitInvoiceForNewCharge,
   processInvoiceAuthorized,
   processInvoiceCanceled,
   processInvoiceError,
@@ -165,19 +167,22 @@ export async function POST(request: Request) {
         const existing = await findCharge(payment);
         if (!existing) {
           const valueCents = Math.round((payment.value ?? 0) * 100);
-          await db.insert(charges).values({
-            companyId: companyService.companyId,
-            companyServiceId: companyService.id,
-            description: payment.description ?? "Cobrança de assinatura",
-            valueCents,
-            billingType: BILLING_TYPE_REVERSE[payment.billingType ?? ""] ?? "undefined",
-            dueDate: payment.dueDate ?? new Date().toISOString().slice(0, 10),
-            status: "pending",
-            asaasPaymentId: payment.id,
-            invoiceUrl: payment.invoiceUrl ?? null,
-            bankSlipUrl: payment.bankSlipUrl ?? null,
-            createdBy: null,
-          });
+          const [newCharge] = await db
+            .insert(charges)
+            .values({
+              companyId: companyService.companyId,
+              companyServiceId: companyService.id,
+              description: payment.description ?? "Cobrança de assinatura",
+              valueCents,
+              billingType: BILLING_TYPE_REVERSE[payment.billingType ?? ""] ?? "undefined",
+              dueDate: payment.dueDate ?? new Date().toISOString().slice(0, 10),
+              status: "pending",
+              asaasPaymentId: payment.id,
+              invoiceUrl: payment.invoiceUrl ?? null,
+              bankSlipUrl: payment.bankSlipUrl ?? null,
+              createdBy: null,
+            })
+            .returning({ id: charges.id });
 
           const recipients = await clientUsersOfCompany(
             companyService.companyId,
@@ -188,6 +193,9 @@ export async function POST(request: Request) {
             body: `Uma cobrança recorrente no valor de ${formatCurrency(valueCents)} com vencimento em ${formatDate(payment.dueDate)} foi gerada.`,
             href: "/portal/financeiro",
           });
+
+          // Emissão automática para empresas que emitem NF junto com a cobrança
+          await emitInvoiceForNewCharge(companyService.companyId, newCharge.id);
         }
       }
       return NextResponse.json({ received: true });
@@ -210,6 +218,7 @@ export async function POST(request: Request) {
         const [company] = await db
           .select({
             name: sql<string>`coalesce(${companies.nomeFantasia}, ${companies.razaoSocial})`,
+            invoiceEmission: companies.invoiceEmission,
           })
           .from(companies)
           .where(eq(companies.id, charge.companyId))
@@ -233,8 +242,11 @@ export async function POST(request: Request) {
           body: `O pagamento de ${formatCurrency(charge.valueCents)} foi confirmado pelo Asaas.`,
           href: "/admin/financeiro",
         });
-        // Emite a NFS-e automaticamente (best-effort, não bloqueia o webhook)
-        await emitInvoiceForCharge(charge);
+        // Emite a NFS-e após o pagamento quando a empresa está configurada
+        // para isso (best-effort, não bloqueia o webhook)
+        if (company?.invoiceEmission === "apos_pagamento") {
+          await emitInvoiceForCharge(charge);
+        }
         break;
       }
       case "PAYMENT_OVERDUE": {
@@ -250,6 +262,8 @@ export async function POST(request: Request) {
       }
       case "PAYMENT_DELETED": {
         await setChargeStatus(charge.id, "cancelled");
+        // Não deixar NF autorizada órfã de uma cobrança excluída no Asaas
+        await cancelInvoiceForCharge(charge.id);
         break;
       }
       case "PAYMENT_REFUNDED": {

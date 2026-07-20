@@ -1,10 +1,11 @@
 import { format } from "date-fns";
 import { eq } from "drizzle-orm";
 
-import { createInvoice, ensureCustomer } from "@/lib/asaas/client";
+import { cancelInvoice, createInvoice, ensureCustomer } from "@/lib/asaas/client";
 import { db } from "@/lib/db";
 import {
   charges,
+  companies,
   companyServices,
   invoices,
   quoteItems,
@@ -120,6 +121,77 @@ export async function emitInvoiceForCharge(
       ok: false,
       error: error instanceof Error ? error.message : "Erro desconhecido.",
     };
+  }
+}
+
+/**
+ * Emissão automática "junto com a cobrança": se a empresa está configurada
+ * para isso, emite a NFS-e assim que a cobrança é criada. Best-effort —
+ * erros ficam registrados na própria nota para retentativa manual.
+ */
+export async function emitInvoiceForNewCharge(
+  companyId: string,
+  chargeId: string,
+): Promise<void> {
+  const [company] = await db
+    .select({ invoiceEmission: companies.invoiceEmission })
+    .from(companies)
+    .where(eq(companies.id, companyId))
+    .limit(1);
+  if (company?.invoiceEmission !== "junto_cobranca") return;
+
+  const [charge] = await db
+    .select()
+    .from(charges)
+    .where(eq(charges.id, chargeId))
+    .limit(1);
+  if (!charge) return;
+
+  await emitInvoiceForCharge(charge);
+}
+
+/**
+ * Cancela a NFS-e da cobrança (se houver), no Asaas e local.
+ * Sem nota, já cancelada ou com erro → ok. Falha no Asaas → ok:false,
+ * e o chamador decide se aborta a operação que motivou o cancelamento.
+ */
+export async function cancelInvoiceForCharge(
+  chargeId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const [invoice] = await db
+    .select()
+    .from(invoices)
+    .where(eq(invoices.chargeId, chargeId))
+    .limit(1);
+  if (
+    !invoice ||
+    invoice.status === "canceled" ||
+    invoice.status === "error"
+  ) {
+    return { ok: true };
+  }
+
+  if (!invoice.asaasInvoiceId) {
+    // Nunca chegou ao Asaas — só marca localmente
+    await db
+      .update(invoices)
+      .set({ status: "canceled", updatedAt: new Date() })
+      .where(eq(invoices.id, invoice.id));
+    return { ok: true };
+  }
+
+  try {
+    await cancelInvoice(invoice.asaasInvoiceId);
+    await db
+      .update(invoices)
+      .set({ status: "canceled", updatedAt: new Date() })
+      .where(eq(invoices.id, invoice.id));
+    return { ok: true };
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Erro desconhecido.";
+    console.error(`Falha ao cancelar NF da cobrança ${chargeId}:`, error);
+    return { ok: false, error: message };
   }
 }
 

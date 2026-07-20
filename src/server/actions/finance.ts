@@ -27,7 +27,11 @@ import {
   quotes,
   services,
 } from "@/lib/db/schema";
-import { emitInvoiceForCharge } from "@/lib/invoices";
+import {
+  cancelInvoiceForCharge,
+  emitInvoiceForCharge,
+  emitInvoiceForNewCharge,
+} from "@/lib/invoices";
 import {
   clientUsersOfCompany,
   notifyChargeReminder,
@@ -226,6 +230,9 @@ export async function createCharge(input: unknown): Promise<ActionResult> {
       throw error;
     }
 
+    // Empresa configurada para emitir a NF junto com a cobrança
+    await emitInvoiceForNewCharge(data.companyId, charge.id);
+
     await logActivity({
       actorId: user.id,
       companyId: data.companyId,
@@ -268,6 +275,15 @@ export async function cancelCharge(chargeId: string): Promise<ActionResult> {
       return { error: "Cobranças já pagas não podem ser canceladas." };
     }
     if (charge.status === "cancelled") return { success: true };
+
+    // Cancela a NF antes (se houver): não deixar nota autorizada órfã.
+    // Se o Asaas recusar o cancelamento, a cobrança permanece ativa.
+    const invoiceCancel = await cancelInvoiceForCharge(chargeId);
+    if (!invoiceCancel.ok) {
+      return {
+        error: `Não foi possível cancelar a nota fiscal: ${invoiceCancel.error}`,
+      };
+    }
 
     if (charge.asaasPaymentId) {
       await deletePayment(charge.asaasPaymentId);
@@ -432,6 +448,9 @@ export async function createChargeFromQuote(
       await db.delete(charges).where(eq(charges.id, charge.id));
       throw error;
     }
+
+    // Empresa configurada para emitir a NF junto com a cobrança
+    await emitInvoiceForNewCharge(quote.companyId, charge.id);
 
     await logActivity({
       actorId: user.id,
@@ -615,8 +634,8 @@ export async function deactivateService(
 }
 
 /**
- * Emissão manual da NFS-e de uma cobrança paga (equipe).
- * Idempotente; se a emissão anterior falhou, tenta novamente.
+ * Emissão manual da NFS-e da cobrança (equipe), paga ou em aberto.
+ * Idempotente; se a emissão anterior falhou ou foi cancelada, tenta novamente.
  */
 export async function emitChargeInvoice(chargeId: string): Promise<ActionResult> {
   try {
@@ -630,17 +649,20 @@ export async function emitChargeInvoice(chargeId: string): Promise<ActionResult>
       .limit(1);
     if (!charge) return { error: "Cobrança não encontrada." };
     await assertCompanyAccess(user, charge.companyId);
-    if (charge.status !== "received" && charge.status !== "confirmed") {
-      return { error: "A nota fiscal só pode ser emitida após o pagamento." };
+    if (charge.status === "cancelled" || charge.status === "refunded") {
+      return {
+        error:
+          "Cobranças canceladas ou estornadas não podem emitir nota fiscal.",
+      };
     }
 
-    // Retry: remove o registro de erro anterior para emitir de novo
+    // Retry: remove o registro de erro/cancelada anterior para emitir de novo
     const [failed] = await db
       .select({ id: invoices.id, status: invoices.status })
       .from(invoices)
       .where(eq(invoices.chargeId, chargeId))
       .limit(1);
-    if (failed && failed.status !== "error") {
+    if (failed && failed.status !== "error" && failed.status !== "canceled") {
       return { error: "Esta cobrança já possui nota fiscal emitida ou em emissão." };
     }
     if (failed) {

@@ -19,6 +19,7 @@ export const registrationStatusLabels: Record<
 
 const CNPJ_REGEX = /^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$/;
 const CPF_REGEX = /^\d{3}\.\d{3}\.\d{3}-\d{2}$/;
+const CEP_REGEX = /^\d{5}-\d{3}$/;
 
 /** Campo de texto opcional: aceita vazio (""), limita o tamanho. */
 const optionalText = (max: number) =>
@@ -49,14 +50,34 @@ export const registrationFormSchema = z
       .optional()
       .or(z.literal("")),
     site: optionalText(255),
-    cidade: optionalText(120),
+    // Endereço completo obrigatório: exigido depois na emissão de NFS-e
+    cep: z.string().regex(CEP_REGEX, "Use o formato 00000-000."),
+    logradouro: z
+      .string()
+      .trim()
+      .min(1, "Logradouro é obrigatório.")
+      .max(255, "Máximo de 255 caracteres."),
+    numero: z
+      .string()
+      .trim()
+      .min(1, "Número é obrigatório.")
+      .max(20, "Máximo de 20 caracteres."),
+    complemento: optionalText(120),
+    bairro: z
+      .string()
+      .trim()
+      .min(1, "Bairro é obrigatório.")
+      .max(120, "Máximo de 120 caracteres."),
+    cidade: z
+      .string()
+      .trim()
+      .min(1, "Cidade é obrigatória.")
+      .max(120, "Máximo de 120 caracteres."),
     estado: z
       .string()
       .trim()
       .toUpperCase()
-      .length(2, "Informe a UF (2 letras).")
-      .optional()
-      .or(z.literal("")),
+      .length(2, "Informe a UF (2 letras)."),
     mensagem: optionalText(5000),
     // Acesso do responsável (1º usuário, admin da empresa)
     userName: z
@@ -112,6 +133,11 @@ export const emptyRegistrationValues: RegistrationFormValues = {
   whatsapp: "",
   email: "",
   site: "",
+  cep: "",
+  logradouro: "",
+  numero: "",
+  complemento: "",
+  bairro: "",
   cidade: "",
   estado: "",
   mensagem: "",

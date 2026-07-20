@@ -119,6 +119,10 @@ export const invoiceStatusEnum = pgEnum("invoice_status", [
   "error",
   "canceled",
 ]);
+export const invoiceEmissionEnum = pgEnum("invoice_emission", [
+  "apos_pagamento",
+  "junto_cobranca",
+]);
 export const personTypeEnum = pgEnum("person_type", ["pj", "pf"]);
 
 // ─────────────────────────── Empresas (clientes) ───────────────────────────
@@ -147,6 +151,10 @@ export const companies = pgTable(
     status: companyStatusEnum("status").notNull().default("ativo"),
     observacoes: text("observacoes"),
     asaasCustomerId: varchar("asaas_customer_id", { length: 40 }), // cliente no Asaas (criado sob demanda)
+    // Momento da emissão automática da NFS-e (definido pela equipe)
+    invoiceEmission: invoiceEmissionEnum("invoice_emission")
+      .notNull()
+      .default("apos_pagamento"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -669,8 +677,13 @@ export const clientRegistrations = pgTable(
     whatsapp: varchar("whatsapp", { length: 20 }),
     email: varchar("email", { length: 255 }),
     site: varchar("site", { length: 255 }),
+    logradouro: varchar("logradouro", { length: 255 }),
+    numero: varchar("numero", { length: 20 }),
+    complemento: varchar("complemento", { length: 120 }),
+    bairro: varchar("bairro", { length: 120 }),
     cidade: varchar("cidade", { length: 120 }),
     estado: varchar("estado", { length: 2 }),
+    cep: varchar("cep", { length: 9 }),
     mensagem: text("mensagem"), // "conte o que precisa" (opcional)
     // Responsável (será o 1º usuário, admin da empresa)
     userName: varchar("user_name", { length: 160 }).notNull(),

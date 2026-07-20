@@ -12,12 +12,18 @@ type ActionErrorOptions = {
 };
 
 function isUniqueViolation(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    (error as { code?: unknown }).code === "23505"
-  );
+  // O drizzle embrulha o erro do pg: o código real pode estar em .cause
+  const hasCode = (e: unknown): boolean =>
+    typeof e === "object" &&
+    e !== null &&
+    "code" in e &&
+    (e as { code?: unknown }).code === "23505";
+  if (hasCode(error)) return true;
+  const cause =
+    typeof error === "object" && error !== null && "cause" in error
+      ? (error as { cause?: unknown }).cause
+      : undefined;
+  return hasCode(cause);
 }
 
 /** Converte exceções em { error } amigável — nunca deixe exceção vazar para o cliente. */
@@ -36,7 +42,8 @@ export function actionError(
         "Já existe um registro cadastrado com este dado.",
     };
   }
-  console.error(error);
+  // Loga a causa real (o drizzle embrulha o erro do pg em .cause)
+  console.error(error instanceof Error ? (error.cause ?? error) : error);
   return {
     error:
       options.fallback ??

@@ -1,0 +1,2 @@
+CREATE TYPE "public"."invoice_emission" AS ENUM('apos_pagamento', 'junto_cobranca');--> statement-breakpoint
+ALTER TABLE "companies" ADD COLUMN "invoice_emission" "invoice_emission" DEFAULT 'apos_pagamento' NOT NULL;

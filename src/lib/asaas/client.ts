@@ -300,6 +300,15 @@ export async function createInvoice(input: {
   });
 }
 
+/**
+ * Solicita o cancelamento de uma NFS-e no Asaas (autorizada ou agendada).
+ * Docs: https://docs.asaas.com/reference/cancelar-uma-nota-fiscal
+ */
+export async function cancelInvoice(invoiceId: string): Promise<void> {
+  const settings = await requireSettings();
+  await request(settings, "POST", `/invoices/${invoiceId}/cancel`);
+}
+
 // ─────────────────────────── Teste de conexão ───────────────────────────
 
 /** Valida a API key com uma chamada barata (lista 1 cliente). */

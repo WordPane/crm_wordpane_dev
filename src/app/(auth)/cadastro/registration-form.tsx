@@ -18,7 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { maskDocument, maskPhone } from "@/lib/format";
+import { maskCep, maskDocument, maskPhone } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { personTypeLabels, personTypes } from "@/lib/validations/company";
 import {
@@ -64,6 +64,7 @@ export function RegistrationCard() {
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [cnpjLoading, setCnpjLoading] = useState(false);
+  const [cepLoading, setCepLoading] = useState(false);
 
   const form = useForm<RegistrationFormValues>({
     resolver: zodResolver(registrationFormSchema),
@@ -93,6 +94,11 @@ export function RegistrationCard() {
       if (data.nomeFantasia) form.setValue("nomeFantasia", data.nomeFantasia);
       if (data.telefone) form.setValue("telefone", maskPhone(data.telefone));
       if (data.email) form.setValue("email", data.email);
+      if (data.cep) form.setValue("cep", maskCep(data.cep));
+      if (data.logradouro) form.setValue("logradouro", data.logradouro);
+      if (data.numero) form.setValue("numero", data.numero);
+      if (data.complemento) form.setValue("complemento", data.complemento);
+      if (data.bairro) form.setValue("bairro", data.bairro);
       if (data.cidade) form.setValue("cidade", data.cidade);
       if (data.estado) form.setValue("estado", data.estado);
       toast.success("Dados do CNPJ preenchidos.");
@@ -100,6 +106,26 @@ export function RegistrationCard() {
       toast.error("Consulta indisponível no momento.");
     } finally {
       setCnpjLoading(false);
+    }
+  }
+
+  /** Auto-completa o endereço pelo CEP (ViaCEP) ao sair do campo. */
+  async function handleCepLookup() {
+    const digits = (form.getValues("cep") ?? "").replace(/\D/g, "");
+    if (digits.length !== 8) return;
+    setCepLoading(true);
+    try {
+      const response = await fetch(`/api/lookup/cep/${digits}`);
+      if (!response.ok) return; // silencioso: usuário digita manualmente
+      const data = (await response.json()) as Record<string, string>;
+      if (data.logradouro) form.setValue("logradouro", data.logradouro);
+      if (data.bairro) form.setValue("bairro", data.bairro);
+      if (data.cidade) form.setValue("cidade", data.cidade);
+      if (data.estado) form.setValue("estado", data.estado);
+    } catch {
+      // silencioso: falha de rede não impede o cadastro manual
+    } finally {
+      setCepLoading(false);
     }
   }
 
@@ -326,41 +352,121 @@ export function RegistrationCard() {
                 {...form.register("site")}
               />
             </Field>
-            <div className="grid grid-cols-[1fr_5rem] gap-4">
-              <Field
-                label="Cidade"
-                htmlFor="cidade"
-                error={errors.cidade?.message}
-              >
-                <Input
-                  id="cidade"
-                  placeholder="São Paulo"
-                  {...form.register("cidade")}
-                />
-              </Field>
-              <Field label="UF" htmlFor="estado" error={errors.estado?.message}>
-                <Controller
-                  control={form.control}
-                  name="estado"
-                  render={({ field }) => (
-                    <Input
-                      id="estado"
-                      placeholder="SP"
-                      maxLength={2}
-                      className="uppercase"
-                      aria-invalid={!!errors.estado}
-                      value={field.value ?? ""}
-                      onChange={(e) =>
-                        field.onChange(e.target.value.toUpperCase())
-                      }
-                      onBlur={field.onBlur}
-                      name={field.name}
-                      ref={field.ref}
-                    />
-                  )}
-                />
-              </Field>
-            </div>
+          </div>
+        </section>
+
+        {/* ─── Endereço ─── */}
+        <section className="space-y-4">
+          <SectionTitle>Endereço</SectionTitle>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <Field
+              label={cepLoading ? "CEP * (buscando...)" : "CEP *"}
+              htmlFor="cep"
+              error={errors.cep?.message}
+            >
+              <Controller
+                control={form.control}
+                name="cep"
+                render={({ field }) => (
+                  <Input
+                    id="cep"
+                    placeholder="00000-000"
+                    inputMode="numeric"
+                    aria-invalid={!!errors.cep}
+                    value={field.value ?? ""}
+                    onChange={(e) => field.onChange(maskCep(e.target.value))}
+                    onBlur={() => {
+                      field.onBlur();
+                      handleCepLookup();
+                    }}
+                    name={field.name}
+                    ref={field.ref}
+                  />
+                )}
+              />
+            </Field>
+            <Field
+              label="Logradouro *"
+              htmlFor="logradouro"
+              className="sm:col-span-2"
+              error={errors.logradouro?.message}
+            >
+              <Input
+                id="logradouro"
+                placeholder="Av. Paulista"
+                aria-invalid={!!errors.logradouro}
+                {...form.register("logradouro")}
+              />
+            </Field>
+            <Field
+              label="Número *"
+              htmlFor="numero"
+              error={errors.numero?.message}
+            >
+              <Input
+                id="numero"
+                placeholder="1000"
+                aria-invalid={!!errors.numero}
+                {...form.register("numero")}
+              />
+            </Field>
+            <Field
+              label="Complemento"
+              htmlFor="complemento"
+              error={errors.complemento?.message}
+            >
+              <Input
+                id="complemento"
+                placeholder="Sala 42"
+                {...form.register("complemento")}
+              />
+            </Field>
+            <Field
+              label="Bairro *"
+              htmlFor="bairro"
+              error={errors.bairro?.message}
+            >
+              <Input
+                id="bairro"
+                placeholder="Bela Vista"
+                aria-invalid={!!errors.bairro}
+                {...form.register("bairro")}
+              />
+            </Field>
+            <Field
+              label="Cidade *"
+              htmlFor="cidade"
+              error={errors.cidade?.message}
+            >
+              <Input
+                id="cidade"
+                placeholder="São Paulo"
+                aria-invalid={!!errors.cidade}
+                {...form.register("cidade")}
+              />
+            </Field>
+            <Field label="UF *" htmlFor="estado" error={errors.estado?.message}>
+              <Controller
+                control={form.control}
+                name="estado"
+                render={({ field }) => (
+                  <Input
+                    id="estado"
+                    placeholder="SP"
+                    maxLength={2}
+                    className="uppercase"
+                    aria-invalid={!!errors.estado}
+                    value={field.value ?? ""}
+                    onChange={(e) =>
+                      field.onChange(e.target.value.toUpperCase())
+                    }
+                    onBlur={field.onBlur}
+                    name={field.name}
+                    ref={field.ref}
+                  />
+                )}
+              />
+            </Field>
           </div>
         </section>
 

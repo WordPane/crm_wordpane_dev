@@ -8,6 +8,14 @@ export const personTypeLabels: Record<Company["personType"], string> = {
   pj: "Pessoa jurídica (CNPJ)",
   pf: "Pessoa física (CPF)",
 };
+export const invoiceEmissions = ["apos_pagamento", "junto_cobranca"] as const;
+export const invoiceEmissionLabels: Record<
+  Company["invoiceEmission"],
+  string
+> = {
+  apos_pagamento: "Após o pagamento",
+  junto_cobranca: "Junto com a cobrança",
+};
 
 const CNPJ_REGEX = /^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$/;
 const CPF_REGEX = /^\d{3}\.\d{3}\.\d{3}-\d{2}$/;
@@ -59,6 +67,7 @@ export const companyFormSchema = z
       .optional()
       .or(z.literal("")),
     status: z.enum(companyStatuses),
+    invoiceEmission: z.enum(invoiceEmissions),
     observacoes: optionalText(5000),
   })
   .superRefine((values, ctx) => {
@@ -101,6 +110,7 @@ export const emptyCompanyValues: CompanyFormValues = {
   site: "",
   email: "",
   status: "ativo",
+  invoiceEmission: "apos_pagamento",
   observacoes: "",
 };
 
@@ -125,6 +135,7 @@ export function companyToFormValues(company: Company): CompanyFormValues {
     site: company.site ?? "",
     email: company.email ?? "",
     status: company.status,
+    invoiceEmission: company.invoiceEmission,
     observacoes: company.observacoes ?? "",
   };
 }

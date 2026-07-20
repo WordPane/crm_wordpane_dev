@@ -232,11 +232,23 @@ export default async function FinancePage({
                           NF com erro
                         </span>
                       )}
-                      {(charge.status === "received" ||
-                        charge.status === "confirmed") &&
+                      {charge.invoice?.status === "canceled" && (
+                        <span className="text-xs whitespace-nowrap text-muted-foreground">
+                          NF cancelada
+                        </span>
+                      )}
+                      {charge.status !== "cancelled" &&
+                        charge.status !== "refunded" &&
                         (!charge.invoice ||
-                          charge.invoice.status === "error") && (
-                          <EmitInvoiceButton chargeId={charge.id} />
+                          charge.invoice.status === "error" ||
+                          charge.invoice.status === "canceled") && (
+                          <EmitInvoiceButton
+                            chargeId={charge.id}
+                            paid={
+                              charge.status === "received" ||
+                              charge.status === "confirmed"
+                            }
+                          />
                         )}
                       {charge.invoiceUrl && (
                         <Button
