@@ -1,13 +1,6 @@
 "use client";
 
-import {
-  Bell,
-  Inbox,
-  MessageSquare,
-  Paperclip,
-  UserPlus,
-  type LucideIcon,
-} from "lucide-react";
+import { Bell } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -18,6 +11,10 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  isPriorityNotification,
+  notificationIcon,
+} from "@/lib/notification-display";
 import { cn } from "@/lib/utils";
 import { timeAgo } from "@/lib/utils/format";
 import { markNotificationRead } from "@/server/actions/notifications";
@@ -30,14 +27,6 @@ export type NotificationBellItem = {
   href: string | null;
   readAt: Date | string | null;
   createdAt: Date | string;
-};
-
-const ICONS: Record<string, LucideIcon> = {
-  comment: MessageSquare,
-  "demand.created": Inbox,
-  "demand.status": Inbox,
-  "registration.created": UserPlus,
-  upload: Paperclip,
 };
 
 const POLL_INTERVAL_MS = 60_000;
@@ -123,8 +112,9 @@ export function NotificationBell({
             </p>
           ) : (
             items.map((item) => {
-              const Icon = ICONS[item.type] ?? Bell;
+              const Icon = notificationIcon(item.type);
               const isUnread = !item.readAt;
+              const priority = isPriorityNotification(item.type);
               return (
                 <button
                   key={item.id}
@@ -132,11 +122,23 @@ export function NotificationBell({
                   onClick={() => handleItemClick(item)}
                   className={cn(
                     "flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-white/[0.04]",
-                    isUnread && "bg-primary/5",
+                    isUnread && (priority ? "bg-amber-400/5" : "bg-primary/5"),
                   )}
                 >
-                  <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-muted ring-1 ring-border">
-                    <Icon className="size-3.5 text-muted-foreground" />
+                  <span
+                    className={cn(
+                      "mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full ring-1",
+                      priority
+                        ? "bg-amber-400/10 ring-amber-400/30"
+                        : "bg-muted ring-border",
+                    )}
+                  >
+                    <Icon
+                      className={cn(
+                        "size-3.5",
+                        priority ? "text-amber-400" : "text-muted-foreground",
+                      )}
+                    />
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-medium">
@@ -152,7 +154,12 @@ export function NotificationBell({
                     </span>
                   </span>
                   {isUnread && (
-                    <span className="mt-1.5 size-2 shrink-0 rounded-full bg-primary" />
+                    <span
+                      className={cn(
+                        "mt-1.5 size-2 shrink-0 rounded-full",
+                        priority ? "bg-amber-400" : "bg-primary",
+                      )}
+                    />
                   )}
                 </button>
               );

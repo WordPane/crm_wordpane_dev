@@ -48,6 +48,7 @@ import {
 } from "@/lib/validations/finance";
 import {
   cancelCharge,
+  deleteCharge,
   emitChargeInvoice,
   resendChargeNotification,
   updateCharge,
@@ -84,17 +85,20 @@ export function ChargeActionsMenu({
   invoice: ChargeInvoiceInfo;
 }) {
   const router = useRouter();
-  const [dialog, setDialog] = useState<"emit" | "edit" | "cancel" | null>(
-    null,
-  );
+  const [dialog, setDialog] = useState<
+    "emit" | "edit" | "cancel" | "delete" | null
+  >(null);
   const [pending, startTransition] = useTransition();
 
   const paid = status === "received" || status === "confirmed";
   const open = status === "pending" || status === "overdue";
+  const cancelled = status === "cancelled";
   const canEmit =
     status !== "cancelled" &&
     status !== "refunded" &&
     (!invoice || invoice.status === "error" || invoice.status === "canceled");
+  const hasTopItems =
+    invoice?.status === "authorized" || canEmit || !!invoiceUrl || open;
 
   function resend() {
     startTransition(async () => {
@@ -209,6 +213,16 @@ export function ChargeActionsMenu({
               </DropdownMenuItem>
             </>
           )}
+          {cancelled && hasTopItems && <DropdownMenuSeparator />}
+          {cancelled && (
+            <DropdownMenuItem
+              variant="destructive"
+              onClick={() => setDialog("delete")}
+            >
+              <Trash2 />
+              Excluir fatura
+            </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
 
@@ -241,6 +255,21 @@ export function ChargeActionsMenu({
           const result = await cancelCharge(chargeId);
           if ("error" in result) return result.error;
           toast.success("Cobrança cancelada.");
+          router.refresh();
+          return null;
+        }}
+      />
+
+      <ConfirmDialog
+        open={dialog === "delete"}
+        onOpenChange={(openDialog) => !openDialog && setDialog(null)}
+        title="Excluir fatura"
+        description={`Tem certeza que deseja excluir a fatura "${description}"? O registro será removido do financeiro e não aparecerá mais para a contabilidade. No Asaas ela já está cancelada. Esta ação não pode ser desfeita.`}
+        confirmLabel="Excluir fatura"
+        onConfirm={async () => {
+          const result = await deleteCharge(chargeId);
+          if ("error" in result) return result.error;
+          toast.success("Fatura excluída do financeiro.");
           router.refresh();
           return null;
         }}

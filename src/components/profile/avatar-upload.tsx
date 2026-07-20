@@ -8,12 +8,12 @@ import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { initials } from "@/lib/utils/format";
-import { updatePortalAvatar } from "@/server/actions/portal";
+import { updateOwnAvatar } from "@/server/actions/profile";
 
 const ACCEPTED_TYPES = "image/png,image/jpeg,image/webp,image/svg+xml,image/gif";
 
-/** Foto de perfil: envia via /api/upload e grava o avatarUrl do usuário. */
-export function PortalAvatarUpload({
+/** Foto de perfil: envia via /api/upload e grava o avatarUrl do usuário (qualquer role). */
+export function AvatarUpload({
   name,
   avatarUrl,
 }: {
@@ -48,7 +48,7 @@ export function PortalAvatarUpload({
         return;
       }
 
-      const result = await updatePortalAvatar({
+      const result = await updateOwnAvatar({
         fileKey: payload.fileKey,
         publicUrl: payload.publicUrl ?? "",
         mimeType: payload.mimeType ?? file.type,

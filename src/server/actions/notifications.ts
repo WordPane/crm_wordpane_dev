@@ -41,3 +41,20 @@ export async function markAllNotificationsRead(): Promise<ActionResult> {
     return actionError(error);
   }
 }
+
+/** Exclui uma notificação — apenas a do próprio usuário. */
+export async function deleteNotification(id: string): Promise<ActionResult> {
+  try {
+    const user = await requireUser();
+    await db
+      .delete(notifications)
+      .where(
+        and(eq(notifications.id, id), eq(notifications.userId, user.id)),
+      );
+    revalidatePath("/admin/notificacoes");
+    revalidatePath("/portal/notificacoes");
+    return { success: true };
+  } catch (error) {
+    return actionError(error);
+  }
+}

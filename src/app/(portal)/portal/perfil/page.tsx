@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { PortalAvatarUpload } from "@/components/portal/portal-avatar-upload";
 import { PortalPasswordForm } from "@/components/portal/portal-password-form";
 import { PortalProfileForm } from "@/components/portal/portal-profile-form";
+import { AvatarUpload } from "@/components/profile/avatar-upload";
+import { PopupPreferenceForm } from "@/components/profile/popup-preference-form";
 import {
   Card,
   CardContent,
@@ -41,7 +42,7 @@ export default async function PortalProfilePage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <PortalAvatarUpload
+          <AvatarUpload
             name={profile.name}
             avatarUrl={profile.avatarUrl ? `/api/avatar/${user.id}` : null}
           />
@@ -77,6 +78,18 @@ export default async function PortalProfilePage() {
         </CardHeader>
         <CardContent>
           <PortalPasswordForm />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Notificações</CardTitle>
+          <CardDescription>
+            Como você quer ser avisado das novidades.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <PopupPreferenceForm defaultEnabled={profile.notifyPopup} />
         </CardContent>
       </Card>
     </div>

@@ -181,6 +181,8 @@ export const users = pgTable(
     status: userStatusEnum("status").notNull().default("active"),
     // Só tem significado para role "client": gerencia os usuários da própria empresa
     isCompanyAdmin: boolean("is_company_admin").notNull().default(false),
+    // Preferência: receber popup na tela quando chega notificação nova
+    notifyPopup: boolean("notify_popup").notNull().default(false),
     // Preenchido apenas para usuários clientes (portal)
     companyId: uuid("company_id").references(() => companies.id, {
       onDelete: "cascade",

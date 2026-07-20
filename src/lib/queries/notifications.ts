@@ -25,3 +25,32 @@ export async function countUnread(user: SessionUser): Promise<number> {
     .where(and(eq(notifications.userId, user.id), isNull(notifications.readAt)));
   return row?.value ?? 0;
 }
+
+export type RecentUnreadNotification = {
+  id: string;
+  type: string;
+  title: string;
+  body: string | null;
+  href: string | null;
+  createdAt: Date;
+};
+
+/** Não lidas mais recentes — polling do popup e semente de ids do sino. */
+export async function listRecentUnread(
+  user: SessionUser,
+  limit = 5,
+): Promise<RecentUnreadNotification[]> {
+  return db
+    .select({
+      id: notifications.id,
+      type: notifications.type,
+      title: notifications.title,
+      body: notifications.body,
+      href: notifications.href,
+      createdAt: notifications.createdAt,
+    })
+    .from(notifications)
+    .where(and(eq(notifications.userId, user.id), isNull(notifications.readAt)))
+    .orderBy(desc(notifications.createdAt))
+    .limit(limit);
+}

@@ -2,12 +2,17 @@ import { redirect } from "next/navigation";
 
 import { PortalSidebar } from "@/components/layout/portal-sidebar";
 import { NotificationBell } from "@/components/layout/notification-bell";
+import { NotificationPopups } from "@/components/layout/notification-popups";
 import { UserMenu } from "@/components/layout/user-menu";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { requireUser } from "@/lib/access/permissions";
 import { getBranding } from "@/lib/brand/settings";
-import { countUnread, listNotifications } from "@/lib/queries/notifications";
+import {
+  countUnread,
+  listNotifications,
+  listRecentUnread,
+} from "@/lib/queries/notifications";
 import { getPortalCompany, getPortalProfile } from "@/lib/queries/portal";
 import { logout } from "@/server/actions/auth";
 import { stopImpersonation } from "@/server/actions/impersonate";
@@ -46,11 +51,13 @@ export default async function PortalLayout({
   }
 
   // Avatar fresco do banco (a sessão JWT só atualiza no próximo login)
-  const [profile, unreadNotifications, notifications] = await Promise.all([
-    getPortalProfile(user),
-    countUnread(user),
-    listNotifications(user, 8),
-  ]);
+  const [profile, unreadNotifications, notifications, recentUnread] =
+    await Promise.all([
+      getPortalProfile(user),
+      countUnread(user),
+      listNotifications(user, 8),
+      listRecentUnread(user, 50),
+    ]);
 
   return (
     <div className="min-h-screen">
@@ -58,6 +65,10 @@ export default async function PortalLayout({
         companyName={company.name}
         canManageUsers={profile?.isCompanyAdmin ?? false}
         brand={brand}
+      />
+      <NotificationPopups
+        enabled={profile?.notifyPopup ?? false}
+        initialIds={recentUnread.map((n) => n.id)}
       />
 
       <div className="flex min-h-screen flex-col pl-60">

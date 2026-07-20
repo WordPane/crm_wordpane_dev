@@ -311,6 +311,62 @@ export async function cancelCharge(chargeId: string): Promise<ActionResult> {
 }
 
 /**
+ * Exclui o registro local de uma cobrança CANCELADA (limpeza p/ contabilidade).
+ * O Asaas já não tem a cobrança (cancelada antes); notas em erro/canceladas
+ * vão junto (cascade). Nota autorizada/em emissão bloqueia a exclusão.
+ */
+export async function deleteCharge(chargeId: string): Promise<ActionResult> {
+  try {
+    const user = await requireUser();
+    requireTeam(user);
+
+    const [charge] = await db
+      .select()
+      .from(charges)
+      .where(eq(charges.id, chargeId))
+      .limit(1);
+    if (!charge) return { error: "Cobrança não encontrada." };
+    await assertCompanyAccess(user, charge.companyId);
+    if (charge.status !== "cancelled") {
+      return { error: "Só é possível excluir cobranças canceladas." };
+    }
+
+    const [invoice] = await db
+      .select({ status: invoices.status })
+      .from(invoices)
+      .where(eq(invoices.chargeId, chargeId))
+      .limit(1);
+    if (
+      invoice &&
+      (invoice.status === "authorized" ||
+        invoice.status === "scheduled" ||
+        invoice.status === "synchronized")
+    ) {
+      return {
+        error:
+          "Esta cobrança tem nota fiscal autorizada ou em emissão — cancele a nota antes de excluir.",
+      };
+    }
+
+    await db.delete(charges).where(eq(charges.id, chargeId));
+
+    await logActivity({
+      actorId: user.id,
+      companyId: charge.companyId,
+      entityType: "charge",
+      entityId: chargeId,
+      action: "charge.deleted",
+      metadata: { description: charge.description },
+    });
+
+    revalidateFinance(charge.companyId);
+    return { success: true };
+  } catch (error) {
+    return financeError(error);
+  }
+}
+
+/**
  * Edita descrição, valor, meio de pagamento e vencimento da cobrança
  * (no Asaas e local). O Asaas só permite alterar cobranças
  * aguardando pagamento ou vencidas.

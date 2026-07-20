@@ -83,6 +83,7 @@ export type PortalProfile = {
   position: string | null;
   avatarUrl: string | null;
   isCompanyAdmin: boolean;
+  notifyPopup: boolean;
 };
 
 /** Dados frescos do próprio usuário (perfil/avatar — a sessão JWT pode estar velha). */
@@ -97,6 +98,7 @@ export async function getPortalProfile(
       position: users.position,
       avatarUrl: users.avatarUrl,
       isCompanyAdmin: users.isCompanyAdmin,
+      notifyPopup: users.notifyPopup,
     })
     .from(users)
     .where(eq(users.id, user.id))

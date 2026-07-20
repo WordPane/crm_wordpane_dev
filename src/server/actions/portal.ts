@@ -28,7 +28,6 @@ import { notifyUsers, teamUsersOfCompany } from "@/lib/notifications";
 import { getStorage } from "@/lib/storage";
 import { attachmentFormSchema } from "@/lib/validations/attachment";
 import {
-  portalAvatarSchema,
   portalCommentSchema,
   portalDemandSchema,
   portalPasswordSchema,
@@ -415,43 +414,6 @@ export async function updatePortalProfile(input: unknown): Promise<ActionResult>
         updatedAt: new Date(),
       })
       .where(and(eq(users.id, user.id), eq(users.role, "client")));
-
-    revalidatePath("/portal/perfil");
-    return { success: true };
-  } catch (error) {
-    return actionError(error);
-  }
-}
-
-/** Grava a foto de perfil (arquivo já enviado via POST /api/upload). */
-export async function updatePortalAvatar(input: unknown): Promise<ActionResult> {
-  try {
-    const user = await requireUser();
-    await requireClient(user);
-    const data = portalAvatarSchema.parse(input);
-
-    const [current] = await db
-      .select({ avatarUrl: users.avatarUrl })
-      .from(users)
-      .where(eq(users.id, user.id))
-      .limit(1);
-
-    // Driver blob guarda a URL pública; driver local guarda a chave do arquivo
-    const avatarUrl = data.publicUrl || data.fileKey;
-
-    await db
-      .update(users)
-      .set({ avatarUrl, updatedAt: new Date() })
-      .where(eq(users.id, user.id));
-
-    // Remove o arquivo anterior do storage local (melhor esforço)
-    if (
-      current?.avatarUrl &&
-      current.avatarUrl !== avatarUrl &&
-      !/^https?:\/\//i.test(current.avatarUrl)
-    ) {
-      await getStorage().delete(current.avatarUrl);
-    }
 
     revalidatePath("/portal/perfil");
     return { success: true };
