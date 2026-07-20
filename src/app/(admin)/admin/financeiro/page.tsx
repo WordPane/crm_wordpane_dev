@@ -3,12 +3,9 @@ import { Plus, Wallet } from "lucide-react";
 import Link from "next/link";
 
 import { ChargeStatusChip } from "@/components/chips";
-import { CancelChargeButton } from "@/components/finance/cancel-charge-button";
+import { ChargeActionsMenu } from "@/components/finance/charge-actions-menu";
 import { ChargeFilters } from "@/components/finance/charge-filters";
 import { DownloadInvoicesButton } from "@/components/finance/download-invoices-button";
-import { EditChargeButton } from "@/components/finance/edit-charge-button";
-import { EmitInvoiceButton } from "@/components/finance/emit-invoice-button";
-import { ResendChargeButton } from "@/components/finance/resend-charge-button";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -200,102 +197,16 @@ export default async function FinancePage({
                     <ChargeStatusChip status={charge.status} />
                   </TableCell>
                   <TableCell>
-                    <div className="flex items-center justify-end gap-1">
-                      {charge.invoice?.status === "authorized" && (
-                        <>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            render={
-                              <a
-                                href={`/api/invoices/${charge.invoice.id}/pdf`}
-                                target="_blank"
-                                rel="noreferrer"
-                              />
-                            }
-                          >
-                            NF PDF
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            render={
-                              <a
-                                href={`/api/invoices/${charge.invoice.id}/xml`}
-                                target="_blank"
-                                rel="noreferrer"
-                              />
-                            }
-                          >
-                            XML
-                          </Button>
-                        </>
-                      )}
-                      {(charge.invoice?.status === "scheduled" ||
-                        charge.invoice?.status === "synchronized") && (
-                        <span className="text-xs whitespace-nowrap text-muted-foreground">
-                          NF emitindo...
-                        </span>
-                      )}
-                      {charge.invoice?.status === "error" && (
-                        <span
-                          className="text-xs whitespace-nowrap text-red-300"
-                          title={charge.invoice.errorMessage ?? ""}
-                        >
-                          NF com erro
-                        </span>
-                      )}
-                      {charge.invoice?.status === "canceled" && (
-                        <span className="text-xs whitespace-nowrap text-muted-foreground">
-                          NF cancelada
-                        </span>
-                      )}
-                      {charge.status !== "cancelled" &&
-                        charge.status !== "refunded" &&
-                        (!charge.invoice ||
-                          charge.invoice.status === "error" ||
-                          charge.invoice.status === "canceled") && (
-                          <EmitInvoiceButton
-                            chargeId={charge.id}
-                            paid={
-                              charge.status === "received" ||
-                              charge.status === "confirmed"
-                            }
-                          />
-                        )}
-                      {charge.invoiceUrl && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          render={
-                            <a
-                              href={charge.invoiceUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                            />
-                          }
-                        >
-                          Fatura
-                        </Button>
-                      )}
-                      {(charge.status === "pending" ||
-                        charge.status === "overdue") && (
-                        <>
-                          <EditChargeButton
-                            chargeId={charge.id}
-                            description={charge.description}
-                            valueCents={charge.valueCents}
-                            billingType={charge.billingType}
-                            currentDueDate={charge.dueDate}
-                          />
-                          <ResendChargeButton chargeId={charge.id} />
-                          <CancelChargeButton
-                            chargeId={charge.id}
-                            description={charge.description}
-                          />
-                        </>
-                      )}
-                    </div>
+                    <ChargeActionsMenu
+                      chargeId={charge.id}
+                      description={charge.description}
+                      valueCents={charge.valueCents}
+                      billingType={charge.billingType}
+                      dueDate={charge.dueDate}
+                      status={charge.status}
+                      invoiceUrl={charge.invoiceUrl}
+                      invoice={charge.invoice}
+                    />
                   </TableCell>
                 </TableRow>
               ))}
