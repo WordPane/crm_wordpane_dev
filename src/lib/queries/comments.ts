@@ -1,7 +1,7 @@
 import { and, asc, eq, inArray, or, type SQL } from "drizzle-orm";
 
 import {
-  assertCompanyAccess,
+  assertProjectAccess,
   requireTeam,
   type SessionUser,
 } from "@/lib/access/permissions";
@@ -39,13 +39,13 @@ export async function listTaskComments(
   requireTeam(user);
 
   const [task] = await db
-    .select({ companyId: projects.companyId })
+    .select({ id: projects.id, companyId: projects.companyId })
     .from(tasks)
     .innerJoin(projects, eq(tasks.projectId, projects.id))
     .where(eq(tasks.id, taskId))
     .limit(1);
   if (!task) return [];
-  await assertCompanyAccess(user, task.companyId);
+  await assertProjectAccess(user, task);
 
   const rows = await db
     .select({

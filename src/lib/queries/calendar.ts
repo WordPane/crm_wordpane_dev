@@ -15,8 +15,10 @@ import {
 } from "drizzle-orm";
 
 import {
+  inColumn,
   requireTeam,
-  visibleCompanyIds,
+  visibleProjectScope,
+  type ProjectScope,
   type SessionUser,
 } from "@/lib/access/permissions";
 import { db } from "@/lib/db";
@@ -98,11 +100,13 @@ function todayStr(): string {
  * Filtro fora do escopo (ou projeto de outra empresa) é ignorado, sem erro.
  */
 async function sanitizeFilters(
-  scope: string[] | null,
+  scope: ProjectScope,
   filters: CalendarEventFilters,
 ): Promise<{ companyId?: string; projectId?: string }> {
   let companyId = filters.companyId || undefined;
-  if (companyId && scope && !scope.includes(companyId)) companyId = undefined;
+  if (companyId && scope && !scope.companyIds.includes(companyId)) {
+    companyId = undefined;
+  }
 
   let projectId = filters.projectId || undefined;
   if (projectId) {
@@ -111,7 +115,11 @@ async function sanitizeFilters(
       .from(projects)
       .where(eq(projects.id, projectId))
       .limit(1);
-    const inScope = row && (!scope || scope.includes(row.companyId));
+    const inScope =
+      row &&
+      (!scope ||
+        scope.companyIds.includes(row.companyId) ||
+        scope.projectIds.includes(projectId));
     const sameCompany = !companyId || row?.companyId === companyId;
     if (!inScope || !sameCompany) projectId = undefined;
   }
@@ -121,13 +129,21 @@ async function sanitizeFilters(
 
 /** Condições de escopo/filtro sobre a tabela de projetos (direta ou via join). */
 function scopeConditions(
-  scope: string[] | null,
+  scope: ProjectScope,
   companyId: string | undefined,
   projectId: string | undefined,
   projectIdColumn: typeof projects.id | typeof milestones.projectId | typeof tasks.projectId,
 ): SQL[] {
   const conditions: SQL[] = [];
-  if (scope) conditions.push(inArray(projects.companyId, scope));
+  if (scope) {
+    // Empresa atribuída OU projeto em que é membro
+    conditions.push(
+      or(
+        inColumn(projects.companyId, scope.companyIds),
+        inColumn(projects.id, scope.projectIds),
+      )!,
+    );
+  }
   if (companyId) conditions.push(eq(projects.companyId, companyId));
   if (projectId) conditions.push(eq(projectIdColumn, projectId));
   return conditions;
@@ -139,8 +155,10 @@ export async function getCalendarEvents(
   filters: CalendarEventFilters,
 ): Promise<CalendarEvent[]> {
   requireTeam(user);
-  const scope = await visibleCompanyIds(user);
-  if (scope && scope.length === 0) return [];
+  const scope = await visibleProjectScope(user);
+  if (scope && scope.companyIds.length === 0 && scope.projectIds.length === 0) {
+    return [];
+  }
 
   const { companyId, projectId } = await sanitizeFilters(scope, filters);
   const today = todayStr();
@@ -229,7 +247,7 @@ export async function getCalendarEvents(
             and(
               inArray(charges.status, ["pending", "overdue"]),
               between(charges.dueDate, filters.from, filters.to),
-              scope ? inArray(charges.companyId, scope) : undefined,
+              scope ? inColumn(charges.companyId, scope.companyIds) : undefined,
               companyId ? eq(charges.companyId, companyId) : undefined,
             ),
           ),
@@ -334,9 +352,11 @@ export async function getCalendarSummary(
   user: SessionUser,
 ): Promise<CalendarSummary> {
   requireTeam(user);
-  const scope = await visibleCompanyIds(user);
+  const scope = await visibleProjectScope(user);
   const empty = { vencidos: 0, hoje: 0, proximos7: 0, proximos30: 0 };
-  if (scope && scope.length === 0) return empty;
+  if (scope && scope.companyIds.length === 0 && scope.projectIds.length === 0) {
+    return empty;
+  }
 
   const today = todayStr();
   const limit30 = format(addDays(new Date(), 30), "yyyy-MM-dd");
@@ -350,7 +370,14 @@ export async function getCalendarSummary(
     eq(taskStatuses.isFinal, false),
   );
 
-  const scopeCondition = scope ? [inArray(projects.companyId, scope)] : [];
+  const scopeCondition = scope
+    ? [
+        or(
+          inColumn(projects.companyId, scope.companyIds),
+          inColumn(projects.id, scope.projectIds),
+        )!,
+      ]
+    : [];
 
   const [projectRows, milestoneRows, taskRows, chargeRows] = await Promise.all([
     db
@@ -397,7 +424,7 @@ export async function getCalendarSummary(
         and(
           inArray(charges.status, ["pending", "overdue"]),
           lte(charges.dueDate, limit30),
-          ...(scope ? [inArray(charges.companyId, scope)] : []),
+          ...(scope ? [inColumn(charges.companyId, scope.companyIds)] : []),
         ),
       ),
   ]);
@@ -426,14 +453,16 @@ export async function getCalendarFilterOptions(
   user: SessionUser,
 ): Promise<CalendarFilterOptions> {
   requireTeam(user);
-  const scope = await visibleCompanyIds(user);
-  if (scope && scope.length === 0) return { companies: [], projects: [] };
+  const scope = await visibleProjectScope(user);
+  if (scope && scope.companyIds.length === 0 && scope.projectIds.length === 0) {
+    return { companies: [], projects: [] };
+  }
 
   const [companyRows, projectRows] = await Promise.all([
     db
       .select({ id: companies.id, name: companyName })
       .from(companies)
-      .where(scope ? inArray(companies.id, scope) : undefined)
+      .where(scope ? inColumn(companies.id, scope.companyIds) : undefined)
       .orderBy(asc(companies.razaoSocial)),
     db
       .select({
@@ -444,7 +473,14 @@ export async function getCalendarFilterOptions(
       })
       .from(projects)
       .innerJoin(companies, eq(projects.companyId, companies.id))
-      .where(scope ? inArray(projects.companyId, scope) : undefined)
+      .where(
+        scope
+          ? or(
+              inColumn(projects.companyId, scope.companyIds),
+              inColumn(projects.id, scope.projectIds),
+            )
+          : undefined,
+      )
       .orderBy(asc(projects.name)),
   ]);
 

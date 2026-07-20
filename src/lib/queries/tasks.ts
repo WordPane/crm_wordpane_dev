@@ -1,9 +1,9 @@
-import { and, asc, eq, inArray, sql, type SQL } from "drizzle-orm";
+import { and, asc, eq, inArray, or, sql, type SQL } from "drizzle-orm";
 
 import {
-  assertCompanyAccess,
+  assertProjectAccess,
   requireTeam,
-  visibleCompanyIds,
+  visibleProjectScope,
   type SessionUser,
 } from "@/lib/access/permissions";
 import { db } from "@/lib/db";
@@ -40,17 +40,29 @@ export type TaskListFilters = {
   projectId?: string;
 };
 
-/** Lista global de tarefas (escopo de empresas aplicado via projeto). */
+/** Lista global de tarefas (escopo de projetos visíveis: empresa atribuída ou membro). */
 export async function listTasks(
   user: SessionUser,
   filters: TaskListFilters = {},
 ): Promise<TaskListItem[]> {
   requireTeam(user);
-  const scope = await visibleCompanyIds(user);
-  if (scope && scope.length === 0) return [];
+  const scope = await visibleProjectScope(user);
+  if (scope && scope.companyIds.length === 0 && scope.projectIds.length === 0) {
+    return [];
+  }
 
   const conditions: SQL[] = [];
-  if (scope) conditions.push(inArray(projects.companyId, scope));
+  if (scope) {
+    // Empresa atribuída OU membro do projeto
+    const scopeConditions: SQL[] = [];
+    if (scope.companyIds.length > 0) {
+      scopeConditions.push(inArray(projects.companyId, scope.companyIds));
+    }
+    if (scope.projectIds.length > 0) {
+      scopeConditions.push(inArray(projects.id, scope.projectIds));
+    }
+    if (scopeConditions.length > 0) conditions.push(or(...scopeConditions)!);
+  }
   if (filters.statusId) conditions.push(eq(tasks.statusId, filters.statusId));
   if (filters.priority) conditions.push(eq(tasks.priority, filters.priority));
   if (filters.projectId) conditions.push(eq(tasks.projectId, filters.projectId));
@@ -131,7 +143,7 @@ export async function getTask(
     .limit(1);
 
   if (!row) return null;
-  await assertCompanyAccess(user, row.project.companyId);
+  await assertProjectAccess(user, row.project);
 
   const [statusRow, ownerRow, creatorRow, milestoneRow, checklist] =
     await Promise.all([
@@ -214,12 +226,12 @@ export async function listProjectMilestonesForTask(
 ): Promise<{ id: string; name: string }[]> {
   requireTeam(user);
   const [project] = await db
-    .select({ companyId: projects.companyId })
+    .select({ id: projects.id, companyId: projects.companyId })
     .from(projects)
     .where(eq(projects.id, projectId))
     .limit(1);
   if (!project) return [];
-  await assertCompanyAccess(user, project.companyId);
+  await assertProjectAccess(user, project);
   return db
     .select({ id: milestones.id, name: milestones.name })
     .from(milestones)

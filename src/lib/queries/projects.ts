@@ -1,9 +1,9 @@
-import { and, asc, eq, ilike, inArray, sql, type SQL } from "drizzle-orm";
+import { and, asc, eq, ilike, inArray, or, sql, type SQL } from "drizzle-orm";
 
 import {
-  assertCompanyAccess,
+  assertProjectAccess,
   requireTeam,
-  visibleCompanyIds,
+  visibleProjectScope,
   type SessionUser,
 } from "@/lib/access/permissions";
 import { db } from "@/lib/db";
@@ -56,11 +56,23 @@ export async function listProjects(
   filters: ProjectListFilters = {},
 ): Promise<ProjectListItem[]> {
   requireTeam(user);
-  const scope = await visibleCompanyIds(user);
-  if (scope && scope.length === 0) return [];
+  const scope = await visibleProjectScope(user);
+  if (scope && scope.companyIds.length === 0 && scope.projectIds.length === 0) {
+    return [];
+  }
 
   const conditions: SQL[] = [];
-  if (scope) conditions.push(inArray(projects.companyId, scope));
+  if (scope) {
+    // Empresa atribuída OU membro do projeto
+    const scopeConditions: SQL[] = [];
+    if (scope.companyIds.length > 0) {
+      scopeConditions.push(inArray(projects.companyId, scope.companyIds));
+    }
+    if (scope.projectIds.length > 0) {
+      scopeConditions.push(inArray(projects.id, scope.projectIds));
+    }
+    if (scopeConditions.length > 0) conditions.push(or(...scopeConditions)!);
+  }
   if (filters.companyId)
     conditions.push(eq(projects.companyId, filters.companyId));
   if (filters.statusId)
@@ -202,7 +214,7 @@ export async function getProject(
     .limit(1);
 
   if (!row) return null;
-  await assertCompanyAccess(user, row.project.companyId);
+  await assertProjectAccess(user, row.project);
 
   const [memberRows, milestoneRows, taskRows] = await Promise.all([
     db

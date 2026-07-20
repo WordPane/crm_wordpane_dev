@@ -4,8 +4,10 @@ import { and, asc, desc, eq, inArray, isNotNull, isNull, or, sql, type SQL } fro
 import { alias } from "drizzle-orm/pg-core";
 
 import {
+  inColumn,
   requireTeam,
-  visibleCompanyIds,
+  visibleProjectScope,
+  type ProjectScope,
   type SessionUser,
 } from "@/lib/access/permissions";
 import { db } from "@/lib/db";
@@ -129,13 +131,28 @@ const EMPTY_DATA: AdminDashboardData = {
   comments: [],
 };
 
-/** Visão geral da operação — tudo escopado por visibleCompanyIds. */
+/**
+ * Visão geral da operação.
+ * Projetos/tarefas: empresa atribuída OU projeto em que é membro.
+ * Financeiro/demandas/clientes: somente empresas atribuídas.
+ */
 export async function getAdminDashboard(
   user: SessionUser,
 ): Promise<AdminDashboardData> {
   requireTeam(user);
-  const scope = await visibleCompanyIds(user);
-  if (scope && scope.length === 0) return EMPTY_DATA;
+  const scope = await visibleProjectScope(user);
+  if (scope && scope.companyIds.length === 0 && scope.projectIds.length === 0) {
+    return EMPTY_DATA;
+  }
+
+  // Projetos/tarefas: empresa atribuída OU projeto em que é membro
+  const projectsScope: SQL | undefined = scope
+    ? or(
+        inColumn(projects.companyId, scope.companyIds),
+        inColumn(projects.id, scope.projectIds),
+      )
+    : undefined;
+  const companyIds = scope?.companyIds ?? [];
 
   const [projectCountRows, demandCountRows, clientCountRows, quoteCountRows, chargeCountRows] =
     await Promise.all([
@@ -147,7 +164,7 @@ export async function getAdminDashboard(
         })
         .from(projects)
         .leftJoin(projectStatuses, eq(projects.statusId, projectStatuses.id))
-        .where(scope ? inArray(projects.companyId, scope) : undefined),
+        .where(projectsScope),
       db
         .select({
           open: sql<number>`count(*) filter (where ${demands.status} = 'aberta')::int`,
@@ -155,14 +172,14 @@ export async function getAdminDashboard(
           done: sql<number>`count(*) filter (where ${demands.status} = 'concluida')::int`,
         })
         .from(demands)
-        .where(scope ? inArray(demands.companyId, scope) : undefined),
+        .where(scope ? inColumn(demands.companyId, companyIds) : undefined),
       db
         .select({ value: sql<number>`count(*)::int` })
         .from(companies)
         .where(
           and(
             eq(companies.status, "ativo"),
-            scope ? inArray(companies.id, scope) : undefined,
+            scope ? inColumn(companies.id, companyIds) : undefined,
           ),
         ),
       db
@@ -171,7 +188,7 @@ export async function getAdminDashboard(
         .where(
           and(
             eq(quotes.status, "sent"),
-            scope ? inArray(quotes.companyId, scope) : undefined,
+            scope ? inColumn(quotes.companyId, companyIds) : undefined,
           ),
         ),
       db
@@ -182,7 +199,7 @@ export async function getAdminDashboard(
           receivedMonthCents: sql<number>`coalesce(sum(${charges.valueCents}) filter (where ${charges.status} in ('received', 'confirmed') and date_trunc('month', ${charges.paidAt}) = date_trunc('month', current_date)), 0)::int`,
         })
         .from(charges)
-        .where(scope ? inArray(charges.companyId, scope) : undefined),
+        .where(scope ? inColumn(charges.companyId, companyIds) : undefined),
     ]);
 
   const [upcoming, activityRows, uploadRows, commentRows, revenueByMonth, receivables] =
@@ -191,8 +208,8 @@ export async function getAdminDashboard(
       listRecentActivities(scope),
       listRecentUploads(scope),
       listRecentComments(scope),
-      listRevenueByMonth(scope),
-      listReceivables(scope),
+      listRevenueByMonth(scope ? companyIds : null),
+      listReceivables(scope ? companyIds : null),
     ]);
 
   const projectCounts = projectCountRows[0];
@@ -230,7 +247,7 @@ async function listReceivables(
   const conditions: SQL[] = [
     inArray(charges.status, ["pending", "overdue"]),
   ];
-  if (scope) conditions.push(inArray(charges.companyId, scope));
+  if (scope) conditions.push(inColumn(charges.companyId, scope));
 
   const rows = await db
     .select({
@@ -261,22 +278,28 @@ async function listReceivables(
 
 /** Projetos e tarefas com prazo vencido ou nos próximos 30 dias (limite 10). */
 async function listUpcoming(
-  scope: string[] | null,
+  scope: ProjectScope,
 ): Promise<UpcomingItem[]> {
   const projectConditions: SQL[] = [
     isNotNull(projects.dueDate),
     sql`${projects.dueDate} <= current_date + interval '30 days'`,
     or(isNull(projectStatuses.isFinal), eq(projectStatuses.isFinal, false))!,
   ];
-  if (scope) projectConditions.push(inArray(projects.companyId, scope));
-
   const taskConditions: SQL[] = [
     isNotNull(tasks.dueDate),
     sql`${tasks.dueDate} <= current_date + interval '30 days'`,
     or(isNull(taskStatuses.isFinal), eq(taskStatuses.isFinal, false))!,
     isNull(tasks.completedAt),
   ];
-  if (scope) taskConditions.push(inArray(projects.companyId, scope));
+  if (scope) {
+    // Empresa atribuída OU projeto em que é membro
+    const scopeCondition = or(
+      inColumn(projects.companyId, scope.companyIds),
+      inColumn(projects.id, scope.projectIds),
+    )!;
+    projectConditions.push(scopeCondition);
+    taskConditions.push(scopeCondition);
+  }
 
   const [projectRows, taskRows] = await Promise.all([
     db
@@ -347,7 +370,7 @@ async function listRevenueByMonth(
     isNotNull(charges.paidAt),
     sql`${charges.paidAt} >= date_trunc('month', current_date) - interval '5 months'`,
   ];
-  if (scope) conditions.push(inArray(charges.companyId, scope));
+  if (scope) conditions.push(inColumn(charges.companyId, scope));
 
   const rows = await db
     .select({
@@ -372,12 +395,20 @@ async function listRevenueByMonth(
   });
 }
 
-/** Últimas 10 atividades das empresas do escopo, com o autor. */
+/** Últimas 10 atividades do escopo, com o autor. */
 async function listRecentActivities(
-  scope: string[] | null,
+  scope: ProjectScope,
 ): Promise<ActivityItem[]> {
   const conditions: SQL[] = [];
-  if (scope) conditions.push(inArray(activities.companyId, scope));
+  if (scope) {
+    // Empresa atribuída OU atividade de projeto em que é membro
+    conditions.push(
+      or(
+        inColumn(activities.companyId, scope.companyIds),
+        inColumn(activities.projectId, scope.projectIds),
+      )!,
+    );
+  }
 
   const rows = await db
     .select({
@@ -412,15 +443,17 @@ async function listRecentActivities(
 
 /** Últimos 8 anexos do escopo, com autor e origem. */
 async function listRecentUploads(
-  scope: string[] | null,
+  scope: ProjectScope,
 ): Promise<DashboardUpload[]> {
   const taskProjects = alias(projects, "task_projects");
 
   const scopeCondition = scope
     ? or(
-        inArray(projects.companyId, scope),
-        inArray(taskProjects.companyId, scope),
-        inArray(demands.companyId, scope),
+        inColumn(projects.companyId, scope.companyIds),
+        inColumn(projects.id, scope.projectIds),
+        inColumn(taskProjects.companyId, scope.companyIds),
+        inColumn(taskProjects.id, scope.projectIds),
+        inColumn(demands.companyId, scope.companyIds),
       )
     : undefined;
 
@@ -460,7 +493,7 @@ async function listRecentUploads(
 
 /** Últimos 8 comentários do escopo, com autor e tarefa. */
 async function listRecentComments(
-  scope: string[] | null,
+  scope: ProjectScope,
 ): Promise<DashboardComment[]> {
   const rows = await db
     .select({
@@ -475,7 +508,14 @@ async function listRecentComments(
     .innerJoin(tasks, eq(comments.taskId, tasks.id))
     .innerJoin(projects, eq(tasks.projectId, projects.id))
     .leftJoin(users, eq(comments.authorId, users.id))
-    .where(scope ? inArray(projects.companyId, scope) : undefined)
+    .where(
+      scope
+        ? or(
+            inColumn(projects.companyId, scope.companyIds),
+            inColumn(projects.id, scope.projectIds),
+          )
+        : undefined,
+    )
     .orderBy(desc(comments.createdAt))
     .limit(8);
 

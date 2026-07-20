@@ -4,7 +4,7 @@ import { asc, eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 import {
-  assertCompanyAccess,
+  assertProjectAccess,
   requireTeam,
   requireUser,
   type SessionUser,
@@ -25,7 +25,7 @@ import {
   type ActionResult,
 } from "@/server/actions/utils";
 
-/** Tarefa + projeto, com acesso garantido à empresa do projeto. */
+/** Tarefa + projeto, com acesso garantido (empresa atribuída ou membro do projeto). */
 async function getScopedTask(user: SessionUser, taskId: string) {
   const [row] = await db
     .select({ task: tasks, project: projects })
@@ -34,7 +34,7 @@ async function getScopedTask(user: SessionUser, taskId: string) {
     .where(eq(tasks.id, taskId))
     .limit(1);
   if (!row) return null;
-  await assertCompanyAccess(user, row.project.companyId);
+  await assertProjectAccess(user, row.project);
   return row;
 }
 
@@ -60,7 +60,7 @@ export async function createTask(
       .where(eq(projects.id, projectId))
       .limit(1);
     if (!project) return { error: "Projeto não encontrado." };
-    await assertCompanyAccess(user, project.companyId);
+    await assertProjectAccess(user, project);
 
     // Sem status informado → primeiro status ativo pela ordem
     let statusId = data.statusId || null;

@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 
 import {
   assertCompanyAccess,
+  assertProjectAccess,
   requireTeam,
   requireUser,
   type SessionUser,
@@ -82,7 +83,10 @@ async function resolveTarget(
       .where(eq(tasks.id, data.taskId))
       .limit(1);
     if (!row) return null;
-    await assertCompanyAccess(user, row.companyId);
+    await assertProjectAccess(user, {
+      id: row.projectId,
+      companyId: row.companyId,
+    });
     return {
       companyId: row.companyId,
       projectId: row.projectId,
@@ -99,7 +103,7 @@ async function resolveTarget(
       .where(eq(projects.id, data.projectId))
       .limit(1);
     if (!project) return null;
-    await assertCompanyAccess(user, project.companyId);
+    await assertProjectAccess(user, project);
     return {
       companyId: project.companyId,
       projectId: project.id,
@@ -205,7 +209,14 @@ export async function deleteAttachment(id: string): Promise<ActionResult> {
 
     const owner = await resolveAttachmentOwner(attachment);
     if (!owner) return { error: "Arquivo não encontrado." };
-    await assertCompanyAccess(user, owner.companyId);
+    if (owner.projectId) {
+      await assertProjectAccess(user, {
+        id: owner.projectId,
+        companyId: owner.companyId,
+      });
+    } else {
+      await assertCompanyAccess(user, owner.companyId);
+    }
 
     if (attachment.uploadedBy !== user.id && user.role !== "super_admin") {
       return { error: "Você só pode excluir os arquivos que enviou." };

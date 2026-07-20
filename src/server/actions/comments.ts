@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 import {
-  assertCompanyAccess,
+  assertProjectAccess,
   requireTeam,
   requireUser,
   type SessionUser,
@@ -21,7 +21,7 @@ import { clientUsersOfCompany, notifyUsers } from "@/lib/notifications";
 import { commentFormSchema } from "@/lib/validations/comment";
 import { actionError, type ActionResult } from "@/server/actions/utils";
 
-/** Comentário + tarefa + projeto, com acesso garantido à empresa do projeto. */
+/** Comentário + tarefa + projeto, com acesso garantido (empresa atribuída ou membro do projeto). */
 async function getScopedComment(user: SessionUser, commentId: string) {
   const [row] = await db
     .select({ comment: comments, task: tasks, project: projects })
@@ -31,7 +31,7 @@ async function getScopedComment(user: SessionUser, commentId: string) {
     .where(eq(comments.id, commentId))
     .limit(1);
   if (!row) return null;
-  await assertCompanyAccess(user, row.project.companyId);
+  await assertProjectAccess(user, row.project);
   return row;
 }
 
@@ -51,7 +51,7 @@ export async function createComment(
       .where(eq(tasks.id, taskId))
       .limit(1);
     if (!row) return { error: "Tarefa não encontrada." };
-    await assertCompanyAccess(user, row.project.companyId);
+    await assertProjectAccess(user, row.project);
 
     const parentId = await resolveCommentParent(taskId, data.parentId);
     const parentAuthorId = parentId

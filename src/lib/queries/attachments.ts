@@ -1,7 +1,7 @@
 import { desc, eq } from "drizzle-orm";
 
 import {
-  assertCompanyAccess,
+  assertProjectAccess,
   requireTeam,
   type SessionUser,
 } from "@/lib/access/permissions";
@@ -30,13 +30,13 @@ export async function listTaskAttachments(
   requireTeam(user);
 
   const [task] = await db
-    .select({ companyId: projects.companyId })
+    .select({ id: projects.id, companyId: projects.companyId })
     .from(tasks)
     .innerJoin(projects, eq(tasks.projectId, projects.id))
     .where(eq(tasks.id, taskId))
     .limit(1);
   if (!task) return [];
-  await assertCompanyAccess(user, task.companyId);
+  await assertProjectAccess(user, task);
 
   return listByCondition(eq(attachments.taskId, taskId));
 }
@@ -49,12 +49,12 @@ export async function listProjectAttachments(
   requireTeam(user);
 
   const [project] = await db
-    .select({ companyId: projects.companyId })
+    .select({ id: projects.id, companyId: projects.companyId })
     .from(projects)
     .where(eq(projects.id, projectId))
     .limit(1);
   if (!project) return [];
-  await assertCompanyAccess(user, project.companyId);
+  await assertProjectAccess(user, project);
 
   return listByCondition(eq(attachments.projectId, projectId));
 }
@@ -67,12 +67,12 @@ export async function listProjectTaskAttachments(
   requireTeam(user);
 
   const [project] = await db
-    .select({ companyId: projects.companyId })
+    .select({ id: projects.id, companyId: projects.companyId })
     .from(projects)
     .where(eq(projects.id, projectId))
     .limit(1);
   if (!project) return [];
-  await assertCompanyAccess(user, project.companyId);
+  await assertProjectAccess(user, project);
 
   const rows = await db
     .select({

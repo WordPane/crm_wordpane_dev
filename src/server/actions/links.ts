@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 import {
-  assertCompanyAccess,
+  assertProjectAccess,
   requireTeam,
   requireUser,
   type SessionUser,
@@ -19,7 +19,7 @@ import {
   type ActionResult,
 } from "@/server/actions/utils";
 
-/** Projeto existente + acesso garantido à empresa dele. */
+/** Projeto existente + acesso garantido (empresa atribuída ou membro do projeto). */
 async function getScopedProject(user: SessionUser, projectId: string) {
   const [project] = await db
     .select()
@@ -27,7 +27,7 @@ async function getScopedProject(user: SessionUser, projectId: string) {
     .where(eq(projects.id, projectId))
     .limit(1);
   if (!project) return null;
-  await assertCompanyAccess(user, project.companyId);
+  await assertProjectAccess(user, project);
   return project;
 }
 

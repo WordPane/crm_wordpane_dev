@@ -1,7 +1,7 @@
 import { desc, eq } from "drizzle-orm";
 
 import {
-  assertCompanyAccess,
+  assertProjectAccess,
   requireTeam,
   type SessionUser,
 } from "@/lib/access/permissions";
@@ -16,12 +16,12 @@ export async function listProjectLinks(
   requireTeam(user);
 
   const [project] = await db
-    .select({ companyId: projects.companyId })
+    .select({ id: projects.id, companyId: projects.companyId })
     .from(projects)
     .where(eq(projects.id, projectId))
     .limit(1);
   if (!project) return [];
-  await assertCompanyAccess(user, project.companyId);
+  await assertProjectAccess(user, project);
 
   return db
     .select()
