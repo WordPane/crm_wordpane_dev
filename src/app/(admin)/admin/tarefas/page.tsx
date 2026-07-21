@@ -34,6 +34,7 @@ export default async function TasksPage({
     status?: string | string[];
     prioridade?: string | string[];
     projeto?: string | string[];
+    concluidas?: string | string[];
   }>;
 }) {
   const user = await requireUser();
@@ -43,6 +44,7 @@ export default async function TasksPage({
   const statusId = first(params.status);
   const priorityParam = first(params.prioridade);
   const projectId = first(params.projeto);
+  const showDone = first(params.concluidas) !== "nao";
   const priority = (priorities as readonly string[]).includes(priorityParam)
     ? (priorityParam as Task["priority"])
     : "";
@@ -52,6 +54,7 @@ export default async function TasksPage({
       statusId,
       priority: priority || undefined,
       projectId,
+      hideCompleted: !showDone,
     }),
     listActiveTaskStatuses(user),
     listProjects(user),
@@ -71,6 +74,7 @@ export default async function TasksPage({
         statusId={statusId}
         priority={priority}
         projectId={projectId}
+        showDone={showDone}
         statuses={statuses}
         projects={projects.map((p) => ({ id: p.id, name: p.name }))}
       />
@@ -81,7 +85,7 @@ export default async function TasksPage({
             <ListChecks className="size-12 text-muted-foreground/40" />
             <p className="font-medium">Nenhuma tarefa encontrada</p>
             <p className="text-sm text-muted-foreground">
-              {statusId || priority || projectId
+              {statusId || priority || projectId || !showDone
                 ? "Ajuste os filtros para ver mais resultados."
                 : "As tarefas criadas nos projetos aparecem aqui."}
             </p>

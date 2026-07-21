@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
 
 import {
   assertProjectAccess,
@@ -38,6 +38,7 @@ export type TaskListFilters = {
   statusId?: string;
   priority?: Task["priority"];
   projectId?: string;
+  hideCompleted?: boolean;
 };
 
 /** Lista global de tarefas (escopo de projetos visíveis: empresa atribuída ou membro). */
@@ -66,6 +67,7 @@ export async function listTasks(
   if (filters.statusId) conditions.push(eq(tasks.statusId, filters.statusId));
   if (filters.priority) conditions.push(eq(tasks.priority, filters.priority));
   if (filters.projectId) conditions.push(eq(tasks.projectId, filters.projectId));
+  if (filters.hideCompleted) conditions.push(isNull(tasks.completedAt));
 
   const rows = await db
     .select({
@@ -90,7 +92,8 @@ export async function listTasks(
     .leftJoin(taskStatuses, eq(tasks.statusId, taskStatuses.id))
     .leftJoin(users, eq(tasks.ownerId, users.id))
     .where(conditions.length > 0 ? and(...conditions) : undefined)
-    .orderBy(asc(tasks.createdAt));
+    // Vencimento mais próximo primeiro; sem prazo vai para o fim (NULLS LAST no ASC)
+    .orderBy(asc(tasks.dueDate), asc(tasks.createdAt));
 
   return rows.map((r) => ({
     id: r.id,

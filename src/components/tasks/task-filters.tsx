@@ -2,6 +2,7 @@
 
 import { usePathname, useRouter } from "next/navigation";
 
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -14,17 +15,19 @@ import { priorityLabels, priorities } from "@/lib/validations/project";
 
 const ALL = "__all__";
 
-/** Filtros da lista global de tarefas — searchParams (status, prioridade, projeto). */
+/** Filtros da lista global de tarefas — searchParams (status, prioridade, projeto, concluidas). */
 export function TaskFilters({
   statusId,
   priority,
   projectId,
+  showDone,
   statuses,
   projects,
 }: {
   statusId: string;
   priority: string;
   projectId: string;
+  showDone: boolean;
   statuses: StatusInfo[];
   projects: { id: string; name: string }[];
 }) {
@@ -109,6 +112,16 @@ export function TaskFilters({
           ))}
         </SelectContent>
       </Select>
+
+      <label className="ml-auto flex items-center gap-2 text-sm text-muted-foreground">
+        <Checkbox
+          checked={showDone}
+          onCheckedChange={(checked) =>
+            updateParam("concluidas", checked ? "" : "nao")
+          }
+        />
+        Mostrar concluídas
+      </label>
     </div>
   );
 }
