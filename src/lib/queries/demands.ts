@@ -8,6 +8,7 @@ import {
 } from "@/lib/access/permissions";
 import { db } from "@/lib/db";
 import {
+  attachments,
   companies,
   demands,
   milestones,
@@ -15,6 +16,13 @@ import {
   users,
   type Demand,
 } from "@/lib/db/schema";
+
+export type DemandAttachmentItem = {
+  id: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: string | null;
+};
 
 export type DemandListItem = {
   id: string;
@@ -30,6 +38,8 @@ export type DemandListItem = {
   companyId: string;
   companyName: string;
   authorName: string | null;
+  /** Anexos enviados pelo cliente junto com a demanda. */
+  attachments: DemandAttachmentItem[];
 };
 
 export type DemandListFilters = {
@@ -75,7 +85,43 @@ export async function listDemands(
     .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy(desc(demands.createdAt));
 
-  return rows;
+  if (rows.length === 0) return [];
+
+  // Anexos enviados junto com as demandas (um por linha, agrupados aqui)
+  const attachmentRows = await db
+    .select({
+      id: attachments.id,
+      demandId: attachments.demandId,
+      fileName: attachments.fileName,
+      fileSize: attachments.fileSize,
+      mimeType: attachments.mimeType,
+    })
+    .from(attachments)
+    .where(
+      inArray(
+        attachments.demandId,
+        rows.map((r) => r.id),
+      ),
+    )
+    .orderBy(asc(attachments.createdAt));
+
+  const attachmentsByDemand = new Map<string, DemandAttachmentItem[]>();
+  for (const file of attachmentRows) {
+    if (!file.demandId) continue;
+    const list = attachmentsByDemand.get(file.demandId) ?? [];
+    list.push({
+      id: file.id,
+      fileName: file.fileName,
+      fileSize: file.fileSize,
+      mimeType: file.mimeType,
+    });
+    attachmentsByDemand.set(file.demandId, list);
+  }
+
+  return rows.map((row) => ({
+    ...row,
+    attachments: attachmentsByDemand.get(row.id) ?? [],
+  }));
 }
 
 /** Quantidade de demandas abertas no escopo (badge da página). */

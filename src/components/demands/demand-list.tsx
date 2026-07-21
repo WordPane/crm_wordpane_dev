@@ -6,6 +6,7 @@ import {
   ChevronDown,
   ExternalLink,
   Loader2,
+  Paperclip,
   Pencil,
   Trash2,
 } from "lucide-react";
@@ -49,7 +50,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { DemandListItem } from "@/lib/queries/demands";
-import { formatDate, timeAgo } from "@/lib/utils/format";
+import { formatDate, formatFileSize, timeAgo } from "@/lib/utils/format";
 import { cn } from "@/lib/utils";
 import {
   convertDemandSchema,
@@ -151,6 +152,19 @@ export function DemandList({
                         )}
                       />
                       {demand.title}
+                      {demand.attachments.length > 0 && (
+                        <span
+                          className="inline-flex items-center gap-0.5 text-xs font-normal text-muted-foreground"
+                          title={`${demand.attachments.length} ${
+                            demand.attachments.length === 1
+                              ? "anexo"
+                              : "anexos"
+                          }`}
+                        >
+                          <Paperclip className="size-3.5" />
+                          {demand.attachments.length}
+                        </span>
+                      )}
                     </span>
                   </TableCell>
                   {showCompany && (
@@ -207,6 +221,26 @@ export function DemandList({
                         <p className="max-w-3xl text-sm whitespace-pre-wrap text-muted-foreground">
                           {demand.description}
                         </p>
+                        {demand.attachments.length > 0 && (
+                          <ul className="space-y-1.5">
+                            {demand.attachments.map((file) => (
+                              <li key={file.id}>
+                                <a
+                                  href={`/api/files/${file.id}`}
+                                  className="inline-flex max-w-full items-center gap-2 text-sm text-primary transition-colors hover:underline"
+                                >
+                                  <Paperclip className="size-3.5 shrink-0" />
+                                  <span className="truncate">
+                                    {file.fileName}
+                                  </span>
+                                  <span className="shrink-0 text-xs text-muted-foreground">
+                                    {formatFileSize(file.fileSize)}
+                                  </span>
+                                </a>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
                         <div className="flex flex-wrap items-center gap-3">
                           <Select
                             value={demand.status}
