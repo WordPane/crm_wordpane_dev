@@ -1,4 +1,4 @@
-import { differenceInCalendarDays, format, parseISO, startOfMonth, subMonths } from "date-fns";
+import { format, startOfMonth, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { and, asc, desc, eq, inArray, isNotNull, isNull, or, sql, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
@@ -11,6 +11,8 @@ import {
   type SessionUser,
 } from "@/lib/access/permissions";
 import { db } from "@/lib/db";
+import { SQL_THIS_MONTH, SQL_TODAY } from "@/lib/db/business-date";
+import { daysUntilDate } from "@/lib/utils/format";
 import {
   activities,
   attachments,
@@ -160,7 +162,7 @@ export async function getAdminDashboard(
         .select({
           active: sql<number>`count(*) filter (where not coalesce(${projectStatuses.isFinal}, false))::int`,
           done: sql<number>`count(*) filter (where coalesce(${projectStatuses.isFinal}, false))::int`,
-          overdue: sql<number>`count(*) filter (where not coalesce(${projectStatuses.isFinal}, false) and ${projects.dueDate} < current_date)::int`,
+          overdue: sql<number>`count(*) filter (where not coalesce(${projectStatuses.isFinal}, false) and ${projects.dueDate} < ${SQL_TODAY})::int`,
         })
         .from(projects)
         .leftJoin(projectStatuses, eq(projects.statusId, projectStatuses.id))
@@ -196,7 +198,7 @@ export async function getAdminDashboard(
           openCount: sql<number>`count(*) filter (where ${charges.status} in ('pending', 'overdue'))::int`,
           openCents: sql<number>`coalesce(sum(${charges.valueCents}) filter (where ${charges.status} in ('pending', 'overdue')), 0)::int`,
           overdueCount: sql<number>`count(*) filter (where ${charges.status} = 'overdue')::int`,
-          receivedMonthCents: sql<number>`coalesce(sum(${charges.valueCents}) filter (where ${charges.status} in ('received', 'confirmed') and date_trunc('month', ${charges.paidAt}) = date_trunc('month', current_date)), 0)::int`,
+          receivedMonthCents: sql<number>`coalesce(sum(${charges.valueCents}) filter (where ${charges.status} in ('received', 'confirmed') and date_trunc('month', ${charges.paidAt} AT TIME ZONE 'America/Sao_Paulo') = ${SQL_THIS_MONTH}), 0)::int`,
         })
         .from(charges)
         .where(scope ? inColumn(charges.companyId, companyIds) : undefined),
@@ -264,7 +266,6 @@ async function listReceivables(
     .orderBy(asc(charges.dueDate))
     .limit(6);
 
-  const today = new Date();
   return rows.map((r) => ({
     id: r.id,
     description: r.description,
@@ -272,7 +273,7 @@ async function listReceivables(
     dueDate: r.dueDate,
     companyName: r.companyName,
     status: r.status as "pending" | "overdue",
-    daysLeft: differenceInCalendarDays(parseISO(r.dueDate), today),
+    daysLeft: daysUntilDate(r.dueDate),
   }));
 }
 
@@ -282,12 +283,12 @@ async function listUpcoming(
 ): Promise<UpcomingItem[]> {
   const projectConditions: SQL[] = [
     isNotNull(projects.dueDate),
-    sql`${projects.dueDate} <= current_date + interval '30 days'`,
+    sql`${projects.dueDate} <= ${SQL_TODAY} + interval '30 days'`,
     or(isNull(projectStatuses.isFinal), eq(projectStatuses.isFinal, false))!,
   ];
   const taskConditions: SQL[] = [
     isNotNull(tasks.dueDate),
-    sql`${tasks.dueDate} <= current_date + interval '30 days'`,
+    sql`${tasks.dueDate} <= ${SQL_TODAY} + interval '30 days'`,
     or(isNull(taskStatuses.isFinal), eq(taskStatuses.isFinal, false))!,
     isNull(tasks.completedAt),
   ];
@@ -330,7 +331,6 @@ async function listUpcoming(
       .limit(10),
   ]);
 
-  const today = new Date();
   const items: UpcomingItem[] = [
     ...projectRows
       .filter((r): r is typeof r & { dueDate: string } => r.dueDate !== null)
@@ -340,7 +340,7 @@ async function listUpcoming(
         title: r.name,
         subtitle: r.companyName,
         dueDate: r.dueDate,
-        daysLeft: differenceInCalendarDays(parseISO(r.dueDate), today),
+        daysLeft: daysUntilDate(r.dueDate),
         href: `/admin/projetos/${r.id}`,
       })),
     ...taskRows
@@ -351,7 +351,7 @@ async function listUpcoming(
         title: r.title,
         subtitle: r.projectName,
         dueDate: r.dueDate,
-        daysLeft: differenceInCalendarDays(parseISO(r.dueDate), today),
+        daysLeft: daysUntilDate(r.dueDate),
         href: `/admin/tarefas/${r.id}`,
       })),
   ];
@@ -368,7 +368,7 @@ async function listRevenueByMonth(
   const conditions: SQL[] = [
     inArray(charges.status, ["received", "confirmed"]),
     isNotNull(charges.paidAt),
-    sql`${charges.paidAt} >= date_trunc('month', current_date) - interval '5 months'`,
+    sql`${charges.paidAt} >= ${SQL_THIS_MONTH} - interval '5 months'`,
   ];
   if (scope) conditions.push(inColumn(charges.companyId, scope));
 

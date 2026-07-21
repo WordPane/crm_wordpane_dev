@@ -39,6 +39,7 @@ type ProjectFormProps =
       companies: SelectOption[];
       statuses: StatusInfo[];
       teamUsers: SelectOption[];
+      templates: SelectOption[];
       defaultCompanyId?: string;
     }
   | {
@@ -309,6 +310,54 @@ export function ProjectForm(props: ProjectFormProps) {
           {...form.register("description")}
         />
       </Field>
+
+      {props.mode === "create" && props.templates.length > 0 && (
+        <Field
+          label="Modelo de projeto"
+          error={errors.templateId?.message}
+        >
+          <Controller
+            control={form.control}
+            name="templateId"
+            render={({ field }) => (
+              <Select
+                value={field.value || NONE}
+                onValueChange={(value) =>
+                  field.onChange(!value || value === NONE ? "" : value)
+                }
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Sem modelo">
+                    {(value: string | null) =>
+                      !value || value === NONE
+                        ? "Sem modelo — projeto começa vazio"
+                        : (props.mode === "create" &&
+                            props.templates.find((t) => t.id === value)
+                              ?.name) ||
+                          "Sem modelo"
+                    }
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NONE}>
+                    Sem modelo — projeto começa vazio
+                  </SelectItem>
+                  {props.mode === "create" &&
+                    props.templates.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>
+                        {t.name}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            )}
+          />
+          <p className="text-xs text-muted-foreground">
+            Ao criar, as etapas e tarefas do modelo já são incluídas no
+            projeto.
+          </p>
+        </Field>
+      )}
 
       {error && (
         <p className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">

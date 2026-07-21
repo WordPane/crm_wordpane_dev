@@ -20,26 +20,37 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { updateTask } from "@/server/actions/tasks";
 
-/** Edição rápida de título e descrição da tarefa. */
+/** Edição rápida de título, descrição e prazo da tarefa. */
 export function TaskEditDialog({
   taskId,
   title,
   description,
+  dueDate,
 }: {
   taskId: string;
   title: string;
   description: string;
+  /** yyyy-MM-DD ("" = sem prazo). */
+  dueDate: string;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  const form = useForm<{ title: string; description: string }>({
-    defaultValues: { title, description },
+  const form = useForm<{
+    title: string;
+    description: string;
+    dueDate: string;
+  }>({
+    defaultValues: { title, description, dueDate },
   });
 
-  function onSubmit(values: { title: string; description: string }) {
+  function onSubmit(values: {
+    title: string;
+    description: string;
+    dueDate: string;
+  }) {
     setError(null);
     if (!values.title.trim()) {
       setError("Título é obrigatório.");
@@ -68,7 +79,7 @@ export function TaskEditDialog({
           <DialogHeader>
             <DialogTitle>Editar tarefa</DialogTitle>
             <DialogDescription>
-              Atualize o título e a descrição da tarefa.
+              Atualize o título, a descrição e o prazo da tarefa.
             </DialogDescription>
           </DialogHeader>
 
@@ -84,6 +95,13 @@ export function TaskEditDialog({
                 rows={5}
                 {...form.register("description")}
               />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="te-due">Prazo</Label>
+              <Input id="te-due" type="date" {...form.register("dueDate")} />
+              <p className="text-xs text-muted-foreground">
+                Deixe em branco para remover o prazo.
+              </p>
             </div>
 
             {error && (

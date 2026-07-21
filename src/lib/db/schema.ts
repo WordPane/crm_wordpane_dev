@@ -377,6 +377,59 @@ export const taskChecklistItems = pgTable(
   (t) => [index("checklist_task_idx").on(t.taskId)],
 );
 
+// ─────────────────────────── Modelos de projeto (etapas + tarefas) ───────────────────────────
+
+export const projectTemplates = pgTable("project_templates", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: varchar("name", { length: 160 }).notNull(),
+  description: text("description"),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export const projectTemplateMilestones = pgTable(
+  "project_template_milestones",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    templateId: uuid("template_id")
+      .notNull()
+      .references(() => projectTemplates.id, { onDelete: "cascade" }),
+    name: varchar("name", { length: 160 }).notNull(),
+    description: text("description"),
+    position: integer("position").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("ptm_template_idx").on(t.templateId)],
+);
+
+export const projectTemplateTasks = pgTable(
+  "project_template_tasks",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    milestoneId: uuid("milestone_id")
+      .notNull()
+      .references(() => projectTemplateMilestones.id, {
+        onDelete: "cascade",
+      }),
+    title: varchar("title", { length: 220 }).notNull(),
+    description: text("description"),
+    priority: priorityEnum("priority").notNull().default("media"),
+    visibleToClient: boolean("visible_to_client").notNull().default(true),
+    position: integer("position").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("ptt_milestone_idx").on(t.milestoneId)],
+);
+
 // ─────────────────────────── Comentários ───────────────────────────
 
 export const comments = pgTable(
@@ -1022,6 +1075,10 @@ export type TaskStatus = typeof taskStatuses.$inferSelect;
 export type Milestone = typeof milestones.$inferSelect;
 export type Task = typeof tasks.$inferSelect;
 export type TaskChecklistItem = typeof taskChecklistItems.$inferSelect;
+export type ProjectTemplate = typeof projectTemplates.$inferSelect;
+export type ProjectTemplateMilestone =
+  typeof projectTemplateMilestones.$inferSelect;
+export type ProjectTemplateTask = typeof projectTemplateTasks.$inferSelect;
 export type Comment = typeof comments.$inferSelect;
 export type Attachment = typeof attachments.$inferSelect;
 export type Demand = typeof demands.$inferSelect;

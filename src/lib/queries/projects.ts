@@ -175,6 +175,7 @@ export type ProjectTaskItem = {
   milestoneId: string | null;
   origin: Task["origin"];
   status: StatusInfo | null;
+  ownerId: string | null;
   ownerName: string | null;
 };
 
@@ -243,6 +244,7 @@ export async function getProject(
         statusName: taskStatuses.name,
         statusColor: taskStatuses.color,
         statusIsFinal: taskStatuses.isFinal,
+        ownerId: tasks.ownerId,
         ownerName: users.name,
       })
       .from(tasks)
@@ -298,6 +300,7 @@ export async function getProject(
             isFinal: t.statusIsFinal!,
           }
         : null,
+      ownerId: t.ownerId,
       ownerName: t.ownerName,
     })),
   };

@@ -6,6 +6,7 @@ import { BrandSettingsForm } from "@/components/settings/brand-settings-form";
 import { EmailSettingsForm } from "@/components/settings/email-settings-form";
 import { IssuerSettingsForm } from "@/components/settings/issuer-settings-form";
 import { StatusManager } from "@/components/settings/status-manager";
+import { TemplateManager } from "@/components/settings/template-manager";
 import { requireUser } from "@/lib/access/permissions";
 import { getMaskedAsaasSettings } from "@/lib/asaas/settings";
 import { getBranding } from "@/lib/brand/settings";
@@ -15,6 +16,7 @@ import {
   listProjectStatusesWithUsage,
   listTaskStatusesWithUsage,
 } from "@/lib/queries/settings";
+import { listProjectTemplates } from "@/lib/queries/templates";
 
 export const metadata: Metadata = { title: "Configurações" };
 
@@ -22,7 +24,7 @@ export default async function SettingsPage() {
   const user = await requireUser();
   if (user.role !== "super_admin") redirect("/admin/dashboard");
 
-  const [projectStatuses, taskStatuses, emailSettings, asaasSettings, issuer, brand] =
+  const [projectStatuses, taskStatuses, emailSettings, asaasSettings, issuer, brand, templates] =
     await Promise.all([
       listProjectStatusesWithUsage(user),
       listTaskStatusesWithUsage(user),
@@ -30,6 +32,7 @@ export default async function SettingsPage() {
       getMaskedAsaasSettings(),
       getIssuer(),
       getBranding(),
+      listProjectTemplates(user),
     ]);
 
   return (
@@ -58,6 +61,8 @@ export default async function SettingsPage() {
         projectStatuses={projectStatuses}
         taskStatuses={taskStatuses}
       />
+
+      <TemplateManager templates={templates} />
     </div>
   );
 }

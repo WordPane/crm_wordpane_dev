@@ -8,6 +8,7 @@ import { AttachmentList } from "@/components/attachments/attachment-list";
 import { PriorityChip, StatusColorChip } from "@/components/chips";
 import { TaskComments } from "@/components/comments/task-comments";
 import { TaskChecklist } from "@/components/tasks/task-checklist";
+import { TaskDeleteButton } from "@/components/tasks/task-delete-button";
 import { TaskEditDialog } from "@/components/tasks/task-edit-dialog";
 import { TaskSidebarControls } from "@/components/tasks/task-sidebar-controls";
 import {
@@ -39,13 +40,17 @@ export const metadata: Metadata = { title: "Detalhes da tarefa" };
 
 export default async function TaskDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ from?: string | string[] }>;
 }) {
   const user = await requireUser();
   requireTeam(user);
 
   const { id } = await params;
+  const { from } = await searchParams;
+  const fromProject = (Array.isArray(from) ? from[0] : from) === "projeto";
 
   let detail;
   try {
@@ -71,21 +76,31 @@ export default async function TaskDetailPage({
     ]);
 
   const overdue = !task.completedAt && isOverdue(task.dueDate);
+  const backHref = fromProject
+    ? `/admin/projetos/${project.id}?tab=tarefas`
+    : "/admin/tarefas";
+  const backLabel = fromProject
+    ? "Voltar para as tarefas do projeto"
+    : "Voltar para tarefas";
 
   return (
     <div className="space-y-6">
       {/* ─── Header ─── */}
       <div className="space-y-3">
         <Link
-          href="/admin/tarefas"
+          href={backHref}
           className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
         >
           <ArrowLeft className="size-4" />
-          Voltar para tarefas
+          {backLabel}
         </Link>
         <nav className="flex flex-wrap items-center gap-1 text-sm text-muted-foreground">
           <Link
-            href={`/admin/projetos/${project.id}`}
+            href={
+              fromProject
+                ? `/admin/projetos/${project.id}?tab=tarefas`
+                : `/admin/projetos/${project.id}`
+            }
             className="transition-colors hover:text-foreground"
           >
             {project.name}
@@ -104,11 +119,19 @@ export default async function TaskDetailPage({
               </span>
             )}
           </div>
-          <TaskEditDialog
-            taskId={task.id}
-            title={task.title}
-            description={task.description ?? ""}
-          />
+          <div className="flex items-center gap-2">
+            <TaskEditDialog
+              taskId={task.id}
+              title={task.title}
+              description={task.description ?? ""}
+              dueDate={task.dueDate ?? ""}
+            />
+            <TaskDeleteButton
+              taskId={task.id}
+              title={task.title}
+              backHref={backHref}
+            />
+          </div>
         </div>
       </div>
 

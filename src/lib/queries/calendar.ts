@@ -1,4 +1,4 @@
-import { addDays, format } from "date-fns";
+import { addDays, format, parseISO } from "date-fns";
 import {
   and,
   asc,
@@ -34,7 +34,7 @@ import {
 } from "@/lib/db/schema";
 import { chargeStatusLabels } from "@/lib/validations/finance";
 import { milestoneStatusLabels } from "@/lib/validations/project";
-import { formatCurrency } from "@/lib/utils/format";
+import { businessToday, formatCurrency } from "@/lib/utils/format";
 
 export const calendarEventTypes = [
   "project",
@@ -90,9 +90,9 @@ export type CalendarFilterOptions = {
 
 const companyName = sql<string>`coalesce(${companies.nomeFantasia}, ${companies.razaoSocial})`;
 
-/** Data de hoje (local) como yyyy-MM-dd — comparação lexicográfica funciona. */
+/** Data de hoje no fuso da aplicação — comparação lexicográfica funciona. */
 function todayStr(): string {
-  return format(new Date(), "yyyy-MM-dd");
+  return businessToday();
 }
 
 /**
@@ -359,7 +359,7 @@ export async function getCalendarSummary(
   }
 
   const today = todayStr();
-  const limit30 = format(addDays(new Date(), 30), "yyyy-MM-dd");
+  const limit30 = format(addDays(parseISO(today), 30), "yyyy-MM-dd");
   // Não concluído: status final (projeto/tarefa) ou etapa concluída
   const projectNotDone = or(
     isNull(projectStatuses.isFinal),
@@ -429,8 +429,8 @@ export async function getCalendarSummary(
       ),
   ]);
 
-  const tomorrow = format(addDays(new Date(), 1), "yyyy-MM-dd");
-  const limit7 = format(addDays(new Date(), 7), "yyyy-MM-dd");
+  const tomorrow = format(addDays(parseISO(today), 1), "yyyy-MM-dd");
+  const limit7 = format(addDays(parseISO(today), 7), "yyyy-MM-dd");
 
   const summary = { ...empty };
   for (const { dueDate } of [

@@ -30,6 +30,7 @@ import {
   nullIfEmpty,
   type ActionResult,
 } from "@/server/actions/utils";
+import { applyProjectTemplate } from "@/server/actions/templates";
 
 /** Projeto existente + acesso garantido (empresa atribuída ou membro do projeto). */
 async function getScopedProject(user: SessionUser, projectId: string) {
@@ -95,6 +96,11 @@ export async function createProject(input: unknown): Promise<ActionResult> {
       action: "project.created",
       metadata: { title: data.name },
     });
+
+    // Modelo selecionado: etapas e tarefas já nascem prontas
+    if (data.templateId) {
+      await applyProjectTemplate(created.id, data.templateId);
+    }
 
     revalidateProject(created.id, data.companyId);
     return { success: true, id: created.id };

@@ -6,6 +6,7 @@ import {
   type SessionUser,
 } from "@/lib/access/permissions";
 import { db } from "@/lib/db";
+import { SQL_THIS_MONTH } from "@/lib/db/business-date";
 import type { PeriodRange } from "@/lib/utils/period";
 import {
   charges,
@@ -229,7 +230,7 @@ export async function financeSummary(
         and(
           scopeCondition,
           inArray(charges.status, ["received", "confirmed"]),
-          sql`date_trunc('month', ${charges.paidAt}) = date_trunc('month', current_date)`,
+          sql`date_trunc('month', ${charges.paidAt} AT TIME ZONE 'America/Sao_Paulo') = ${SQL_THIS_MONTH}`,
         ),
       ),
   ]);

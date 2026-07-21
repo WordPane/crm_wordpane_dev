@@ -5,6 +5,7 @@ import {
   ChevronDown,
   ChevronUp,
   Flag,
+  Layers,
   Loader2,
   MoreHorizontal,
   Pencil,
@@ -53,7 +54,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { ViewToggle, type ViewMode } from "@/components/ui/view-toggle";
 import type { MilestoneItem } from "@/lib/queries/projects";
+import { useViewPreference } from "@/lib/use-view-preference";
 import { formatDate, isOverdue } from "@/lib/utils/format";
 import { cn } from "@/lib/utils";
 import {
@@ -69,6 +72,7 @@ import {
   updateMilestone,
   updateMilestoneStatus,
 } from "@/server/actions/projects";
+import { applyProjectTemplate } from "@/server/actions/templates";
 
 type SelectOption = { id: string; name: string };
 
@@ -78,16 +82,24 @@ export function MilestonesSection({
   projectId,
   milestones,
   teamUsers,
+  templates,
 }: {
   projectId: string;
   milestones: MilestoneItem[];
   teamUsers: SelectOption[];
+  templates: SelectOption[];
 }) {
   const router = useRouter();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<MilestoneItem | null>(null);
   const [deleting, setDeleting] = useState<MilestoneItem | null>(null);
+  const [applyOpen, setApplyOpen] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState("");
   const [pending, startTransition] = useTransition();
+  const [view, setView] = useViewPreference<ViewMode>(
+    "view:project-milestones",
+    "lista",
+  );
 
   function run(action: Promise<{ success: true; id?: string } | { error: string }>, successMessage: string) {
     startTransition(async () => {
@@ -101,6 +113,73 @@ export function MilestonesSection({
     });
   }
 
+  function applyTemplate() {
+    if (!selectedTemplate) return;
+    run(
+      applyProjectTemplate(projectId, selectedTemplate),
+      "Modelo aplicado ao projeto.",
+    );
+    setApplyOpen(false);
+    setSelectedTemplate("");
+  }
+
+  /** Menu de ações da etapa (lista e kanban). */
+  function milestoneMenu(m: MilestoneItem) {
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Ações da etapa"
+              disabled={pending}
+            />
+          }
+        >
+          <MoreHorizontal className="size-4" />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem
+            onClick={() => {
+              setEditing(m);
+              setDialogOpen(true);
+            }}
+          >
+            <Pencil />
+            Editar
+          </DropdownMenuItem>
+          {milestoneStatuses
+            .filter((s) => s !== m.status)
+            .map((s) => (
+              <DropdownMenuItem
+                key={s}
+                onClick={() =>
+                  run(
+                    updateMilestoneStatus(m.id, s),
+                    s === "concluida"
+                      ? "Etapa concluída."
+                      : "Status da etapa atualizado.",
+                  )
+                }
+              >
+                <Flag />
+                Marcar como {milestoneStatusLabels[s].toLowerCase()}
+              </DropdownMenuItem>
+            ))}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            variant="destructive"
+            onClick={() => setDeleting(m)}
+          >
+            <Trash2 />
+            Excluir
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -109,16 +188,29 @@ export function MilestonesSection({
           Marcos (milestones) com progresso das tarefas vinculadas.
         </CardDescription>
         <CardAction>
-          <Button
-            size="sm"
-            onClick={() => {
-              setEditing(null);
-              setDialogOpen(true);
-            }}
-          >
-            <Plus />
-            Nova etapa
-          </Button>
+          <div className="flex items-center gap-2">
+            <ViewToggle value={view} onChange={setView} />
+            {templates.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setApplyOpen(true)}
+              >
+                <Layers />
+                Aplicar modelo
+              </Button>
+            )}
+            <Button
+              size="sm"
+              onClick={() => {
+                setEditing(null);
+                setDialogOpen(true);
+              }}
+            >
+              <Plus />
+              Nova etapa
+            </Button>
+          </div>
         </CardAction>
       </CardHeader>
       <CardContent>
@@ -129,6 +221,68 @@ export function MilestonesSection({
             <p className="text-sm text-muted-foreground">
               Divida o projeto em etapas para acompanhar o progresso.
             </p>
+          </div>
+        ) : view === "kanban" ? (
+          <div className="grid gap-3 md:grid-cols-3">
+            {milestoneStatuses.map((status) => {
+              const items = milestones.filter((m) => m.status === status);
+              return (
+                <section
+                  key={status}
+                  className="space-y-2 rounded-xl bg-white/[0.02] p-2 ring-1 ring-foreground/5"
+                >
+                  <header className="flex items-center justify-between px-1 pt-1">
+                    <h3 className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">
+                      {milestoneStatusLabels[status]}
+                    </h3>
+                    <span className="text-xs text-muted-foreground">
+                      {items.length}
+                    </span>
+                  </header>
+                  {items.length === 0 ? (
+                    <p className="px-1 pb-2 text-xs text-muted-foreground">
+                      Nenhuma etapa.
+                    </p>
+                  ) : (
+                    items.map((m) => {
+                      const overdue = !m.completedAt && isOverdue(m.dueDate);
+                      const percent =
+                        m.totalTasks > 0
+                          ? Math.round((m.doneTasks / m.totalTasks) * 100)
+                          : 0;
+                      return (
+                        <div
+                          key={m.id}
+                          className="space-y-2 rounded-lg bg-background p-3 ring-1 ring-foreground/10"
+                        >
+                          <div className="flex items-start justify-between gap-1">
+                            <span className="text-sm font-medium">{m.name}</span>
+                            {milestoneMenu(m)}
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {m.ownerName ?? "Sem responsável"}
+                            {" · "}
+                            <span
+                              className={cn(
+                                overdue && "font-medium text-red-300",
+                              )}
+                            >
+                              {formatDate(m.dueDate)}
+                            </span>
+                          </p>
+                          <div className="flex items-center gap-2">
+                            <Progress value={percent} className="flex-1" />
+                            <span className="text-xs text-muted-foreground tabular-nums">
+                              {m.doneTasks}/{m.totalTasks}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </section>
+              );
+            })}
           </div>
         ) : (
           <ul className="space-y-3">
@@ -190,57 +344,7 @@ export function MilestonesSection({
                     </div>
                   </div>
 
-                  <DropdownMenu>
-                    <DropdownMenuTrigger
-                      render={
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          aria-label="Ações da etapa"
-                          disabled={pending}
-                        />
-                      }
-                    >
-                      <MoreHorizontal className="size-4" />
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        onClick={() => {
-                          setEditing(m);
-                          setDialogOpen(true);
-                        }}
-                      >
-                        <Pencil />
-                        Editar
-                      </DropdownMenuItem>
-                      {milestoneStatuses
-                        .filter((s) => s !== m.status)
-                        .map((s) => (
-                          <DropdownMenuItem
-                            key={s}
-                            onClick={() =>
-                              run(
-                                updateMilestoneStatus(m.id, s),
-                                s === "concluida"
-                                  ? "Etapa concluída."
-                                  : "Status da etapa atualizado.",
-                              )
-                            }
-                          >
-                            <Flag />
-                            Marcar como {milestoneStatusLabels[s].toLowerCase()}
-                          </DropdownMenuItem>
-                        ))}
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        variant="destructive"
-                        onClick={() => setDeleting(m)}
-                      >
-                        <Trash2 />
-                        Excluir
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  {milestoneMenu(m)}
                 </li>
               );
             })}
@@ -275,6 +379,67 @@ export function MilestonesSection({
           return null;
         }}
       />
+
+      <Dialog
+        open={applyOpen}
+        onOpenChange={(open) => {
+          setApplyOpen(open);
+          if (!open) setSelectedTemplate("");
+        }}
+      >
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Aplicar modelo</DialogTitle>
+            <DialogDescription>
+              Todas as etapas e tarefas do modelo serão criadas ao final das
+              etapas existentes.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-1.5">
+            <Label>Modelo</Label>
+            <Select
+              value={selectedTemplate || undefined}
+              onValueChange={(value) => setSelectedTemplate(value ?? "")}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Selecione o modelo">
+                  {(value: string | null) =>
+                    value
+                      ? (templates.find((t) => t.id === value)?.name ??
+                        "Selecione o modelo")
+                      : "Selecione o modelo"
+                  }
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {templates.map((t) => (
+                  <SelectItem key={t.id} value={t.id}>
+                    {t.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              disabled={pending}
+              onClick={() => setApplyOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              disabled={pending || !selectedTemplate}
+              onClick={applyTemplate}
+            >
+              {pending && <Loader2 className="animate-spin" />}
+              Aplicar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

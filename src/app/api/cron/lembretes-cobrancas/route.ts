@@ -1,10 +1,11 @@
-import { format } from "date-fns";
 import { and, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { db } from "@/lib/db";
+import { SQL_TODAY } from "@/lib/db/business-date";
 import { charges } from "@/lib/db/schema";
 import { notifyChargeReminder } from "@/lib/notifications";
+import { businessToday } from "@/lib/utils/format";
 
 /**
  * GET /api/cron/lembretes-cobrancas — lembrete diário de cobranças vencidas.
@@ -17,7 +18,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
   }
 
-  const today = format(new Date(), "yyyy-MM-dd");
+  const today = businessToday();
 
   // Vencidas (status local ou já vencidas pela data) sem lembrete hoje
   const overdueCharges = await db
@@ -29,7 +30,7 @@ export async function GET(request: Request) {
         lt(charges.dueDate, today),
         or(
           isNull(charges.lastReminderAt),
-          sql`${charges.lastReminderAt} < current_date`,
+          sql`${charges.lastReminderAt} AT TIME ZONE 'America/Sao_Paulo' < ${SQL_TODAY}`,
         ),
       ),
     )

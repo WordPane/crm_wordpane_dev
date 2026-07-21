@@ -48,6 +48,11 @@ function describe(activity: ActivityItem): string {
       return `mudou o status do projeto de "${str(m.from) ?? "—"}" para "${str(m.to) ?? "—"}"`;
     case "project.deleted":
       return `excluiu o projeto "${str(m.title) ?? ""}"`;
+    case "project.template_applied": {
+      const count = typeof m.milestones === "number" ? m.milestones : 0;
+      const taskCount = typeof m.tasks === "number" ? m.tasks : 0;
+      return `aplicou o modelo "${str(m.name) ?? ""}" (${count} ${count === 1 ? "etapa" : "etapas"}, ${taskCount} ${taskCount === 1 ? "tarefa" : "tarefas"})`;
+    }
     case "task.created":
       return `criou a tarefa "${str(m.title) ?? ""}"`;
     case "task.status_changed":
@@ -56,6 +61,8 @@ function describe(activity: ActivityItem): string {
       return `moveu a tarefa "${str(m.title) ?? ""}" da etapa "${str(m.from) ?? "Sem etapa"}" para "${str(m.to) ?? "Sem etapa"}"`;
     case "task.completed":
       return `concluiu a tarefa "${str(m.title) ?? ""}"`;
+    case "task.deleted":
+      return `excluiu a tarefa "${str(m.title) ?? ""}"`;
     case "milestone.created":
       return `criou a etapa "${str(m.title) ?? ""}"`;
     case "milestone.completed":
@@ -89,9 +96,9 @@ function describe(activity: ActivityItem): string {
     case "quote.sent":
       return `enviou o orçamento ${str(m.number) ?? ""} ao cliente`;
     case "quote.approved":
-      return `${str(m.name) ?? "O cliente"} aprovou o orçamento ${str(m.number) ?? ""}`;
+      return `aprovou o orçamento ${str(m.number) ?? ""}`;
     case "quote.rejected":
-      return `${str(m.name) ?? "O cliente"} recusou o orçamento ${str(m.number) ?? ""}`;
+      return `recusou o orçamento ${str(m.number) ?? ""}`;
     case "quote.duplicated":
       return `duplicou o orçamento ${str(m.from) ?? ""} como ${str(m.number) ?? ""} (v${typeof m.version === "number" ? m.version : "?"})`;
     case "quote.project_created":
@@ -115,7 +122,7 @@ function describe(activity: ActivityItem): string {
         ? "aprovou o cadastro público e criou a empresa"
         : "criou a empresa";
     case "auth.impersonated":
-      return `${str(m.admin) ?? "O super admin"} acessou o portal como ${str(m.user) ?? ""}`;
+      return `acessou o portal como ${str(m.user) ?? ""}`;
     default:
       return activity.action;
   }
@@ -132,7 +139,17 @@ function describeSystem(activity: ActivityItem): string {
       ? `Recebemos o pagamento de ${company} — "${description}" (${value})`
       : `Recebemos o pagamento de "${description}" (${value})`;
   }
-  // Demais eventos sem autor já trazem o nome no texto (ex.: link público)
+  // Resposta via link público: sem autor — o nome vai no metadata
+  if (
+    activity.action === "quote.approved" ||
+    activity.action === "quote.rejected"
+  ) {
+    const verb = activity.action === "quote.approved" ? "aprovou" : "recusou";
+    return `${str(m.name) ?? "O cliente"} ${verb} o orçamento ${str(m.number) ?? ""}`;
+  }
+  if (activity.action === "auth.impersonated") {
+    return `${str(m.admin) ?? "O super admin"} acessou o portal como ${str(m.user) ?? ""}`;
+  }
   return describe(activity);
 }
 

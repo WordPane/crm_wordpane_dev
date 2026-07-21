@@ -127,6 +127,13 @@
       "when": 1784585314278,
       "tag": "0017_left_doomsday",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1784590414914,
+      "tag": "0018_daffy_rattler",
+      "breakpoints": true
     }
   ]
 }

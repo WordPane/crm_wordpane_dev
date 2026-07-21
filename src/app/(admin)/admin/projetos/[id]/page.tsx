@@ -21,7 +21,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ProjectTabsPersist } from "@/components/projects/project-tabs-persist";
 import {
   ForbiddenError,
   requireTeam,
@@ -37,6 +38,7 @@ import { listProjectLinks } from "@/lib/queries/links";
 import { getProject, listActiveProjectStatuses } from "@/lib/queries/projects";
 import { listActiveTaskStatuses } from "@/lib/queries/tasks";
 import { listTeamSelectOptions } from "@/lib/queries/team";
+import { listProjectTemplateOptions } from "@/lib/queries/templates";
 import { formatDate } from "@/lib/utils/format";
 import { projectToFormValues, projectTypeLabels } from "@/lib/validations/project";
 
@@ -69,7 +71,8 @@ export default async function ProjectDetailPage({
   const { id } = await params;
   const { tab } = await searchParams;
   const tabValue = Array.isArray(tab) ? tab[0] : tab;
-  const activeTab: TabValue = isTab(tabValue) ? tabValue : "visao";
+  const hasExplicitTab = isTab(tabValue);
+  const activeTab: TabValue = hasExplicitTab ? tabValue : "visao";
 
   let detail;
   try {
@@ -91,6 +94,7 @@ export default async function ProjectDetailPage({
     projectAttachments,
     taskAttachments,
     projectLinks,
+    templates,
   ] = await Promise.all([
     listActiveProjectStatuses(user),
     listActiveTaskStatuses(user),
@@ -100,6 +104,7 @@ export default async function ProjectDetailPage({
     listProjectAttachments(user, project.id),
     listProjectTaskAttachments(user, project.id),
     listProjectLinks(user, project.id),
+    listProjectTemplateOptions(user),
   ]);
 
   const totalTasks = tasks.length;
@@ -145,7 +150,7 @@ export default async function ProjectDetailPage({
       </div>
 
       {/* ─── Tabs ─── */}
-      <Tabs defaultValue={activeTab}>
+      <ProjectTabsPersist initialTab={activeTab} hasExplicitTab={hasExplicitTab}>
         <TabsList>
           <TabsTrigger value="visao">Visão geral</TabsTrigger>
           <TabsTrigger value="etapas">Etapas</TabsTrigger>
@@ -258,6 +263,7 @@ export default async function ProjectDetailPage({
             projectId={project.id}
             milestones={milestones}
             teamUsers={teamUsers}
+            templates={templates}
           />
         </TabsContent>
 
@@ -268,6 +274,7 @@ export default async function ProjectDetailPage({
             tasks={tasks}
             statuses={taskStatuses}
             teamUsers={teamUsers}
+            currentUserId={user.id}
           />
         </TabsContent>
 
@@ -325,7 +332,7 @@ export default async function ProjectDetailPage({
         <TabsContent value="links" className="pt-4">
           <ProjectLinksSection projectId={project.id} links={projectLinks} />
         </TabsContent>
-      </Tabs>
+      </ProjectTabsPersist>
     </div>
   );
 }

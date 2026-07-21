@@ -17,7 +17,10 @@ import {
   taskChecklistItems,
   tasks,
   taskStatuses,
+  attachments,
+  demands,
 } from "@/lib/db/schema";
+import { getStorage } from "@/lib/storage";
 import { checklistItemSchema, taskFormSchema, taskUpdateSchema } from "@/lib/validations/task";
 import {
   actionError,
@@ -344,6 +347,59 @@ export async function deleteChecklistItem(itemId: string): Promise<ActionResult>
       .where(eq(taskChecklistItems.id, itemId));
 
     revalidatePath(`/admin/tarefas/${item.taskId}`);
+    return { success: true };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+/**
+ * Exclui a tarefa: checklist, comentários e anexos (registro) vão em cascade;
+ * demandas vinculadas são desvinculadas; arquivos dos anexos saem do storage
+ * (melhor esforço). A equipe com acesso ao projeto pode excluir.
+ */
+export async function deleteTask(taskId: string): Promise<ActionResult> {
+  try {
+    const user = await requireUser();
+    requireTeam(user);
+
+    const scoped = await getScopedTask(user, taskId);
+    if (!scoped) return { error: "Tarefa não encontrada." };
+    const { task, project } = scoped;
+
+    // Chaves dos anexos para limpar o storage depois da exclusão
+    const attachmentRows = await db
+      .select({ fileKey: attachments.fileKey })
+      .from(attachments)
+      .where(eq(attachments.taskId, taskId));
+
+    await db.transaction(async (tx) => {
+      // Demandas convertidas nesta tarefa ficam sem vínculo (coluna sem FK)
+      await tx
+        .update(demands)
+        .set({ taskId: null })
+        .where(eq(demands.taskId, taskId));
+      await tx.delete(tasks).where(eq(tasks.id, taskId));
+    });
+
+    // Arquivos locais dos anexos (blob guarda URL pública — nada a remover)
+    for (const row of attachmentRows) {
+      if (!/^https?:\/\//i.test(row.fileKey)) {
+        await getStorage().delete(row.fileKey);
+      }
+    }
+
+    await logActivity({
+      actorId: user.id,
+      companyId: project.companyId,
+      projectId: project.id,
+      entityType: "task",
+      entityId: taskId,
+      action: "task.deleted",
+      metadata: { title: task.title },
+    });
+
+    revalidateTask(taskId, project.id);
     return { success: true };
   } catch (error) {
     return actionError(error);

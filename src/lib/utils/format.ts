@@ -1,5 +1,5 @@
 import { TZDate } from "@date-fns/tz";
-import { format, formatDistanceToNow, isPast, parseISO } from "date-fns";
+import { format, formatDistanceToNow, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 /**
@@ -10,6 +10,20 @@ const APP_TIMEZONE = process.env.APP_TIMEZONE ?? "America/Sao_Paulo";
 
 /** String de coluna `date` (YYYY-MM-DD, sem hora)? */
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+
+/** "Hoje" (yyyy-MM-dd) no fuso da aplicação — referência de vencimentos. */
+export function businessToday(): string {
+  return format(new TZDate(new Date(), APP_TIMEZONE), "yyyy-MM-dd");
+}
+
+/** Dias até a data yyyy-MM-dd (negativo = vencida), no fuso da aplicação. */
+export function daysUntilDate(dueDate: string): number {
+  const msPerDay = 86_400_000;
+  return Math.round(
+    (Date.parse(`${dueDate}T00:00:00Z`) -
+      Date.parse(`${businessToday()}T00:00:00Z`)) / msPerDay,
+  );
+}
 
 /** "22/07/2026" — timestamps convertidos para America/Sao_Paulo. */
 export function formatDate(value: Date | string | null | undefined): string {
@@ -36,11 +50,18 @@ export function timeAgo(value: Date | string | null | undefined): string {
   return formatDistanceToNow(d, { addSuffix: true, locale: ptBR });
 }
 
-/** Data de prazo já venceu? (ignora valores nulos) */
+/**
+ * Prazo vencido? Comparação por DIA no fuso da aplicação: vence só depois
+ * que o dia do prazo passa (não às 21h do dia anterior, como era em UTC).
+ */
 export function isOverdue(value: Date | string | null | undefined): boolean {
   if (!value) return false;
+  // Coluna `date` (sem hora): compara o dia literal
+  if (typeof value === "string" && DATE_ONLY.test(value)) {
+    return value < businessToday();
+  }
   const d = typeof value === "string" ? parseISO(value) : value;
-  return isPast(d);
+  return format(new TZDate(d, APP_TIMEZONE), "yyyy-MM-dd") < businessToday();
 }
 
 /** "R$ 1.234,56" — valores monetários são inteiros em centavos. */

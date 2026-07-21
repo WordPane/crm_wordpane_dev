@@ -14,6 +14,7 @@ import { requireTeam, requireUser } from "@/lib/access/permissions";
 import { listCompanies } from "@/lib/queries/companies";
 import { listActiveProjectStatuses } from "@/lib/queries/projects";
 import { listTeamSelectOptions } from "@/lib/queries/team";
+import { listProjectTemplateOptions } from "@/lib/queries/templates";
 
 export const metadata: Metadata = { title: "Novo projeto" };
 
@@ -28,10 +29,11 @@ export default async function NewProjectPage({
   const { empresa } = await searchParams;
   const defaultCompanyId = (Array.isArray(empresa) ? empresa[0] : empresa) ?? "";
 
-  const [companies, statuses, teamUsers] = await Promise.all([
+  const [companies, statuses, teamUsers, templates] = await Promise.all([
     listCompanies(user),
     listActiveProjectStatuses(user),
     listTeamSelectOptions(user),
+    listProjectTemplateOptions(user),
   ]);
 
   return (
@@ -63,6 +65,7 @@ export default async function NewProjectPage({
             }))}
             statuses={statuses}
             teamUsers={teamUsers}
+            templates={templates}
             defaultCompanyId={defaultCompanyId}
           />
         </CardContent>

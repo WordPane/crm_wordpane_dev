@@ -1,4 +1,4 @@
-import { addDays, format } from "date-fns";
+import { addDays, format, parseISO } from "date-fns";
 import {
   and,
   asc,
@@ -34,7 +34,7 @@ import {
 } from "@/lib/queries/calendar";
 import { chargeStatusLabels } from "@/lib/validations/finance";
 import { milestoneStatusLabels } from "@/lib/validations/project";
-import { formatCurrency } from "@/lib/utils/format";
+import { businessToday, formatCurrency } from "@/lib/utils/format";
 
 /**
  * Agenda do portal: mesmos eventos da agenda interna, mas escopados à
@@ -49,7 +49,7 @@ function requireClientCompanyId(user: SessionUser): string {
 }
 
 function todayStr(): string {
-  return format(new Date(), "yyyy-MM-dd");
+  return businessToday();
 }
 
 const milestoneStatusColors: Record<string, string> = {
@@ -252,7 +252,7 @@ export async function getPortalCalendarSummary(
   const companyId = requireClientCompanyId(user);
 
   const today = todayStr();
-  const limit30 = format(addDays(new Date(), 30), "yyyy-MM-dd");
+  const limit30 = format(addDays(parseISO(today), 30), "yyyy-MM-dd");
   const projectNotDone = or(
     isNull(projectStatuses.isFinal),
     eq(projectStatuses.isFinal, false),
@@ -313,8 +313,8 @@ export async function getPortalCalendarSummary(
       ),
   ]);
 
-  const tomorrow = format(addDays(new Date(), 1), "yyyy-MM-dd");
-  const limit7 = format(addDays(new Date(), 7), "yyyy-MM-dd");
+  const tomorrow = format(addDays(parseISO(today), 1), "yyyy-MM-dd");
+  const limit7 = format(addDays(parseISO(today), 7), "yyyy-MM-dd");
 
   const summary = { vencidos: 0, hoje: 0, proximos7: 0, proximos30: 0 };
   for (const { dueDate } of [

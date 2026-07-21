@@ -6,6 +6,7 @@ import {
   type SessionUser,
 } from "@/lib/access/permissions";
 import { db } from "@/lib/db";
+import { SQL_TODAY } from "@/lib/db/business-date";
 import {
   activities,
   attachments,
@@ -277,7 +278,7 @@ export async function getPortalDashboard(
             eq(projects.companyId, companyId),
             eq(tasks.visibleToClient, true),
             isNull(tasks.completedAt),
-            sql`${tasks.dueDate} >= current_date`,
+            sql`${tasks.dueDate} >= ${SQL_TODAY}`,
           ),
         )
         .orderBy(asc(tasks.dueDate), asc(tasks.createdAt))

@@ -76,6 +76,8 @@ export const projectFormSchema = z.object({
   dueDate: optionalDate,
   priority: z.enum(priorities),
   description: optionalText(5000),
+  /** Modelo aplicado na criação (etapas + tarefas prontas). */
+  templateId: optionalId,
 });
 
 export type ProjectFormValues = z.infer<typeof projectFormSchema>;
@@ -92,6 +94,7 @@ export const emptyProjectValues: Omit<ProjectFormValues, "companyId"> & {
   dueDate: "",
   priority: "media",
   description: "",
+  templateId: "",
 };
 
 /** Converte o registro do banco para os valores do formulário. */
@@ -106,6 +109,7 @@ export function projectToFormValues(project: Project): ProjectFormValues {
     dueDate: project.dueDate ?? "",
     priority: project.priority,
     description: project.description ?? "",
+    templateId: "",
   };
 }
 
