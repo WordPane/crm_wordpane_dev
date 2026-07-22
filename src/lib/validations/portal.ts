@@ -15,7 +15,7 @@ const optionalText = (max: number) =>
 
 // ─────────────────────────── Demanda (portal do cliente) ───────────────────────────
 
-/** Metadados de um arquivo já enviado via POST /api/upload. */
+/** Metadados de um arquivo já enviado (uploadFile). */
 const demandAttachmentSchema = z.object({
   fileKey: z.string().trim().min(1, "Arquivo inválido.").max(2000),
   fileName: z.string().trim().min(1, "Nome inválido.").max(255),
@@ -78,7 +78,7 @@ export type PortalProfileValues = z.infer<typeof portalProfileSchema>;
 
 // ─────────────────────────── Avatar ───────────────────────────
 
-/** Metadados do upload da foto (POST /api/upload) — precisa ser imagem. */
+/** Metadados do upload da foto — precisa ser imagem. */
 export const portalAvatarSchema = z
   .object({
     fileKey: z.string().trim().min(1, "Arquivo inválido.").max(2000),

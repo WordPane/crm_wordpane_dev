@@ -20,6 +20,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import type { UserRole } from "@/lib/auth/types";
 import type { AttachmentItem } from "@/lib/queries/attachments";
+import { uploadFile } from "@/lib/upload";
 import { formatFileSize, timeAgo } from "@/lib/utils/format";
 import {
   createAttachment,
@@ -62,7 +63,7 @@ function fileIcon(mimeType: string | null) {
   return File;
 }
 
-/** Lista de anexos com upload (POST /api/upload + createAttachment) e exclusão. */
+/** Lista de anexos com upload (uploadFile + createAttachment) e exclusão. */
 export function AttachmentList({
   attachments,
   taskId,
@@ -88,29 +89,13 @@ export function AttachmentList({
 
     setUploading(true);
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      const response = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-      });
-      const payload = (await response.json().catch(() => null)) as {
-        error?: string;
-        fileKey?: string;
-        fileName?: string;
-        fileSize?: number;
-        mimeType?: string;
-      } | null;
-      if (!response.ok || !payload?.fileKey) {
-        toast.error(payload?.error ?? "Não foi possível enviar o arquivo.");
-        return;
-      }
+      const uploaded = await uploadFile(file);
 
       const result = await createAction({
-        fileKey: payload.fileKey,
-        fileName: payload.fileName ?? file.name,
-        fileSize: payload.fileSize ?? file.size,
-        mimeType: payload.mimeType ?? file.type,
+        fileKey: uploaded.fileKey,
+        fileName: uploaded.fileName,
+        fileSize: uploaded.fileSize,
+        mimeType: uploaded.mimeType,
         taskId: taskId ?? "",
         projectId: projectId ?? "",
         demandId: demandId ?? "",
@@ -121,8 +106,12 @@ export function AttachmentList({
       }
       toast.success("Arquivo anexado.");
       startTransition(() => router.refresh());
-    } catch {
-      toast.error("Não foi possível enviar o arquivo.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível enviar o arquivo.",
+      );
     } finally {
       setUploading(false);
     }

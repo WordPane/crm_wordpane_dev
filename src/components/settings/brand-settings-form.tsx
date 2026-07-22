@@ -24,6 +24,7 @@ import {
   type BrandAsset,
   type BrandConfig,
 } from "@/lib/brand/config";
+import { uploadFile } from "@/lib/upload";
 import {
   brandSettingsSchema,
   type BrandSettingsValues,
@@ -50,24 +51,19 @@ function Field({
   );
 }
 
-/** Upload de um asset de marca para /api/upload; retorna o valor a gravar. */
+/** Upload de um asset de marca; retorna o valor a gravar. */
 async function sendAsset(file: File): Promise<string | null> {
-  const formData = new FormData();
-  formData.append("file", file);
-  const response = await fetch("/api/upload", {
-    method: "POST",
-    body: formData,
-  });
-  const body = (await response.json().catch(() => null)) as {
-    fileKey?: string;
-    publicUrl?: string;
-    error?: string;
-  } | null;
-  if (!response.ok || !body || (!body.publicUrl && !body.fileKey)) {
-    toast.error(body?.error ?? "Não foi possível enviar o arquivo.");
+  try {
+    const uploaded = await uploadFile(file);
+    return uploaded.publicUrl ?? uploaded.fileKey;
+  } catch (error) {
+    toast.error(
+      error instanceof Error
+        ? error.message
+        : "Não foi possível enviar o arquivo.",
+    );
     return null;
   }
-  return body.publicUrl ?? body.fileKey ?? null;
 }
 
 /** Personalização white-label da instância (nome, logo, favicon e cores). */

@@ -7,12 +7,13 @@ import { toast } from "sonner";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { uploadFile } from "@/lib/upload";
 import { initials } from "@/lib/utils/format";
 import { updateOwnAvatar } from "@/server/actions/profile";
 
 const ACCEPTED_TYPES = "image/png,image/jpeg,image/webp,image/svg+xml,image/gif";
 
-/** Foto de perfil: envia via /api/upload e grava o avatarUrl do usuário (qualquer role). */
+/** Foto de perfil: envia via uploadFile e grava o avatarUrl do usuário (qualquer role). */
 export function AvatarUpload({
   name,
   avatarUrl,
@@ -31,27 +32,12 @@ export function AvatarUpload({
 
     setUploading(true);
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      const response = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-      });
-      const payload = (await response.json().catch(() => null)) as {
-        error?: string;
-        fileKey?: string;
-        publicUrl?: string;
-        mimeType?: string;
-      } | null;
-      if (!response.ok || !payload?.fileKey) {
-        toast.error(payload?.error ?? "Não foi possível enviar a foto.");
-        return;
-      }
+      const uploaded = await uploadFile(file);
 
       const result = await updateOwnAvatar({
-        fileKey: payload.fileKey,
-        publicUrl: payload.publicUrl ?? "",
-        mimeType: payload.mimeType ?? file.type,
+        fileKey: uploaded.fileKey,
+        publicUrl: uploaded.publicUrl ?? "",
+        mimeType: uploaded.mimeType,
       });
       if ("error" in result) {
         toast.error(result.error);
@@ -59,8 +45,12 @@ export function AvatarUpload({
       }
       toast.success("Foto atualizada.");
       router.refresh();
-    } catch {
-      toast.error("Não foi possível enviar a foto.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Não foi possível enviar a foto.",
+      );
     } finally {
       setUploading(false);
     }

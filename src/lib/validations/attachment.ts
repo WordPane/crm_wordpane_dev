@@ -7,7 +7,7 @@ const optionalId = z
   .or(z.literal(""));
 
 /**
- * Metadados retornados por POST /api/upload + alvo do vínculo
+ * Metadados do upload (uploadFile) + alvo do vínculo
  * (exatamente um de taskId/projectId/demandId).
  */
 export const attachmentFormSchema = z

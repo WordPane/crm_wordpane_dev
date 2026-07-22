@@ -137,9 +137,12 @@ src/
   portal; a equipe muda o status e, quando fizer sentido, converte em tarefa de
   um projeto (origem `demanda_cliente`). Nada é automático.
 - **Storage**: em dev os arquivos vão para `./.storage` (sem dependências
-  externas); em produção, com `BLOB_READ_WRITE_TOKEN` definido, o driver troca
-  para Vercel Blob automaticamente (`getStorage()` em `src/lib/storage/`).
-  Metadados ficam na tabela `attachments`; download autenticado via
+  externas); em produção, com `BLOB_READ_WRITE_TOKEN` definido, o upload vai
+  direto do navegador para o Vercel Blob (`upload()` de `@vercel/blob/client`
+  + `handleUpload` em `/api/upload`), sem passar pelo corpo da função
+  serverless (limite de ~4,5 MB na Vercel). O cliente descobre o driver ativo
+  via `GET /api/upload` e o helper `uploadFile` (`src/lib/upload.ts`) escolhe
+  o fluxo. Metadados ficam na tabela `attachments`; download autenticado via
   `/api/files/[id]`.
 - **Middleware = `src/proxy.ts`.** No Next 16 o arquivo de middleware passa a
   se chamar `proxy.ts` — é ele quem protege `/admin/*` e `/portal/*` e

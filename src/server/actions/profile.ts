@@ -86,7 +86,7 @@ export async function updatePopupPreference(
   }
 }
 
-/** Grava a foto de perfil (arquivo já enviado via POST /api/upload). */
+/** Grava a foto de perfil (arquivo já enviado via uploadFile). */
 export async function updateOwnAvatar(input: unknown): Promise<ActionResult> {
   try {
     const user = await requireUser();

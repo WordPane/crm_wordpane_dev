@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { uploadFile } from "@/lib/upload";
 import { formatFileSize } from "@/lib/utils/format";
 import { cn } from "@/lib/utils";
 import {
@@ -99,37 +100,25 @@ export function PortalDemandForm({
     setUploading(true);
     try {
       for (const file of selected) {
-        const formData = new FormData();
-        formData.append("file", file);
-        const response = await fetch("/api/upload", {
-          method: "POST",
-          body: formData,
-        });
-        const payload = (await response.json().catch(() => null)) as {
-          error?: string;
-          fileKey?: string;
-          fileName?: string;
-          fileSize?: number;
-          mimeType?: string;
-        } | null;
-        if (!response.ok || !payload?.fileKey) {
+        try {
+          const uploaded = await uploadFile(file);
+          setFiles((prev) => [
+            ...prev,
+            {
+              fileKey: uploaded.fileKey,
+              fileName: uploaded.fileName,
+              fileSize: uploaded.fileSize,
+              mimeType: uploaded.mimeType,
+            },
+          ]);
+        } catch (error) {
           toast.error(
-            payload?.error ?? `Não foi possível enviar ${file.name}.`,
+            error instanceof Error
+              ? error.message
+              : `Não foi possível enviar ${file.name}.`,
           );
-          continue;
         }
-        setFiles((prev) => [
-          ...prev,
-          {
-            fileKey: payload.fileKey!,
-            fileName: payload.fileName ?? file.name,
-            fileSize: payload.fileSize ?? file.size,
-            mimeType: payload.mimeType ?? file.type,
-          },
-        ]);
       }
-    } catch {
-      toast.error("Não foi possível enviar o arquivo.");
     } finally {
       setUploading(false);
     }
