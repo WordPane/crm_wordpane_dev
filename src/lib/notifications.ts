@@ -94,28 +94,50 @@ async function emailNotificationRecipients(
   }
 }
 
-/** E-mail de boas-vindas ao 1º usuário de uma empresa aprovada (best-effort). */
+/**
+ * E-mail de boas-vindas (best-effort): 1º usuário de empresa aprovada ou
+ * usuário criado manualmente pelo admin. `companyName` presente → texto de
+ * cliente do portal; ausente → texto de membro da equipe. `password` é a
+ * senha provisória definida pelo admin na criação manual.
+ */
 export async function sendWelcomeEmail(input: {
   to: string;
   name: string;
-  companyName: string;
+  companyName?: string;
+  password?: string;
 }): Promise<void> {
   try {
     const [settings, brand] = await Promise.all([
       getEmailSettings(),
       getBranding(),
     ]);
+    const isClient = Boolean(input.companyName);
+    const rows: EmailTemplateRow[] = [];
+    if (input.companyName) {
+      rows.push({ label: "Empresa", value: input.companyName });
+    }
+    rows.push({ label: "E-mail de acesso", value: input.to });
+    if (input.password) {
+      rows.push({ label: "Senha provisória", value: input.password });
+    }
+
     const result = await sendEmail({
       to: input.to,
-      subject: `Seu acesso ao portal ${brand.appName} está ativo`,
-      title: `Seu acesso ao portal ${brand.appName} está ativo`,
-      intro: `Olá, ${input.name}! O acesso de ${input.companyName} ao portal ${brand.appName} foi liberado. Entre com o seu e-mail e a senha cadastrada para acompanhar projetos, demandas e arquivos.`,
-      rows: [
-        { label: "Empresa", value: input.companyName },
-        { label: "E-mail de acesso", value: input.to },
-      ],
+      subject: isClient
+        ? `Seu acesso ao portal ${brand.appName} está ativo`
+        : `Sua conta na equipe ${brand.appName} foi criada`,
+      title: isClient
+        ? `Seu acesso ao portal ${brand.appName} está ativo`
+        : `Sua conta na equipe ${brand.appName} foi criada`,
+      intro: isClient
+        ? `Olá, ${input.name}! O acesso de ${input.companyName} ao portal ${brand.appName} foi liberado. Entre com o seu e-mail e a senha cadastrada para acompanhar projetos, demandas e arquivos.`
+        : `Olá, ${input.name}! Sua conta na equipe ${brand.appName} foi criada. Entre com o seu e-mail e a senha cadastrada para acessar o painel.`,
+      rows,
       cta: settings
-        ? { label: "Acessar o portal", url: `${settings.appUrl}/login` }
+        ? {
+            label: isClient ? "Acessar o portal" : "Acessar o painel",
+            url: `${settings.appUrl}/login`,
+          }
         : undefined,
     });
     if (!result.ok) {
@@ -163,6 +185,32 @@ export async function clientUsersOfCompany(
       ),
     );
   return rows.map((r) => r.id);
+}
+
+/**
+ * Avisa o novo responsável por uma tarefa (notificação interna + e-mail).
+ * Não dispara quando não há responsável ou quando o autor atribui a si mesmo.
+ */
+export async function notifyTaskAssigned(input: {
+  actorId: string;
+  actorName: string;
+  ownerId: string | null;
+  taskId: string;
+  taskTitle: string;
+  projectName: string;
+}): Promise<void> {
+  if (!input.ownerId || input.ownerId === input.actorId) return;
+  await notifyUsers([input.ownerId], {
+    type: "task.assigned",
+    title: `Tarefa atribuída a você: ${input.taskTitle}`,
+    body: `${input.actorName} atribuiu a tarefa "${input.taskTitle}" para você no projeto ${input.projectName}.`,
+    href: `/admin/tarefas/${input.taskId}`,
+    rows: [
+      { label: "Projeto", value: input.projectName },
+      { label: "Tarefa", value: input.taskTitle },
+      { label: "Atribuída por", value: input.actorName },
+    ],
+  });
 }
 
 /**

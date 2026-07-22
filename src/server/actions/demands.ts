@@ -27,7 +27,7 @@ import {
   demandStatusLabels,
   demandUpdateSchema,
 } from "@/lib/validations/demand";
-import { clientUsersOfCompany, notifyUsers } from "@/lib/notifications";
+import { clientUsersOfCompany, notifyTaskAssigned, notifyUsers } from "@/lib/notifications";
 import { actionError, type ActionResult } from "@/server/actions/utils";
 
 /** Demanda existente + acesso garantido à empresa dela. */
@@ -177,6 +177,15 @@ export async function convertDemandToTask(
       title: `Demanda virou tarefa: "${demand.title}"`,
       body: `A equipe converteu sua demanda em uma tarefa do projeto "${project.name}".`,
       href: `/portal/projetos/${project.id}/tarefas/${created.id}`,
+    });
+
+    await notifyTaskAssigned({
+      actorId: user.id,
+      actorName: user.name,
+      ownerId: data.ownerId || null,
+      taskId: created.id,
+      taskTitle: demand.title,
+      projectName: project.name,
     });
 
     revalidateDemand(demand.companyId);

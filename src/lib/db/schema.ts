@@ -848,6 +848,26 @@ export const appSettings = pgTable("app_settings", {
     .defaultNow(),
 });
 
+// ─────────────────────────── Recuperação de senha ───────────────────────────
+
+export const passwordResetTokens = pgTable(
+  "password_reset_tokens",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** SHA-256 do token enviado por e-mail (o token puro nunca é gravado). */
+    tokenHash: varchar("token_hash", { length: 64 }).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    usedAt: timestamp("used_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("password_reset_tokens_hash_idx").on(t.tokenHash)],
+);
+
 // ─────────────────────────── Relations ───────────────────────────
 
 export const companiesRelations = relations(companies, ({ many }) => ({
@@ -1097,5 +1117,6 @@ export type ClientRegistration = typeof clientRegistrations.$inferSelect;
 export type NewClientRegistration = typeof clientRegistrations.$inferInsert;
 export type ProjectLink = typeof projectLinks.$inferSelect;
 export type Activity = typeof activities.$inferSelect;
+export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
 export type Notification = typeof notifications.$inferSelect;
 export type AppSetting = typeof appSettings.$inferSelect;

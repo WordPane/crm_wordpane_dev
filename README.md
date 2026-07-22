@@ -151,9 +151,13 @@ src/
   `visibleCompanyIds`; toda query do portal filtra pela empresa do usuário e
   por `visibleToClient` nas tarefas.
 - **Notificações internas** (tabela `notifications`): comentários, uploads,
-  novas demandas e mudanças de status disparam registros para a equipe ou para
-  os clientes da empresa (nunca para o próprio autor). O sino faz polling do
-  contador a cada 60s.
+  novas demandas, mudanças de status e atribuição de tarefa disparam registros
+  para a equipe ou para os clientes da empresa (nunca para o próprio autor). O
+  sino faz polling do contador a cada 60s. Cada notificação também dispara
+  e-mail transacional (best-effort, template único white-label em
+  `src/lib/email/`) quando o SMTP está configurado — mesmo e-mail usado nas
+  boas-vindas de novos usuários e na recuperação de senha
+  (`/recuperar-senha` → token em `password_reset_tokens`, válido por 1h).
 - **Pesquisa global** (`Cmd+K` no admin): route `/api/search` com ILIKE
   escopado e limite de 5 por grupo; paleta com `cmdk` + debounce de 300ms.
 

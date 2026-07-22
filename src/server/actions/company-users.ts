@@ -6,7 +6,8 @@ import { revalidatePath } from "next/cache";
 
 import { requireTeamCompanyAccess, requireUser } from "@/lib/access/permissions";
 import { db } from "@/lib/db";
-import { users } from "@/lib/db/schema";
+import { companies, users } from "@/lib/db/schema";
+import { sendWelcomeEmail } from "@/lib/notifications";
 import {
   companyUserCreateSchema,
   companyUserUpdateSchema,
@@ -55,6 +56,24 @@ export async function createCompanyUser(
         companyId,
       });
     });
+
+    // Boas-vindas com as credenciais (best-effort; depende de SMTP configurado)
+    const [company] = await db
+      .select({
+        nomeFantasia: companies.nomeFantasia,
+        razaoSocial: companies.razaoSocial,
+      })
+      .from(companies)
+      .where(eq(companies.id, companyId))
+      .limit(1);
+    if (company) {
+      await sendWelcomeEmail({
+        to: normalizeEmail(data.email),
+        name: data.name,
+        companyName: company.nomeFantasia ?? company.razaoSocial,
+        password: data.password,
+      });
+    }
 
     revalidatePath(`/admin/clientes/${companyId}`);
     return { success: true };

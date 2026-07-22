@@ -8,7 +8,9 @@ export default auth((req) => {
   const path = nextUrl.pathname;
   const isLogin = path === "/login";
   const isCadastro = path === "/cadastro";
-  const isPublic = isLogin || isCadastro;
+  const isPasswordReset =
+    path === "/recuperar-senha" || path === "/redefinir-senha";
+  const isPublic = isLogin || isCadastro || isPasswordReset;
   // Link público de orçamento: acessível com ou sem sessão
   const isPublicQuote = path.startsWith("/orcamento");
 

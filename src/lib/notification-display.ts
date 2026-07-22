@@ -4,6 +4,7 @@ import {
   MessageSquare,
   Paperclip,
   Siren,
+  UserCheck,
   UserPlus,
   type LucideIcon,
 } from "lucide-react";
@@ -21,6 +22,7 @@ const ICONS: Record<string, LucideIcon> = {
   "demand.created": Inbox,
   "demand.status": Inbox,
   "registration.created": UserPlus,
+  "task.assigned": UserCheck,
   upload: Paperclip,
 };
 

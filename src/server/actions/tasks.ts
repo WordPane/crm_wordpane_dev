@@ -20,6 +20,7 @@ import {
   attachments,
   demands,
 } from "@/lib/db/schema";
+import { notifyTaskAssigned } from "@/lib/notifications";
 import { getStorage } from "@/lib/storage";
 import { checklistItemSchema, taskFormSchema, taskUpdateSchema } from "@/lib/validations/task";
 import {
@@ -101,6 +102,15 @@ export async function createTask(
       entityId: created.id,
       action: "task.created",
       metadata: { title: data.title },
+    });
+
+    await notifyTaskAssigned({
+      actorId: user.id,
+      actorName: user.name,
+      ownerId: data.ownerId || null,
+      taskId: created.id,
+      taskTitle: data.title,
+      projectName: project.name,
     });
 
     revalidateTask(created.id, projectId);
@@ -190,6 +200,21 @@ export async function updateTask(
           from: milestoneChange.from,
           to: milestoneChange.to,
         },
+      });
+    }
+
+    // Troca de responsável → avisa o novo dono da tarefa
+    if (
+      data.ownerId !== undefined &&
+      (data.ownerId || null) !== scoped.task.ownerId
+    ) {
+      await notifyTaskAssigned({
+        actorId: user.id,
+        actorName: user.name,
+        ownerId: data.ownerId || null,
+        taskId,
+        taskTitle: data.title ?? scoped.task.title,
+        projectName: scoped.project.name,
       });
     }
 

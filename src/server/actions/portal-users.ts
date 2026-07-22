@@ -11,7 +11,8 @@ import {
 } from "@/lib/access/permissions";
 import { getBranding } from "@/lib/brand/settings";
 import { db } from "@/lib/db";
-import { users } from "@/lib/db/schema";
+import { companies, users } from "@/lib/db/schema";
+import { sendWelcomeEmail } from "@/lib/notifications";
 import {
   portalUserCreateSchema,
   portalUserUpdateSchema,
@@ -69,6 +70,24 @@ export async function createPortalCompanyUser(
       isCompanyAdmin: data.isCompanyAdmin,
       companyId,
     });
+
+    // Boas-vindas com as credenciais (best-effort; depende de SMTP configurado)
+    const [company] = await db
+      .select({
+        nomeFantasia: companies.nomeFantasia,
+        razaoSocial: companies.razaoSocial,
+      })
+      .from(companies)
+      .where(eq(companies.id, companyId))
+      .limit(1);
+    if (company) {
+      await sendWelcomeEmail({
+        to: email,
+        name: data.name,
+        companyName: company.nomeFantasia ?? company.razaoSocial,
+        password: data.password,
+      });
+    }
 
     revalidatePath("/portal/usuarios");
     return { success: true };

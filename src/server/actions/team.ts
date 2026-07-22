@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import { requireSuperAdmin, requireUser } from "@/lib/access/permissions";
 import { db } from "@/lib/db";
 import { adminCompanyAssignments, users } from "@/lib/db/schema";
+import { sendWelcomeEmail } from "@/lib/notifications";
 import {
   adminAssignmentsSchema,
   teamMemberCreateSchema,
@@ -33,6 +34,13 @@ export async function createTeamMember(input: unknown): Promise<ActionResult> {
       status: data.status,
       passwordHash: hashSync(data.password, 10),
       companyId: null,
+    });
+
+    // Boas-vindas com as credenciais (best-effort; depende de SMTP configurado)
+    await sendWelcomeEmail({
+      to: normalizeEmail(data.email),
+      name: data.name,
+      password: data.password,
     });
 
     revalidatePath("/admin/equipe");

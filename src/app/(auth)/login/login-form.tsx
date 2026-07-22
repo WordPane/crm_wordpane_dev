@@ -1,6 +1,7 @@
 "use client";
 
 import { Loader2 } from "lucide-react";
+import Link from "next/link";
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 
@@ -59,6 +60,15 @@ export function LoginForm() {
       )}
 
       <SubmitButton />
+
+      <p className="text-center text-sm">
+        <Link
+          href="/recuperar-senha"
+          className="text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
+        >
+          Esqueci a senha
+        </Link>
+      </p>
     </form>
   );
 }
