@@ -8,6 +8,11 @@ import {
 } from "@/lib/access/permissions";
 import { db } from "@/lib/db";
 import {
+  SQL_THIS_MONTH_END,
+  SQL_THIS_WEEK_END,
+  SQL_TODAY,
+} from "@/lib/db/business-date";
+import {
   companies,
   milestones,
   projects,
@@ -115,6 +120,54 @@ export async function listTasks(
       : null,
     ownerName: r.ownerName,
   }));
+}
+
+// ─────────────────────────── Resumo ───────────────────────────
+
+export type TaskSummary = {
+  /** Tarefas não concluídas. */
+  open: number;
+  /** Abertas com prazo entre hoje e o domingo desta semana. */
+  dueThisWeek: number;
+  /** Abertas com prazo entre hoje e o fim deste mês. */
+  dueThisMonth: number;
+  /** Abertas com prazo já passado. */
+  overdue: number;
+};
+
+/** Contadores do topo da página de tarefas — escopo visível, ignora os filtros da listagem. */
+export async function getTaskSummary(user: SessionUser): Promise<TaskSummary> {
+  requireTeam(user);
+  const scope = await visibleProjectScope(user);
+  if (scope && scope.companyIds.length === 0 && scope.projectIds.length === 0) {
+    return { open: 0, dueThisWeek: 0, dueThisMonth: 0, overdue: 0 };
+  }
+
+  const conditions: SQL[] = [];
+  if (scope) {
+    // Empresa atribuída OU membro do projeto (mesmo escopo de listTasks)
+    const scopeConditions: SQL[] = [];
+    if (scope.companyIds.length > 0) {
+      scopeConditions.push(inArray(projects.companyId, scope.companyIds));
+    }
+    if (scope.projectIds.length > 0) {
+      scopeConditions.push(inArray(projects.id, scope.projectIds));
+    }
+    if (scopeConditions.length > 0) conditions.push(or(...scopeConditions)!);
+  }
+
+  const [row] = await db
+    .select({
+      open: sql<number>`count(*) filter (where ${tasks.completedAt} is null)::int`,
+      dueThisWeek: sql<number>`count(*) filter (where ${tasks.completedAt} is null and ${tasks.dueDate} between ${SQL_TODAY} and ${SQL_THIS_WEEK_END})::int`,
+      dueThisMonth: sql<number>`count(*) filter (where ${tasks.completedAt} is null and ${tasks.dueDate} between ${SQL_TODAY} and ${SQL_THIS_MONTH_END})::int`,
+      overdue: sql<number>`count(*) filter (where ${tasks.completedAt} is null and ${tasks.dueDate} < ${SQL_TODAY})::int`,
+    })
+    .from(tasks)
+    .innerJoin(projects, eq(tasks.projectId, projects.id))
+    .where(conditions.length > 0 ? and(...conditions) : undefined);
+
+  return row;
 }
 
 // ─────────────────────────── Detalhe ───────────────────────────

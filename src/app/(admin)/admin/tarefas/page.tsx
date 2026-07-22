@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { ListChecks } from "lucide-react";
+import { CalendarClock, CalendarDays, ListChecks, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 
 import { PriorityChip, StatusColorChip } from "@/components/chips";
@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/table";
 import { requireTeam, requireUser } from "@/lib/access/permissions";
 import { listProjects } from "@/lib/queries/projects";
-import { listActiveTaskStatuses, listTasks } from "@/lib/queries/tasks";
+import { getTaskSummary, listActiveTaskStatuses, listTasks } from "@/lib/queries/tasks";
 import { formatDate, isOverdue } from "@/lib/utils/format";
 import { cn } from "@/lib/utils";
 import { priorities } from "@/lib/validations/project";
@@ -49,7 +49,7 @@ export default async function TasksPage({
     ? (priorityParam as Task["priority"])
     : "";
 
-  const [items, statuses, projects] = await Promise.all([
+  const [items, statuses, projects, summary] = await Promise.all([
     listTasks(user, {
       statusId,
       priority: priority || undefined,
@@ -58,7 +58,30 @@ export default async function TasksPage({
     }),
     listActiveTaskStatuses(user),
     listProjects(user),
+    getTaskSummary(user),
   ]);
+
+  const summaryCards = [
+    { label: "Em aberto", value: summary.open, icon: ListChecks, alert: false },
+    {
+      label: "Vencem esta semana",
+      value: summary.dueThisWeek,
+      icon: CalendarClock,
+      alert: false,
+    },
+    {
+      label: "Vencem este mês",
+      value: summary.dueThisMonth,
+      icon: CalendarDays,
+      alert: false,
+    },
+    {
+      label: "Vencidas",
+      value: summary.overdue,
+      icon: TriangleAlert,
+      alert: summary.overdue > 0,
+    },
+  ];
 
   return (
     <div className="space-y-6">
@@ -68,6 +91,34 @@ export default async function TasksPage({
           {items.length}{" "}
           {items.length === 1 ? "tarefa encontrada" : "tarefas encontradas"}
         </p>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {summaryCards.map((card) => (
+          <Card key={card.label}>
+            <CardContent className="flex items-center gap-4 py-5">
+              <span
+                className={`flex size-11 shrink-0 items-center justify-center rounded-xl ring-1 ${
+                  card.alert
+                    ? "bg-[rgba(255,107,107,0.1)] text-[#ff6b6b] ring-[rgba(255,107,107,0.3)]"
+                    : "bg-primary/10 text-primary ring-primary/25"
+                }`}
+              >
+                <card.icon className="size-5" />
+              </span>
+              <div className="min-w-0">
+                <p className="truncate text-xs text-muted-foreground">
+                  {card.label}
+                </p>
+                <p
+                  className={`truncate text-2xl font-extrabold ${card.alert ? "text-[#ff6b6b]" : ""}`}
+                >
+                  {card.value}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
       <TaskFilters
