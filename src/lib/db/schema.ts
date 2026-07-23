@@ -70,6 +70,7 @@ export const demandCategoryEnum = pgEnum("demand_category", [
   "alteracao",
   "nova_funcionalidade",
   "correcao",
+  "nova_pagina",
   "outro",
 ]);
 export const registrationStatusEnum = pgEnum("registration_status", [
@@ -517,6 +518,132 @@ export const demands = pgTable(
     index("demands_company_idx").on(t.companyId),
     index("demands_status_idx").on(t.status),
     index("demands_project_idx").on(t.projectId),
+  ],
+);
+
+// ─────────────────────────── Planos de manutenção ───────────────────────────
+
+/** Catálogo de planos de manutenção (cota mensal de ajustes/páginas). */
+export const maintenancePlans = pgTable("maintenance_plans", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: varchar("name", { length: 160 }).notNull(),
+  description: text("description"),
+  adjustmentsLimit: integer("adjustments_limit").notNull(),
+  pagesLimit: integer("pages_limit").notNull(),
+  valueCents: integer("value_cents").notNull(),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+/** Catálogo de pacotes extras (créditos consumíveis de ajustes/páginas). */
+export const maintenancePackages = pgTable("maintenance_packages", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: varchar("name", { length: 160 }).notNull(),
+  adjustments: integer("adjustments").notNull(),
+  pages: integer("pages").notNull(),
+  valueCents: integer("value_cents").notNull(),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+/** Plano de manutenção ativo em um projeto (no máximo 1 por projeto). */
+export const projectPlans = pgTable(
+  "project_plans",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    planId: uuid("plan_id")
+      .notNull()
+      .references(() => maintenancePlans.id),
+    status: varchar("status", { length: 20 }).notNull().default("active"), // active | cancelled
+    /** Início do ciclo mensal corrente (rollover preguiçoso na leitura). */
+    currentPeriodStart: date("current_period_start").notNull(),
+    createdBy: uuid("created_by").references(() => users.id),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [uniqueIndex("project_plans_project_unique").on(t.projectId)],
+);
+
+/** Pacote extra adquirido para o plano do projeto (pago ou manual). */
+export const projectPlanPackages = pgTable(
+  "project_plan_packages",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    projectPlanId: uuid("project_plan_id")
+      .notNull()
+      .references(() => projectPlans.id, { onDelete: "cascade" }),
+    packageId: uuid("package_id").references(() => maintenancePackages.id, {
+      onDelete: "set null",
+    }),
+    // Snapshot do catálogo no momento da compra
+    name: varchar("name", { length: 160 }).notNull(),
+    adjustments: integer("adjustments").notNull(),
+    pages: integer("pages").notNull(),
+    valueCents: integer("value_cents").notNull(),
+    /** Cobrança gerada na compra; null = adicionado manualmente pelo admin. */
+    chargeId: uuid("charge_id").references(() => charges.id, {
+      onDelete: "set null",
+    }),
+    status: varchar("status", { length: 20 })
+      .notNull()
+      .default("pending_payment"), // pending_payment | active | cancelled
+    createdBy: uuid("created_by").references(() => users.id),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("project_plan_packages_plan_idx").on(t.projectPlanId),
+    index("project_plan_packages_charge_idx").on(t.chargeId),
+  ],
+);
+
+/**
+ * Ledger de consumo de cota — uma linha por demanda que consumiu cota.
+ * A demanda é apagada ao virar tarefa, então o consumo fica registrado aqui.
+ */
+export const projectPlanUsages = pgTable(
+  "project_plan_usages",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    projectPlanId: uuid("project_plan_id")
+      .notNull()
+      .references(() => projectPlans.id, { onDelete: "cascade" }),
+    demandId: uuid("demand_id").notNull(), // sem FK: a demanda some na conversão
+    /** Pacote consumido; null = consumiu a cota mensal do ciclo. */
+    packageId: uuid("package_id").references(() => projectPlanPackages.id, {
+      onDelete: "cascade",
+    }),
+    kind: varchar("kind", { length: 20 }).notNull(), // adjustment | page
+    /** Preenchido quando a cota é estornada (recusa/exclusão/edição). */
+    releasedAt: timestamp("released_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("project_plan_usages_plan_idx").on(t.projectPlanId),
+    index("project_plan_usages_demand_idx").on(t.demandId),
   ],
 );
 
@@ -1102,6 +1229,11 @@ export type ProjectTemplateTask = typeof projectTemplateTasks.$inferSelect;
 export type Comment = typeof comments.$inferSelect;
 export type Attachment = typeof attachments.$inferSelect;
 export type Demand = typeof demands.$inferSelect;
+export type MaintenancePlan = typeof maintenancePlans.$inferSelect;
+export type MaintenancePackage = typeof maintenancePackages.$inferSelect;
+export type ProjectPlan = typeof projectPlans.$inferSelect;
+export type ProjectPlanPackage = typeof projectPlanPackages.$inferSelect;
+export type ProjectPlanUsage = typeof projectPlanUsages.$inferSelect;
 export type Quote = typeof quotes.$inferSelect;
 export type NewQuote = typeof quotes.$inferInsert;
 export type QuoteItem = typeof quoteItems.$inferSelect;

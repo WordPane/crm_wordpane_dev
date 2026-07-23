@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, or, type SQL } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 
 import {
   assertProjectAccess,
@@ -7,8 +7,8 @@ import {
 } from "@/lib/access/permissions";
 import { db } from "@/lib/db";
 import {
-  adminCompanyAssignments,
   comments,
+  projectMembers,
   projects,
   tasks,
   users,
@@ -103,38 +103,40 @@ export type MentionableUser = {
 };
 
 /**
- * Usuários que podem ser mencionados nos comentários: equipe vinculada à
- * empresa (super admins + admins atribuídos) e usuários cliente da empresa.
+ * Usuários que podem ser mencionados nos comentários da tarefa:
+ * - equipe (super_admin/admin) **vinculada ao projeto** (project_members) —
+ *   quem não está vinculado não pode ser mencionado;
+ * - usuários cliente da empresa do projeto (participam pelo portal).
  */
 export async function listMentionableUsers(
+  projectId: string,
   companyId: string,
 ): Promise<MentionableUser[]> {
-  const assigned = await db
-    .select({ adminId: adminCompanyAssignments.adminId })
-    .from(adminCompanyAssignments)
-    .where(eq(adminCompanyAssignments.companyId, companyId));
-  const assignedIds = assigned.map((r) => r.adminId);
-
-  const teamConditions: SQL[] = [eq(users.role, "super_admin")];
-  if (assignedIds.length > 0) {
-    teamConditions.push(
-      and(eq(users.role, "admin"), inArray(users.id, assignedIds))!,
-    );
-  }
-
-  const rows = await db
-    .select({ id: users.id, name: users.name, role: users.role })
-    .from(users)
-    .where(
-      and(
-        eq(users.status, "active"),
-        or(
-          or(...teamConditions),
-          and(eq(users.role, "client"), eq(users.companyId, companyId)),
+  const [teamRows, clientRows] = await Promise.all([
+    db
+      .select({ id: users.id, name: users.name, role: users.role })
+      .from(projectMembers)
+      .innerJoin(users, eq(projectMembers.userId, users.id))
+      .where(
+        and(
+          eq(projectMembers.projectId, projectId),
+          eq(users.status, "active"),
+          inArray(users.role, ["super_admin", "admin"]),
         ),
       ),
-    )
-    .orderBy(asc(users.name));
+    db
+      .select({ id: users.id, name: users.name, role: users.role })
+      .from(users)
+      .where(
+        and(
+          eq(users.status, "active"),
+          eq(users.role, "client"),
+          eq(users.companyId, companyId),
+        ),
+      ),
+  ]);
 
-  return rows;
+  return [...teamRows, ...clientRows].sort((a, b) =>
+    a.name.localeCompare(b.name, "pt-BR"),
+  );
 }

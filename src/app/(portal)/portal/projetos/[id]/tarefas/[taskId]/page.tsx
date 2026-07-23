@@ -46,7 +46,7 @@ export default async function PortalTaskDetailPage({
 
   const { task, project, milestone, status, ownerName, checklist, comments } = detail;
   const mentionableUsers = user.companyId
-    ? await listMentionableUsers(user.companyId)
+    ? await listMentionableUsers(project.id, user.companyId)
     : [];
   const overdue = !task.completedAt && isOverdue(task.dueDate);
   const doneItems = checklist.filter((item) => item.done).length;

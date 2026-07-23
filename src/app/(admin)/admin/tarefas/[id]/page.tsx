@@ -72,7 +72,7 @@ export default async function TaskDetailPage({
       listTaskAttachments(user, task.id),
       listTaskActivities(user, task.id),
       listProjectMilestonesForTask(user, project.id),
-      listMentionableUsers(company.id),
+      listMentionableUsers(project.id, company.id),
     ]);
 
   const overdue = !task.completedAt && isOverdue(task.dueDate);

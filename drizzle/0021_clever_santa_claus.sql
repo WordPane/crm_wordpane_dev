@@ -1,0 +1,2 @@
+ALTER TABLE "project_plan_usages" ADD COLUMN "package_id" uuid;--> statement-breakpoint
+ALTER TABLE "project_plan_usages" ADD CONSTRAINT "project_plan_usages_package_id_project_plan_packages_id_fk" FOREIGN KEY ("package_id") REFERENCES "public"."project_plan_packages"("id") ON DELETE cascade ON UPDATE no action;

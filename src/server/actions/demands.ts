@@ -21,6 +21,11 @@ import {
   tasks,
   type Demand,
 } from "@/lib/db/schema";
+import {
+  releaseQuotaForDemand,
+  updateQuotaKindForDemand,
+  usageKindForCategory,
+} from "@/lib/queries/maintenance";
 import { getStorage } from "@/lib/storage";
 import {
   convertDemandSchema,
@@ -62,6 +67,9 @@ export async function updateDemandStatus(
       .update(demands)
       .set({ status, updatedAt: new Date() })
       .where(eq(demands.id, demandId));
+
+    // Demanda recusada devolve a cota do plano de manutenção (idempotente)
+    if (status === "recusada") await releaseQuotaForDemand(demandId);
 
     await logActivity({
       actorId: user.id,
@@ -240,6 +248,17 @@ export async function updateDemand(
       })
       .where(eq(demands.id, demandId));
 
+    // Cota do plano: mudou de projeto → estorna (a cota era do projeto
+    // original); só mudou a categoria → ajusta o tipo do consumo
+    if (projectId !== demand.projectId) {
+      await releaseQuotaForDemand(demandId);
+    } else if (data.category !== demand.category) {
+      await updateQuotaKindForDemand(
+        demandId,
+        usageKindForCategory(data.category),
+      );
+    }
+
     await logActivity({
       actorId: user.id,
       companyId: demand.companyId,
@@ -285,6 +304,9 @@ export async function deleteDemand(demandId: string): Promise<ActionResult> {
     );
 
     await db.delete(demands).where(eq(demands.id, demandId));
+
+    // Exclusão devolve a cota do plano de manutenção (idempotente)
+    await releaseQuotaForDemand(demandId);
 
     await logActivity({
       actorId: user.id,

@@ -24,6 +24,7 @@ export const demandCategories = [
   "alteracao",
   "nova_funcionalidade",
   "correcao",
+  "nova_pagina",
   "outro",
 ] as const;
 
@@ -32,6 +33,7 @@ export const demandCategoryLabels: Record<Demand["category"], string> = {
   alteracao: "Alteração",
   nova_funcionalidade: "Nova funcionalidade",
   correcao: "Correção",
+  nova_pagina: "Nova página",
   outro: "Outro",
 };
 

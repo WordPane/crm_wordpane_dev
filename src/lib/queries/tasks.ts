@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, between, eq, inArray, isNull, lt, or, sql, type SQL } from "drizzle-orm";
 
 import {
   assertProjectAccess,
@@ -39,11 +39,16 @@ export type TaskListItem = {
   ownerName: string | null;
 };
 
+/** Filtro de prazo dos cards de resumo: semana atual, mês atual ou vencidas. */
+export type TaskDueFilter = "semana" | "mes" | "vencidas";
+
 export type TaskListFilters = {
   statusId?: string;
   priority?: Task["priority"];
   projectId?: string;
   hideCompleted?: boolean;
+  /** Filtro de prazo — sempre restrito a tarefas abertas. */
+  due?: TaskDueFilter;
 };
 
 /** Lista global de tarefas (escopo de projetos visíveis: empresa atribuída ou membro). */
@@ -73,6 +78,19 @@ export async function listTasks(
   if (filters.priority) conditions.push(eq(tasks.priority, filters.priority));
   if (filters.projectId) conditions.push(eq(tasks.projectId, filters.projectId));
   if (filters.hideCompleted) conditions.push(isNull(tasks.completedAt));
+  if (filters.due === "semana") {
+    conditions.push(
+      isNull(tasks.completedAt),
+      between(tasks.dueDate, SQL_TODAY, SQL_THIS_WEEK_END),
+    );
+  } else if (filters.due === "mes") {
+    conditions.push(
+      isNull(tasks.completedAt),
+      between(tasks.dueDate, SQL_TODAY, SQL_THIS_MONTH_END),
+    );
+  } else if (filters.due === "vencidas") {
+    conditions.push(isNull(tasks.completedAt), lt(tasks.dueDate, SQL_TODAY));
+  }
 
   const rows = await db
     .select({

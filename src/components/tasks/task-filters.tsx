@@ -11,15 +11,23 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { StatusInfo } from "@/lib/queries/projects";
+import type { TaskDueFilter } from "@/lib/queries/tasks";
 import { priorityLabels, priorities } from "@/lib/validations/project";
 
 const ALL = "__all__";
 
-/** Filtros da lista global de tarefas — searchParams (status, prioridade, projeto, concluidas). */
+const dueLabels: Record<TaskDueFilter, string> = {
+  semana: "Vencem esta semana",
+  mes: "Vencem este mês",
+  vencidas: "Vencidas",
+};
+
+/** Filtros da lista global de tarefas — searchParams (status, prioridade, projeto, vencimento, concluidas). */
 export function TaskFilters({
   statusId,
   priority,
   projectId,
+  due,
   showDone,
   statuses,
   projects,
@@ -27,6 +35,7 @@ export function TaskFilters({
   statusId: string;
   priority: string;
   projectId: string;
+  due: string;
   showDone: boolean;
   statuses: StatusInfo[];
   projects: { id: string; name: string }[];
@@ -110,6 +119,27 @@ export function TaskFilters({
               {p.name}
             </SelectItem>
           ))}
+        </SelectContent>
+      </Select>
+
+      <Select
+        value={due || ALL}
+        onValueChange={(v) => updateParam("vencimento", !v || v === ALL ? "" : v)}
+      >
+        <SelectTrigger aria-label="Filtrar por vencimento">
+          <SelectValue placeholder="Vencimento">
+            {(value: string | null) =>
+              !value || value === ALL
+                ? "Todos os prazos"
+                : (dueLabels[value as TaskDueFilter] ?? "Vencimento")
+            }
+          </SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={ALL}>Todos os prazos</SelectItem>
+          <SelectItem value="semana">{dueLabels.semana}</SelectItem>
+          <SelectItem value="mes">{dueLabels.mes}</SelectItem>
+          <SelectItem value="vencidas">{dueLabels.vencidas}</SelectItem>
         </SelectContent>
       </Select>
 

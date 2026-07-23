@@ -8,6 +8,9 @@ import {
   charges,
   companies,
   companyServices,
+  projectPlanPackages,
+  projectPlans,
+  projects,
   webhookEvents,
   type Charge,
 } from "@/lib/db/schema";
@@ -94,6 +97,65 @@ async function setChargeStatus(
     .update(charges)
     .set({ status, paidAt: paidAt ?? null, updatedAt: new Date() })
     .where(eq(charges.id, chargeId));
+}
+
+/**
+ * Pacote de manutenção comprado no portal segue o destino da cobrança:
+ * pagamento confirmado → créditos ativos; excluída/estornada → cancelado.
+ */
+async function syncPackageWithCharge(chargeId: string, event: string) {
+  const [pkg] = await db
+    .select({
+      id: projectPlanPackages.id,
+      name: projectPlanPackages.name,
+      status: projectPlanPackages.status,
+      projectPlanId: projectPlanPackages.projectPlanId,
+    })
+    .from(projectPlanPackages)
+    .where(eq(projectPlanPackages.chargeId, chargeId))
+    .limit(1);
+  if (!pkg) return;
+
+  if (
+    (event === "PAYMENT_RECEIVED" || event === "PAYMENT_CONFIRMED") &&
+    pkg.status === "pending_payment"
+  ) {
+    await db
+      .update(projectPlanPackages)
+      .set({ status: "active", updatedAt: new Date() })
+      .where(eq(projectPlanPackages.id, pkg.id));
+
+    const [owner] = await db
+      .select({
+        companyId: projects.companyId,
+        projectId: projects.id,
+        projectName: projects.name,
+      })
+      .from(projectPlans)
+      .innerJoin(projects, eq(projectPlans.projectId, projects.id))
+      .where(eq(projectPlans.id, pkg.projectPlanId))
+      .limit(1);
+    if (owner) {
+      const clients = await clientUsersOfCompany(owner.companyId);
+      await notifyUsers(clients, {
+        type: "plan.package_activated",
+        title: `Pacote "${pkg.name}" ativado`,
+        body: `Pagamento confirmado — os créditos do pacote já estão disponíveis no projeto "${owner.projectName}".`,
+        href: `/portal/projetos/${owner.projectId}`,
+      });
+    }
+    return;
+  }
+
+  if (
+    (event === "PAYMENT_DELETED" || event === "PAYMENT_REFUNDED") &&
+    pkg.status !== "cancelled"
+  ) {
+    await db
+      .update(projectPlanPackages)
+      .set({ status: "cancelled", updatedAt: new Date() })
+      .where(eq(projectPlanPackages.id, pkg.id));
+  }
 }
 
 export async function POST(request: Request) {
@@ -274,6 +336,16 @@ export async function POST(request: Request) {
         // Demais eventos (updated, viewed etc.) não mudam o estado local
         break;
       }
+    }
+
+    // Pacote de manutenção vinculado à cobrança (se houver) acompanha o evento
+    if (
+      body.event === "PAYMENT_CONFIRMED" ||
+      body.event === "PAYMENT_RECEIVED" ||
+      body.event === "PAYMENT_DELETED" ||
+      body.event === "PAYMENT_REFUNDED"
+    ) {
+      await syncPackageWithCharge(charge.id, body.event);
     }
 
     return NextResponse.json({ received: true });

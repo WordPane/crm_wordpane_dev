@@ -25,6 +25,12 @@ import {
   users,
 } from "@/lib/db/schema";
 import { notifyUsers, teamUsersOfCompany } from "@/lib/notifications";
+import {
+  allocateQuota,
+  QuotaExceededError,
+  quotaExceededMessage,
+  usageKindForCategory,
+} from "@/lib/queries/maintenance";
 import { getStorage } from "@/lib/storage";
 import { attachmentFormSchema } from "@/lib/validations/attachment";
 import {
@@ -350,6 +356,11 @@ export async function createPortalDemand(input: unknown): Promise<ActionResult> 
         })
         .returning({ id: demands.id });
 
+      // Projeto com plano de manutenção → consome cota (sem plano = no-op)
+      const kind = usageKindForCategory(data.category);
+      const allocated = await allocateQuota(tx, data.projectId, kind, created.id);
+      if (!allocated) throw new QuotaExceededError(kind);
+
       if (data.attachments && data.attachments.length > 0) {
         await tx.insert(attachments).values(
           data.attachments.map((file) => ({
@@ -392,6 +403,9 @@ export async function createPortalDemand(input: unknown): Promise<ActionResult> 
     revalidatePath("/portal/dashboard");
     return { success: true, id: demandId };
   } catch (error) {
+    if (error instanceof QuotaExceededError) {
+      return { error: quotaExceededMessage(error.kind) };
+    }
     return actionError(error);
   }
 }

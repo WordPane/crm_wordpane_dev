@@ -11,6 +11,7 @@ import { MilestonesSection } from "@/components/projects/milestones-section";
 import { ProjectDeleteButton } from "@/components/projects/project-delete-button";
 import { ProjectForm } from "@/components/projects/project-form";
 import { ProjectMembersSection } from "@/components/projects/project-members-section";
+import { ProjectPlanSection } from "@/components/projects/project-plan-section";
 import { ProjectStatusMenu } from "@/components/projects/project-status-menu";
 import { ProjectTasksSection } from "@/components/projects/project-tasks-section";
 import {
@@ -35,6 +36,11 @@ import {
 } from "@/lib/queries/attachments";
 import { listCompanies } from "@/lib/queries/companies";
 import { listProjectLinks } from "@/lib/queries/links";
+import {
+  getProjectPlanBalance,
+  listActiveMaintenancePackages,
+  listActiveMaintenancePlans,
+} from "@/lib/queries/maintenance";
 import { getProject, listActiveProjectStatuses } from "@/lib/queries/projects";
 import { listActiveTaskStatuses } from "@/lib/queries/tasks";
 import { listTeamSelectOptions } from "@/lib/queries/team";
@@ -95,6 +101,9 @@ export default async function ProjectDetailPage({
     taskAttachments,
     projectLinks,
     templates,
+    planBalance,
+    maintenancePlans,
+    maintenancePackages,
   ] = await Promise.all([
     listActiveProjectStatuses(user),
     listActiveTaskStatuses(user),
@@ -105,6 +114,9 @@ export default async function ProjectDetailPage({
     listProjectTaskAttachments(user, project.id),
     listProjectLinks(user, project.id),
     listProjectTemplateOptions(user),
+    getProjectPlanBalance(user, project.id),
+    listActiveMaintenancePlans(user),
+    listActiveMaintenancePackages(),
   ]);
 
   const totalTasks = tasks.length;
@@ -214,6 +226,13 @@ export default async function ProjectDetailPage({
               </CardContent>
             </Card>
           </div>
+
+          <ProjectPlanSection
+            projectId={project.id}
+            balance={planBalance}
+            plans={maintenancePlans}
+            packages={maintenancePackages}
+          />
 
           <Card>
             <CardHeader>

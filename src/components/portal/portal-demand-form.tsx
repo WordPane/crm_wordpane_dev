@@ -1,10 +1,11 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { File, Loader2, Paperclip, Send, X } from "lucide-react";
+import { File, Loader2, Paperclip, Send, ShieldCheck, TriangleAlert, X } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition, type ChangeEvent } from "react";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -62,11 +63,21 @@ function Field({
   );
 }
 
+/** Saldo do plano de manutenção de um projeto (para o aviso no formulário). */
+export type PortalPlanHint = {
+  planName: string;
+  adjustmentsLeft: number;
+  pagesLeft: number;
+};
+
 /** Formulário de nova demanda do cliente (com anexos opcionais). */
 export function PortalDemandForm({
   projects,
+  plans = {},
 }: {
   projects: { id: string; name: string }[];
+  /** Saldo por projeto com plano de manutenção (chave = projectId). */
+  plans?: Record<string, PortalPlanHint>;
 }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -86,6 +97,20 @@ export function PortalDemandForm({
     },
   });
   const { errors } = form.formState;
+
+  // Plano de manutenção do projeto selecionado (se houver) — controla o
+  // aviso de saldo e o bloqueio quando a cota da categoria esgota
+  const watchedProjectId = useWatch({ control: form.control, name: "projectId" });
+  const watchedCategory = useWatch({ control: form.control, name: "category" });
+  const planHint = watchedProjectId ? plans[watchedProjectId] : undefined;
+  const watchedKind = watchedCategory === "nova_pagina" ? "page" : "adjustment";
+  const quotaLeft = planHint
+    ? watchedKind === "page"
+      ? planHint.pagesLeft
+      : planHint.adjustmentsLeft
+    : null;
+  const exhausted = planHint != null && watchedCategory != null &&
+    watchedCategory !== ("" as never) && quotaLeft !== null && quotaLeft <= 0;
 
   async function handleFiles(event: ChangeEvent<HTMLInputElement>) {
     const selected = Array.from(event.target.files ?? []);
@@ -175,6 +200,31 @@ export function PortalDemandForm({
           )}
         />
       </Field>
+
+      {planHint && (
+        <p className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
+          <ShieldCheck className="size-4 shrink-0 text-primary" />
+          Plano {planHint.planName}: restam{" "}
+          <strong className="text-foreground">{planHint.adjustmentsLeft} ajustes</strong>{" "}
+          e{" "}
+          <strong className="text-foreground">{planHint.pagesLeft} páginas</strong>{" "}
+          neste ciclo.
+        </p>
+      )}
+
+      {exhausted && (
+        <p className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-400/40 bg-amber-400/10 px-3 py-2 text-sm text-amber-300">
+          <TriangleAlert className="size-4 shrink-0" />
+          Cota de {watchedKind === "page" ? "páginas novas" : "ajustes"} do
+          plano esgotada neste ciclo.
+          <Link
+            href={`/portal/projetos/${watchedProjectId}`}
+            className="font-medium underline underline-offset-4"
+          >
+            Adquira um pacote extra
+          </Link>
+        </p>
+      )}
 
       <Field label="Título *" htmlFor="dm-title" error={errors.title?.message}>
         <Input
@@ -340,7 +390,7 @@ export function PortalDemandForm({
         >
           Cancelar
         </Button>
-        <Button type="submit" disabled={busy}>
+        <Button type="submit" disabled={busy || exhausted}>
           {pending ? <Loader2 className="animate-spin" /> : <Send />}
           Enviar demanda
         </Button>

@@ -17,6 +17,7 @@ import {
   PriorityChip,
   StatusColorChip,
 } from "@/components/chips";
+import { PortalPlanCard } from "@/components/portal/portal-plan-card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Card,
@@ -27,6 +28,10 @@ import {
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { ForbiddenError, requireUser } from "@/lib/access/permissions";
+import {
+  computeProjectPlanBalance,
+  listActiveMaintenancePackages,
+} from "@/lib/queries/maintenance";
 import { getPortalProject } from "@/lib/queries/portal";
 import { formatDate, initials, timeAgo } from "@/lib/utils/format";
 import {
@@ -54,6 +59,13 @@ export default async function PortalProjectDetailPage({
   if (!detail) notFound();
 
   const { project, status, owner, milestones, tasks, links, activities } = detail;
+
+  // Saldo do plano de manutenção (se houver) — o acesso ao projeto já foi
+  // validado acima por getPortalProject
+  const [planBalance, maintenancePackages] = await Promise.all([
+    computeProjectPlanBalance(project.id),
+    listActiveMaintenancePackages(),
+  ]);
 
   const totalTasks = tasks.length;
   const doneTasks = tasks.filter((t) => t.status?.isFinal).length;
@@ -152,6 +164,15 @@ export default async function PortalProjectDetailPage({
           </CardContent>
         </Card>
       </div>
+
+      {/* ─── Plano de manutenção (só projetos com plano ativo) ─── */}
+      {planBalance && (
+        <PortalPlanCard
+          projectId={project.id}
+          balance={planBalance}
+          packages={maintenancePackages}
+        />
+      )}
 
       {/* ─── Etapas ─── */}
       <Card>

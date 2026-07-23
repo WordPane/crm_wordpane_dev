@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/card";
 import { requireUser } from "@/lib/access/permissions";
 import { getBranding } from "@/lib/brand/settings";
+import { computeProjectPlanBalance } from "@/lib/queries/maintenance";
 import { listPortalProjects } from "@/lib/queries/portal";
 
 export const metadata: Metadata = { title: "Nova demanda" };
@@ -20,6 +21,27 @@ export default async function PortalNewDemandPage() {
   const user = await requireUser();
   const projects = await listPortalProjects(user);
   const brand = await getBranding();
+
+  // Saldo do plano de manutenção por projeto (projetos sem plano ficam fora)
+  const balances = await Promise.all(
+    projects.map((p) => computeProjectPlanBalance(p.id)),
+  );
+  const plans = Object.fromEntries(
+    projects.flatMap((p, i) => {
+      const b = balances[i];
+      if (!b) return [];
+      return [
+        [
+          p.id,
+          {
+            planName: b.plan.name,
+            adjustmentsLeft: b.available.adjustment,
+            pagesLeft: b.available.page,
+          },
+        ],
+      ];
+    }),
+  );
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -55,6 +77,7 @@ export default async function PortalNewDemandPage() {
           ) : (
             <PortalDemandForm
               projects={projects.map((p) => ({ id: p.id, name: p.name }))}
+              plans={plans}
             />
           )}
         </CardContent>
