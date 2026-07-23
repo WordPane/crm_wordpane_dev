@@ -14,6 +14,7 @@ import {
   companyServices,
   invoices,
   services,
+  serviceTeamMembers,
   type Charge,
   type CompanyService,
   type Service,
@@ -245,10 +246,41 @@ export async function financeSummary(
 
 // ─────────────────────────── Catálogo de serviços ───────────────────────────
 
-/** Catálogo completo (gestão) — só equipe. */
-export async function listServices(user: SessionUser): Promise<Service[]> {
+export type ServiceListItem = Service & {
+  /** Ids dos usuários da equipe vinculados ao serviço. */
+  memberUserIds: string[];
+};
+
+/**
+ * Catálogo completo (gestão) — só equipe. Inclui os ids dos membros
+ * vinculados a cada serviço (service_team_members).
+ */
+export async function listServices(
+  user: SessionUser,
+): Promise<ServiceListItem[]> {
   requireTeam(user);
-  return db.select().from(services).orderBy(asc(services.name));
+
+  const [rows, memberRows] = await Promise.all([
+    db.select().from(services).orderBy(asc(services.name)),
+    db
+      .select({
+        serviceId: serviceTeamMembers.serviceId,
+        userId: serviceTeamMembers.userId,
+      })
+      .from(serviceTeamMembers),
+  ]);
+
+  const memberIdsByService = new Map<string, string[]>();
+  for (const member of memberRows) {
+    const ids = memberIdsByService.get(member.serviceId);
+    if (ids) ids.push(member.userId);
+    else memberIdsByService.set(member.serviceId, [member.userId]);
+  }
+
+  return rows.map((service) => ({
+    ...service,
+    memberUserIds: memberIdsByService.get(service.id) ?? [],
+  }));
 }
 
 /** Serviços ativos do catálogo (select de ativação). */

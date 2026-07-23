@@ -83,6 +83,7 @@ export const quoteStatusEnum = pgEnum("quote_status", [
   "sent",
   "approved",
   "rejected",
+  "requested",
 ]);
 export const quoteDiscountTypeEnum = pgEnum("quote_discount_type", [
   "amount",
@@ -469,6 +470,9 @@ export const attachments = pgTable(
       onDelete: "cascade",
     }),
     demandId: uuid("demand_id"),
+    quoteId: uuid("quote_id").references(() => quotes.id, {
+      onDelete: "cascade",
+    }),
     uploadedBy: uuid("uploaded_by")
       .notNull()
       .references(() => users.id),
@@ -483,6 +487,7 @@ export const attachments = pgTable(
   (t) => [
     index("attachments_project_idx").on(t.projectId),
     index("attachments_task_idx").on(t.taskId),
+    index("attachments_quote_idx").on(t.quoteId),
   ],
 );
 
@@ -556,18 +561,27 @@ export const maintenancePackages = pgTable("maintenance_packages", {
     .defaultNow(),
 });
 
-/** Plano de manutenção ativo em um projeto (no máximo 1 por projeto). */
+/** Instância de plano de manutenção da empresa — a cobertura (1..N projetos)
+ *  fica em project_plan_projects; a cota é um pool único compartilhado. */
 export const projectPlans = pgTable(
   "project_plans",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    projectId: uuid("project_id")
+    companyId: uuid("company_id")
       .notNull()
-      .references(() => projects.id, { onDelete: "cascade" }),
+      .references(() => companies.id, { onDelete: "cascade" }),
     planId: uuid("plan_id")
       .notNull()
       .references(() => maintenancePlans.id),
-    status: varchar("status", { length: 20 }).notNull().default("active"), // active | cancelled
+    status: varchar("status", { length: 20 }).notNull().default("active"), // active | pending_payment | cancelled
+    /** Forma de cobrança: manual (equipe) | one_time (avulso) | recurring (assinatura). */
+    billingMode: varchar("billing_mode", { length: 20 })
+      .notNull()
+      .default("manual"),
+    /** Assinatura Asaas (recurring). */
+    asaasSubscriptionId: varchar("asaas_subscription_id", { length: 40 }),
+    /** Último ciclo já faturado (one_time). */
+    lastBilledPeriodStart: date("last_billed_period_start"),
     /** Início do ciclo mensal corrente (rollover preguiçoso na leitura). */
     currentPeriodStart: date("current_period_start").notNull(),
     createdBy: uuid("created_by").references(() => users.id),
@@ -578,7 +592,28 @@ export const projectPlans = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (t) => [uniqueIndex("project_plans_project_unique").on(t.projectId)],
+  (t) => [index("project_plans_company_idx").on(t.companyId)],
+);
+
+/** Cobertura do plano: projetos da empresa que consomem o pool compartilhado. */
+export const projectPlanProjects = pgTable(
+  "project_plan_projects",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    projectPlanId: uuid("project_plan_id")
+      .notNull()
+      .references(() => projectPlans.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("project_plan_projects_unique").on(t.projectPlanId, t.projectId),
+    index("project_plan_projects_project_idx").on(t.projectId),
+  ],
 );
 
 /** Pacote extra adquirido para o plano do projeto (pago ou manual). */
@@ -630,6 +665,10 @@ export const projectPlanUsages = pgTable(
       .notNull()
       .references(() => projectPlans.id, { onDelete: "cascade" }),
     demandId: uuid("demand_id").notNull(), // sem FK: a demanda some na conversão
+    /** Projeto que originou o consumo (visão "uso por site"). */
+    projectId: uuid("project_id").references(() => projects.id, {
+      onDelete: "set null",
+    }),
     /** Pacote consumido; null = consumiu a cota mensal do ciclo. */
     packageId: uuid("package_id").references(() => projectPlanPackages.id, {
       onDelete: "cascade",
@@ -682,6 +721,14 @@ export const quotes = pgTable(
       (): AnyPgColumn => quotes.id,
     ),
     respondedName: varchar("responded_name", { length: 160 }), // nome informado no link público
+    /** Tipo de serviço solicitado pelo cliente (pedido via portal). */
+    serviceId: uuid("service_id").references(() => services.id, {
+      onDelete: "set null",
+    }),
+    /** Prazo desejado informado pelo cliente. */
+    desiredDeadline: date("desired_deadline"),
+    /** Descrição do pedido, escrita pelo cliente — `notes` é o campo da equipe. */
+    description: text("description"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -728,6 +775,13 @@ export const services = pgTable("services", {
   cycle: subscriptionCycleEnum("cycle").notNull().default("monthly"), // só se recurring
   serviceCode: varchar("service_code", { length: 20 }), // código municipal NFS-e (vazio = padrão do emissor)
   active: boolean("active").notNull().default(true),
+  /** Cliente pode solicitar orçamento deste serviço pelo portal. */
+  quoteRequestEnabled: boolean("quote_request_enabled").notNull().default(false),
+  /** Modelo usado para gerar o projeto na aprovação do orçamento solicitado. */
+  projectTemplateId: uuid("project_template_id").references(
+    () => projectTemplates.id,
+    { onDelete: "set null" },
+  ),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -766,6 +820,24 @@ export const companyServices = pgTable(
   ],
 );
 
+/** Equipe vinculada ao serviço (copiada para o projeto gerado na aprovação). */
+export const serviceTeamMembers = pgTable(
+  "service_team_members",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    serviceId: uuid("service_id")
+      .notNull()
+      .references(() => services.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [uniqueIndex("service_team_members_unique").on(t.serviceId, t.userId)],
+);
+
 /** Cobranças (faturas) — avulsas, de orçamento ou geradas por assinatura. */
 export const charges = pgTable(
   "charges",
@@ -781,6 +853,10 @@ export const charges = pgTable(
       () => companyServices.id,
       { onDelete: "set null" },
     ), // origem recorrente
+    /** Instância de plano de manutenção (ativação/renovação do plano). */
+    projectPlanId: uuid("project_plan_id").references(() => projectPlans.id, {
+      onDelete: "set null",
+    }),
     description: text("description").notNull(),
     valueCents: integer("value_cents").notNull(),
     billingType: chargeBillingTypeEnum("billing_type").notNull(),
@@ -1105,6 +1181,10 @@ export const attachmentsRelations = relations(attachments, ({ one }) => ({
     references: [projects.id],
   }),
   task: one(tasks, { fields: [attachments.taskId], references: [tasks.id] }),
+  quote: one(quotes, {
+    fields: [attachments.quoteId],
+    references: [quotes.id],
+  }),
   uploader: one(users, {
     fields: [attachments.uploadedBy],
     references: [users.id],
@@ -1137,6 +1217,10 @@ export const quotesRelations = relations(quotes, ({ one, many }) => ({
     fields: [quotes.projectId],
     references: [projects.id],
   }),
+  service: one(services, {
+    fields: [quotes.serviceId],
+    references: [services.id],
+  }),
   items: many(quoteItems),
 }));
 
@@ -1163,6 +1247,20 @@ export const companyServicesRelations = relations(
       references: [services.id],
     }),
     charges: many(charges),
+  }),
+);
+
+export const serviceTeamMembersRelations = relations(
+  serviceTeamMembers,
+  ({ one }) => ({
+    service: one(services, {
+      fields: [serviceTeamMembers.serviceId],
+      references: [services.id],
+    }),
+    user: one(users, {
+      fields: [serviceTeamMembers.userId],
+      references: [users.id],
+    }),
   }),
 );
 
@@ -1232,6 +1330,7 @@ export type Demand = typeof demands.$inferSelect;
 export type MaintenancePlan = typeof maintenancePlans.$inferSelect;
 export type MaintenancePackage = typeof maintenancePackages.$inferSelect;
 export type ProjectPlan = typeof projectPlans.$inferSelect;
+export type ProjectPlanProject = typeof projectPlanProjects.$inferSelect;
 export type ProjectPlanPackage = typeof projectPlanPackages.$inferSelect;
 export type ProjectPlanUsage = typeof projectPlanUsages.$inferSelect;
 export type Quote = typeof quotes.$inferSelect;

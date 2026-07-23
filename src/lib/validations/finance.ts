@@ -86,6 +86,13 @@ export const serviceFormSchema = z.object({
     .max(20, "Máximo de 20 caracteres.")
     .optional()
     .or(z.literal("")),
+  /** Cliente pode solicitar orçamento deste serviço pelo portal. */
+  quoteRequestEnabled: z.boolean(),
+  /** Modelo de projeto gerado na aprovação do orçamento (vazio = nenhum). */
+  projectTemplateId: z
+    .uuid("Modelo de projeto inválido.")
+    .optional()
+    .or(z.literal("")),
 });
 
 export type ServiceFormValues = z.infer<typeof serviceFormSchema>;

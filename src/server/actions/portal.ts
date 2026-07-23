@@ -27,6 +27,8 @@ import {
 import { notifyUsers, teamUsersOfCompany } from "@/lib/notifications";
 import {
   allocateQuota,
+  PaymentPendingError,
+  paymentPendingMessage,
   QuotaExceededError,
   quotaExceededMessage,
   usageKindForCategory,
@@ -358,8 +360,9 @@ export async function createPortalDemand(input: unknown): Promise<ActionResult> 
 
       // Projeto com plano de manutenção → consome cota (sem plano = no-op)
       const kind = usageKindForCategory(data.category);
-      const allocated = await allocateQuota(tx, data.projectId, kind, created.id);
-      if (!allocated) throw new QuotaExceededError(kind);
+      const allocation = await allocateQuota(tx, data.projectId, kind, created.id);
+      if (allocation === "quota_exceeded") throw new QuotaExceededError(kind);
+      if (allocation === "payment_pending") throw new PaymentPendingError();
 
       if (data.attachments && data.attachments.length > 0) {
         await tx.insert(attachments).values(
@@ -405,6 +408,9 @@ export async function createPortalDemand(input: unknown): Promise<ActionResult> 
   } catch (error) {
     if (error instanceof QuotaExceededError) {
       return { error: quotaExceededMessage(error.kind) };
+    }
+    if (error instanceof PaymentPendingError) {
+      return { error: paymentPendingMessage() };
     }
     return actionError(error);
   }

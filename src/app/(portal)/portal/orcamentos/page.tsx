@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
-import { FileText } from "lucide-react";
+import { FileText, Plus } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { QuoteStatusChip } from "@/components/chips";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ForbiddenError, requireUser } from "@/lib/access/permissions";
 import { getBranding } from "@/lib/brand/settings";
@@ -30,11 +31,17 @@ export default async function PortalQuotesPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-extrabold">Orçamentos</h1>
-        <p className="text-sm text-muted-foreground">
-          Propostas enviadas pela equipe {brand.appName} para a sua empresa.
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-extrabold">Orçamentos</h1>
+          <p className="text-sm text-muted-foreground">
+            Propostas enviadas pela equipe {brand.appName} para a sua empresa.
+          </p>
+        </div>
+        <Button render={<Link href="/portal/orcamentos/nova" />}>
+          <Plus />
+          Solicitar orçamento
+        </Button>
       </div>
 
       {quotes.length === 0 ? (
@@ -67,7 +74,9 @@ export default async function PortalQuotesPage() {
                 </div>
                 <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
                   <span className="text-sm font-medium text-foreground">
-                    {formatCurrency(quote.totalCents)}
+                    {quote.status === "requested"
+                      ? "Aguardando proposta"
+                      : formatCurrency(quote.totalCents)}
                   </span>
                   {quote.sentAt && (
                     <span>Enviado em {formatDate(quote.sentAt)}</span>

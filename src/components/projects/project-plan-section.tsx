@@ -1,11 +1,11 @@
 "use client";
 
-import { Loader2, Plus, ShieldCheck, X } from "lucide-react";
+import { ArrowRight, Loader2, ShieldCheck, Users } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
-import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -21,24 +21,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type {
-  MaintenancePackage,
-  MaintenancePlan,
-} from "@/lib/db/schema";
+import type { MaintenancePlan } from "@/lib/db/schema";
 import type { ProjectPlanBalance } from "@/lib/queries/maintenance";
-import { formatCurrency, formatDate } from "@/lib/utils/format";
-import {
-  activateProjectPlan,
-  addPackageToProject,
-  cancelProjectPlan,
-  cancelProjectPlanPackage,
-} from "@/server/actions/maintenance";
-
-const packageStatusLabels: Record<string, string> = {
-  pending_payment: "Aguardando pagamento",
-  active: "Ativo",
-  cancelled: "Cancelado",
-};
+import { formatDate } from "@/lib/utils/format";
+import { activateCompanyPlan } from "@/server/actions/maintenance";
 
 /** Linha de cota com barra de progresso (usado/limite). */
 function QuotaRow({
@@ -52,7 +38,8 @@ function QuotaRow({
   limit: number;
   credits: number;
 }) {
-  const pct = limit > 0 ? Math.min(Math.round((used / limit) * 100), 100) : used > 0 ? 100 : 0;
+  const pct =
+    limit > 0 ? Math.min(Math.round((used / limit) * 100), 100) : used > 0 ? 100 : 0;
   const exhausted = used >= limit && credits <= 0;
   return (
     <div className="space-y-1">
@@ -77,38 +64,41 @@ function QuotaRow({
   );
 }
 
-/** Seção do plano de manutenção do projeto: cota mensal, pacotes e gestão. */
+/**
+ * Seção do plano de manutenção na página do projeto: visão do pool
+ * (compartilhado entre os projetos cobertos). A gestão é centralizada na
+ * página do cliente (aba Manutenção).
+ */
 export function ProjectPlanSection({
   projectId,
+  companyId,
   balance,
   plans,
-  packages,
 }: {
   projectId: string;
+  companyId: string;
   balance: ProjectPlanBalance | null;
-  plans: Pick<MaintenancePlan, "id" | "name" | "adjustmentsLimit" | "pagesLimit">[];
-  packages: Pick<
-    MaintenancePackage,
-    "id" | "name" | "adjustments" | "pages" | "valueCents"
+  plans: Pick<
+    MaintenancePlan,
+    "id" | "name" | "adjustmentsLimit" | "pagesLimit"
   >[];
 }) {
   const router = useRouter();
   const [planId, setPlanId] = useState("");
-  const [packageId, setPackageId] = useState("");
-  const [cancellingPlan, setCancellingPlan] = useState(false);
   const [pending, startTransition] = useTransition();
 
-  function run(
-    action: () => Promise<{ success: true; id?: string } | { error: string }>,
-    success: string,
-  ) {
+  function activate() {
     startTransition(async () => {
-      const result = await action();
+      const result = await activateCompanyPlan({
+        companyId,
+        planId,
+        projectIds: [projectId],
+      });
       if ("error" in result) {
         toast.error(result.error);
         return;
       }
-      toast.success(success);
+      toast.success("Plano ativado para este projeto.");
       router.refresh();
     });
   }
@@ -126,8 +116,8 @@ export function ProjectPlanSection({
         <CardContent>
           {plans.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              Nenhum plano ativo no catálogo — cadastre em Configurações →
-              Planos de manutenção.
+              Nenhum plano ativo no catálogo — cadastre em Financeiro →
+              Serviços.
             </p>
           ) : (
             <div className="flex flex-wrap items-center gap-3">
@@ -151,21 +141,17 @@ export function ProjectPlanSection({
                   ))}
                 </SelectContent>
               </Select>
-              <Button
-                disabled={!planId || pending}
-                onClick={() =>
-                  run(
-                    () => activateProjectPlan({ projectId, planId }),
-                    "Plano ativado no projeto.",
-                  )
-                }
-              >
+              <Button disabled={!planId || pending} onClick={activate}>
                 {pending && <Loader2 className="animate-spin" />}
                 <ShieldCheck />
                 Ativar plano
               </Button>
             </div>
           )}
+          <p className="mt-3 text-xs text-muted-foreground">
+            Para cobrir vários projetos da empresa com o mesmo pool de cotas,
+            use a aba Manutenção na página do cliente.
+          </p>
         </CardContent>
       </Card>
     );
@@ -181,6 +167,15 @@ export function ProjectPlanSection({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
+        {balance.shared && (
+          <p className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
+            <Users className="size-4 shrink-0 text-primary" />
+            Cota compartilhada com {balance.coveredProjects.length} projetos da
+            empresa:{" "}
+            {balance.coveredProjects.map((p) => p.name).join(", ")}.
+          </p>
+        )}
+
         <div className="grid gap-4 sm:grid-cols-2">
           <QuotaRow
             label="Ajustes no ciclo"
@@ -196,142 +191,34 @@ export function ProjectPlanSection({
           />
         </div>
 
-        {balance.packages.length > 0 && (
-          <div className="space-y-2">
+        {balance.usageByProject.length > 0 && (
+          <div className="space-y-1.5">
             <p className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">
-              Pacotes extras
+              Consumo no ciclo por projeto
             </p>
-            <ul className="space-y-1.5">
-              {balance.packages.map((p) => (
-                <li
-                  key={p.id}
-                  className="flex flex-wrap items-center gap-2 rounded-lg px-2 py-1.5 text-sm ring-1 ring-border"
-                >
-                  <span className="min-w-0 flex-1 truncate font-medium">
-                    {p.name}
+            <ul className="space-y-1 text-sm">
+              {balance.usageByProject.map((u) => (
+                <li key={u.projectId} className="flex items-center justify-between">
+                  <span className="truncate text-muted-foreground">{u.name}</span>
+                  <span className="tabular-nums">
+                    {u.adjustment} ajustes · {u.page} páginas
                   </span>
-                  {p.status === "active" && (
-                    <span className="text-xs text-muted-foreground">
-                      restam {p.adjustmentsLeft} ajustes · {p.pagesLeft} páginas
-                    </span>
-                  )}
-                  <span
-                    className={`chip ${p.status === "cancelled" ? "opacity-60" : ""}`}
-                  >
-                    {packageStatusLabels[p.status] ?? p.status}
-                  </span>
-                  {p.status !== "cancelled" && (
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      aria-label={`Cancelar ${p.name}`}
-                      className="text-muted-foreground hover:text-destructive"
-                      disabled={pending}
-                      onClick={() =>
-                        run(
-                          () => cancelProjectPlanPackage(p.id),
-                          "Pacote cancelado.",
-                        )
-                      }
-                    >
-                      <X className="size-4" />
-                    </Button>
-                  )}
                 </li>
               ))}
             </ul>
           </div>
         )}
 
-        <div className="flex flex-wrap items-center gap-3 border-t border-border pt-4">
-          {packages.length > 0 && (
-            <>
-              <Select value={packageId} onValueChange={(v) => setPackageId(v ?? "")}>
-                <SelectTrigger className="w-64" aria-label="Selecionar pacote">
-                  <SelectValue placeholder="Adicionar pacote">
-                    {(value: string | null) =>
-                      !value
-                        ? "Adicionar pacote"
-                        : (packages.find((p) => p.id === value)?.name ??
-                          "Adicionar pacote")
-                    }
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {packages.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name} (+{p.adjustments} ajustes · +{p.pages} páginas ·{" "}
-                      {formatCurrency(p.valueCents)})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button
-                variant="outline"
-                disabled={!packageId || pending}
-                onClick={() =>
-                  run(
-                    () => addPackageToProject({ projectId, packageId }),
-                    "Pacote adicionado ao projeto.",
-                  )
-                }
-              >
-                <Plus />
-                Adicionar (sem cobrança)
-              </Button>
-            </>
-          )}
-
-          {plans.length > 1 && (
-            <Select
-              value=""
-              onValueChange={(value) =>
-                run(
-                  () => activateProjectPlan({ projectId, planId: value }),
-                  "Plano do projeto atualizado.",
-                )
-              }
-            >
-              <SelectTrigger className="w-48" aria-label="Trocar plano">
-                <SelectValue placeholder="Trocar plano" />
-              </SelectTrigger>
-              <SelectContent>
-                {plans
-                  .filter((p) => p.id !== balance.plan.id)
-                  .map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name}
-                    </SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
-          )}
-
-          <Button
-            variant="ghost"
-            className="ml-auto text-muted-foreground hover:text-destructive"
-            disabled={pending}
-            onClick={() => setCancellingPlan(true)}
+        <p className="border-t border-border pt-3 text-sm">
+          <Link
+            href={`/admin/clientes/${companyId}?tab=manutencao`}
+            className="inline-flex items-center gap-1.5 text-primary transition-colors hover:text-foreground"
           >
-            Cancelar plano
-          </Button>
-        </div>
+            Gerenciar plano, cobertura e pacotes na página do cliente
+            <ArrowRight className="size-3.5" />
+          </Link>
+        </p>
       </CardContent>
-
-      <ConfirmDialog
-        open={cancellingPlan}
-        onOpenChange={setCancellingPlan}
-        title="Cancelar plano de manutenção"
-        description={`Cancela o plano "${balance.plan.name}" deste projeto. O cliente volta a enviar demandas sem controle de cota. O histórico de consumo é mantido.`}
-        confirmLabel="Cancelar plano"
-        onConfirm={async () => {
-          const result = await cancelProjectPlan(projectId);
-          if ("error" in result) return result.error;
-          toast.success("Plano cancelado.");
-          router.refresh();
-          return null;
-        }}
-      />
     </Card>
   );
 }

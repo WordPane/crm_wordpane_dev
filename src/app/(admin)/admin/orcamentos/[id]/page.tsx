@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { ArrowLeft, Download, Eye, FolderKanban, Pencil } from "lucide-react";
+import { ArrowLeft, Download, Eye, FolderKanban, Paperclip, Pencil } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -33,6 +33,7 @@ import {
   formatCurrency,
   formatDate,
   formatDateTime,
+  formatFileSize,
   formatPercentBps,
   formatQuoteNumber,
 } from "@/lib/utils/format";
@@ -57,7 +58,7 @@ export default async function QuoteDetailPage({
   if (!detail) notFound();
   await assertCompanyAccess(user, detail.quote.companyId);
 
-  const { quote, items, company, creator, responder, project, origin } = detail;
+  const { quote, items, company, creator, responder, project, origin, serviceName, attachments } = detail;
   const charge =
     quote.status === "approved" ? await getChargeByQuoteId(quote.id) : null;
   const number = formatQuoteNumber(quote.number);
@@ -103,7 +104,7 @@ export default async function QuoteDetailPage({
       </div>
 
       <div className="flex flex-wrap gap-2">
-        {quote.status === "draft" && (
+        {(quote.status === "draft" || quote.status === "requested") && (
           <>
             <SendQuoteButton quoteId={quote.id} quoteNumber={number} />
             <Button
@@ -113,16 +114,22 @@ export default async function QuoteDetailPage({
               <Pencil />
               Editar
             </Button>
-            <DeleteQuoteButton quoteId={quote.id} quoteNumber={number} />
+            <DeleteQuoteButton
+              quoteId={quote.id}
+              quoteNumber={number}
+              status={quote.status}
+            />
           </>
         )}
-        {quote.status !== "draft" && user.role === "super_admin" && (
-          <DeleteQuoteButton
-            quoteId={quote.id}
-            quoteNumber={number}
-            status={quote.status}
-          />
-        )}
+        {quote.status !== "draft" &&
+          quote.status !== "requested" &&
+          user.role === "super_admin" && (
+            <DeleteQuoteButton
+              quoteId={quote.id}
+              quoteNumber={number}
+              status={quote.status}
+            />
+          )}
         {quote.status === "approved" && !project && (
           <CreateProjectButton quoteId={quote.id} />
         )}
@@ -161,10 +168,63 @@ export default async function QuoteDetailPage({
           Baixar PDF
         </Button>
         <DuplicateQuoteButton quoteId={quote.id} />
-        {quote.status !== "draft" && (
+        {quote.status !== "draft" && quote.status !== "requested" && (
           <CopyPublicLinkButton publicToken={quote.publicToken} />
         )}
       </div>
+
+      {(serviceName || quote.description) && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Solicitação do cliente</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm">
+            {serviceName && (
+              <div className="flex justify-between gap-4">
+                <span className="text-muted-foreground">Tipo de serviço</span>
+                <span className="font-medium">{serviceName}</span>
+              </div>
+            )}
+            {quote.desiredDeadline && (
+              <div className="flex justify-between gap-4">
+                <span className="text-muted-foreground">Prazo desejado</span>
+                <span className="font-medium">
+                  {formatDate(quote.desiredDeadline)}
+                </span>
+              </div>
+            )}
+            {quote.description && (
+              <div className="space-y-1">
+                <p className="text-muted-foreground">Descrição</p>
+                <p className="whitespace-pre-wrap rounded-lg bg-muted/40 px-3 py-2">
+                  {quote.description}
+                </p>
+              </div>
+            )}
+            {attachments.length > 0 && (
+              <div className="space-y-1.5">
+                <p className="text-muted-foreground">Anexos</p>
+                <ul className="space-y-1.5">
+                  {attachments.map((file) => (
+                    <li key={file.id}>
+                      <a
+                        href={`/api/files/${file.id}`}
+                        className="inline-flex max-w-full items-center gap-2 text-primary transition-colors hover:underline"
+                      >
+                        <Paperclip className="size-3.5 shrink-0" />
+                        <span className="truncate">{file.fileName}</span>
+                        <span className="shrink-0 text-xs text-muted-foreground">
+                          {formatFileSize(file.fileSize)}
+                        </span>
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>

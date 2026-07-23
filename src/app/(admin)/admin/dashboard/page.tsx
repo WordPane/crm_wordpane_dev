@@ -67,14 +67,17 @@ function OpRow({
   value,
   total,
   alert = false,
+  href,
 }: {
   label: string;
   value: number;
   total: number;
   alert?: boolean;
+  /** Quando presente, a linha vira link (ex.: lista filtrada de tarefas). */
+  href?: string;
 }) {
   const pct = total > 0 ? Math.max(Math.round((value / total) * 100), value > 0 ? 4 : 0) : 0;
-  return (
+  const body = (
     <div className="space-y-1">
       <div className="flex items-center justify-between text-sm">
         <span className="text-muted-foreground">{label}</span>
@@ -95,6 +98,12 @@ function OpRow({
         />
       </div>
     </div>
+  );
+  if (!href) return body;
+  return (
+    <Link href={href} className="block rounded-md transition-opacity hover:opacity-70">
+      {body}
+    </Link>
   );
 }
 
@@ -143,10 +152,6 @@ export default async function AdminDashboardPage() {
       href: "/admin/orcamentos?status=sent",
     },
   ];
-
-  const projectsTotal = counts.projectsActive + counts.projectsDone;
-  const demandsTotal =
-    counts.demandsOpen + counts.demandsInProgress + counts.demandsDone;
 
   return (
     <div className="space-y-6">
@@ -312,54 +317,38 @@ export default async function AdminDashboardPage() {
           <CardHeader>
             <CardTitle>Operação</CardTitle>
             <CardDescription>
-              Distribuição de projetos e demandas.
+              Prazos e responsáveis das tarefas em aberto.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
             <div className="space-y-3">
               <p className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">
-                Projetos
+                Tarefas
               </p>
               <OpRow
-                label="Em andamento"
-                value={counts.projectsActive}
-                total={projectsTotal}
-              />
-              <OpRow
-                label="Atrasados"
-                value={counts.projectsOverdue}
-                total={projectsTotal}
+                label="Vencidas"
+                value={counts.tasksOverdue}
+                total={counts.tasksOpen}
                 alert
+                href="/admin/tarefas?vencimento=vencidas"
               />
               <OpRow
-                label="Concluídos"
-                value={counts.projectsDone}
-                total={projectsTotal}
-              />
-            </div>
-            <div className="space-y-3">
-              <p className="text-xs font-semibold tracking-widest text-muted-foreground uppercase">
-                Demandas
-              </p>
-              <OpRow
-                label="Abertas"
-                value={counts.demandsOpen}
-                total={demandsTotal}
+                label="Vencem esta semana"
+                value={counts.tasksDueWeek}
+                total={counts.tasksOpen}
+                href="/admin/tarefas?vencimento=semana"
               />
               <OpRow
-                label="Em andamento"
-                value={counts.demandsInProgress}
-                total={demandsTotal}
-              />
-              <OpRow
-                label="Concluídas"
-                value={counts.demandsDone}
-                total={demandsTotal}
+                label="Sem responsável"
+                value={counts.tasksUnassigned}
+                total={counts.tasksOpen}
+                alert
+                href="/admin/tarefas?concluidas=nao"
               />
             </div>
             <div className="flex items-center justify-between border-t border-border pt-3 text-sm">
-              <span className="text-muted-foreground">Clientes ativos</span>
-              <span className="font-semibold">{counts.clientsActive}</span>
+              <span className="text-muted-foreground">Tarefas em aberto</span>
+              <span className="font-semibold">{counts.tasksOpen}</span>
             </div>
           </CardContent>
         </Card>

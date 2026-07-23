@@ -7,6 +7,7 @@ import {
   Inbox,
   LayoutDashboard,
   Paperclip,
+  ShieldCheck,
   Users,
   Wallet,
 } from "lucide-react";
@@ -21,6 +22,7 @@ const NAV_ITEMS = [
   { href: "/portal/agenda", label: "Agenda", icon: CalendarDays },
   { href: "/portal/projetos", label: "Projetos", icon: FolderKanban },
   { href: "/portal/demandas", label: "Demandas", icon: Inbox },
+  { href: "/portal/plano", label: "Manutenção", icon: ShieldCheck },
   { href: "/portal/orcamentos", label: "Orçamentos", icon: FileText },
   { href: "/portal/financeiro", label: "Financeiro", icon: Wallet },
   { href: "/portal/arquivos", label: "Arquivos", icon: Paperclip },

@@ -68,6 +68,7 @@ export type PortalPlanHint = {
   planName: string;
   adjustmentsLeft: number;
   pagesLeft: number;
+  pendingPayment?: boolean;
 };
 
 /** Formulário de nova demanda do cliente (com anexos opcionais). */
@@ -109,8 +110,12 @@ export function PortalDemandForm({
       ? planHint.pagesLeft
       : planHint.adjustmentsLeft
     : null;
-  const exhausted = planHint != null && watchedCategory != null &&
-    watchedCategory !== ("" as never) && quotaLeft !== null && quotaLeft <= 0;
+  const paymentPending = planHint?.pendingPayment === true;
+  const exhausted =
+    planHint != null &&
+    watchedCategory != null &&
+    watchedCategory !== ("" as never) &&
+    (paymentPending || (quotaLeft !== null && quotaLeft <= 0));
 
   async function handleFiles(event: ChangeEvent<HTMLInputElement>) {
     const selected = Array.from(event.target.files ?? []);
@@ -201,7 +206,7 @@ export function PortalDemandForm({
         />
       </Field>
 
-      {planHint && (
+      {planHint && !paymentPending && (
         <p className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
           <ShieldCheck className="size-4 shrink-0 text-primary" />
           Plano {planHint.planName}: restam{" "}
@@ -212,17 +217,32 @@ export function PortalDemandForm({
         </p>
       )}
 
-      {exhausted && (
+      {(exhausted || paymentPending) && (
         <p className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-400/40 bg-amber-400/10 px-3 py-2 text-sm text-amber-300">
           <TriangleAlert className="size-4 shrink-0" />
-          Cota de {watchedKind === "page" ? "páginas novas" : "ajustes"} do
-          plano esgotada neste ciclo.
-          <Link
-            href={`/portal/projetos/${watchedProjectId}`}
-            className="font-medium underline underline-offset-4"
-          >
-            Adquira um pacote extra
-          </Link>
+          {paymentPending ? (
+            <>
+              Plano com fatura em aberto — as demandas ficam bloqueadas até a
+              quitação.
+              <Link
+                href="/portal/financeiro"
+                className="font-medium underline underline-offset-4"
+              >
+                Pagar no Financeiro
+              </Link>
+            </>
+          ) : (
+            <>
+              Cota de {watchedKind === "page" ? "páginas novas" : "ajustes"}{" "}
+              do plano esgotada neste ciclo.
+              <Link
+                href={`/portal/projetos/${watchedProjectId}`}
+                className="font-medium underline underline-offset-4"
+              >
+                Adquira um pacote extra
+              </Link>
+            </>
+          )}
         </p>
       )}
 

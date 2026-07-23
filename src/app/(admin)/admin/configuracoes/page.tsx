@@ -5,7 +5,6 @@ import { AsaasSettingsForm } from "@/components/settings/asaas-settings-form";
 import { BrandSettingsForm } from "@/components/settings/brand-settings-form";
 import { EmailSettingsForm } from "@/components/settings/email-settings-form";
 import { IssuerSettingsForm } from "@/components/settings/issuer-settings-form";
-import { PlanManager } from "@/components/settings/plan-manager";
 import { StatusManager } from "@/components/settings/status-manager";
 import { TemplateManager } from "@/components/settings/template-manager";
 import { requireUser } from "@/lib/access/permissions";
@@ -13,10 +12,6 @@ import { getMaskedAsaasSettings } from "@/lib/asaas/settings";
 import { getBranding } from "@/lib/brand/settings";
 import { getMaskedEmailSettings } from "@/lib/email/settings";
 import { getIssuer } from "@/lib/issuer";
-import {
-  listMaintenancePackages,
-  listMaintenancePlans,
-} from "@/lib/queries/maintenance";
 import {
   listProjectStatusesWithUsage,
   listTaskStatusesWithUsage,
@@ -29,7 +24,7 @@ export default async function SettingsPage() {
   const user = await requireUser();
   if (user.role !== "super_admin") redirect("/admin/dashboard");
 
-  const [projectStatuses, taskStatuses, emailSettings, asaasSettings, issuer, brand, templates, plans, packages] =
+  const [projectStatuses, taskStatuses, emailSettings, asaasSettings, issuer, brand, templates] =
     await Promise.all([
       listProjectStatusesWithUsage(user),
       listTaskStatusesWithUsage(user),
@@ -38,8 +33,6 @@ export default async function SettingsPage() {
       getIssuer(),
       getBranding(),
       listProjectTemplates(user),
-      listMaintenancePlans(user),
-      listMaintenancePackages(user),
     ]);
 
   return (
@@ -68,8 +61,6 @@ export default async function SettingsPage() {
         projectStatuses={projectStatuses}
         taskStatuses={taskStatuses}
       />
-
-      <PlanManager plans={plans} packages={packages} />
 
       <TemplateManager templates={templates} />
     </div>

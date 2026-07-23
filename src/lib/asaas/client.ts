@@ -262,6 +262,24 @@ export async function deleteSubscription(
   await request(settings, "DELETE", `/subscriptions/${asaasSubscriptionId}`);
 }
 
+/**
+ * Atualiza o valor de uma assinatura — usado na troca de plano para a
+ * próxima cobrança já vir com o valor do plano novo.
+ * Docs: https://docs.asaas.com/reference/atualizar-assinatura
+ */
+export async function updateSubscription(input: {
+  asaasSubscriptionId: string;
+  valueCents: number;
+}): Promise<void> {
+  const settings = await requireSettings();
+  await request(
+    settings,
+    "PUT",
+    `/subscriptions/${input.asaasSubscriptionId}`,
+    { value: input.valueCents / 100 },
+  );
+}
+
 // ─────────────────────────── Notas fiscais (NFS-e) ───────────────────────────
 
 export type AsaasInvoice = { id: string };

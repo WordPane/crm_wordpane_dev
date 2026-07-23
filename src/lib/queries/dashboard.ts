@@ -11,7 +11,7 @@ import {
   type SessionUser,
 } from "@/lib/access/permissions";
 import { db } from "@/lib/db";
-import { SQL_THIS_MONTH, SQL_TODAY } from "@/lib/db/business-date";
+import { SQL_THIS_MONTH, SQL_THIS_WEEK_END, SQL_TODAY } from "@/lib/db/business-date";
 import { daysUntilDate } from "@/lib/utils/format";
 import {
   activities,
@@ -43,6 +43,14 @@ export type DashboardCounts = {
   chargesOverdue: number;
   chargesOpenCents: number;
   chargesReceivedMonthCents: number;
+  /** Tarefas em aberto (não concluídas). */
+  tasksOpen: number;
+  /** Abertas com prazo já passado. */
+  tasksOverdue: number;
+  /** Abertas com prazo até o domingo desta semana. */
+  tasksDueWeek: number;
+  /** Abertas sem responsável atribuído. */
+  tasksUnassigned: number;
 };
 
 export type UpcomingItem = {
@@ -124,6 +132,10 @@ const EMPTY_DATA: AdminDashboardData = {
     chargesOverdue: 0,
     chargesOpenCents: 0,
     chargesReceivedMonthCents: 0,
+    tasksOpen: 0,
+    tasksOverdue: 0,
+    tasksDueWeek: 0,
+    tasksUnassigned: 0,
   },
   revenueByMonth: [],
   receivables: [],
@@ -156,7 +168,7 @@ export async function getAdminDashboard(
     : undefined;
   const companyIds = scope?.companyIds ?? [];
 
-  const [projectCountRows, demandCountRows, clientCountRows, quoteCountRows, chargeCountRows] =
+  const [projectCountRows, demandCountRows, clientCountRows, quoteCountRows, chargeCountRows, taskCountRows] =
     await Promise.all([
       db
         .select({
@@ -202,6 +214,16 @@ export async function getAdminDashboard(
         })
         .from(charges)
         .where(scope ? inColumn(charges.companyId, companyIds) : undefined),
+      db
+        .select({
+          open: sql<number>`count(*) filter (where ${tasks.completedAt} is null)::int`,
+          overdue: sql<number>`count(*) filter (where ${tasks.completedAt} is null and ${tasks.dueDate} < ${SQL_TODAY})::int`,
+          dueWeek: sql<number>`count(*) filter (where ${tasks.completedAt} is null and ${tasks.dueDate} between ${SQL_TODAY} and ${SQL_THIS_WEEK_END})::int`,
+          unassigned: sql<number>`count(*) filter (where ${tasks.completedAt} is null and ${tasks.ownerId} is null)::int`,
+        })
+        .from(tasks)
+        .innerJoin(projects, eq(tasks.projectId, projects.id))
+        .where(projectsScope),
     ]);
 
   const [upcoming, activityRows, uploadRows, commentRows, revenueByMonth, receivables] =
@@ -217,6 +239,7 @@ export async function getAdminDashboard(
   const projectCounts = projectCountRows[0];
   const demandCounts = demandCountRows[0];
   const chargeCounts = chargeCountRows[0];
+  const taskCounts = taskCountRows[0];
 
   return {
     counts: {
@@ -232,6 +255,10 @@ export async function getAdminDashboard(
       chargesOverdue: chargeCounts?.overdueCount ?? 0,
       chargesOpenCents: chargeCounts?.openCents ?? 0,
       chargesReceivedMonthCents: chargeCounts?.receivedMonthCents ?? 0,
+      tasksOpen: taskCounts?.open ?? 0,
+      tasksOverdue: taskCounts?.overdue ?? 0,
+      tasksDueWeek: taskCounts?.dueWeek ?? 0,
+      tasksUnassigned: taskCounts?.unassigned ?? 0,
     },
     revenueByMonth,
     receivables,

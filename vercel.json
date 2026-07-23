@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/lembretes-cobrancas",
       "schedule": "0 12 * * *"
+    },
+    {
+      "path": "/api/cron/planos-manutencao",
+      "schedule": "30 12 * * *"
     }
   ]
 }

@@ -71,8 +71,8 @@ async function getLogoDataUri(brand: BrandConfig): Promise<string> {
  * GET /api/quotes/[id]/pdf — PDF do orçamento gerado na hora.
  * Inline por padrão (abre no navegador); `?download=1` força o download.
  * Autenticado: equipe com acesso à empresa, ou cliente da mesma empresa
- * (rascunho nunca). Sem sessão: exige `?token=` igual ao token público
- * do link de aprovação (rascunho nunca).
+ * (rascunho/solicitação nunca). Sem sessão: exige `?token=` igual ao token
+ * público do link de aprovação (rascunho/solicitação nunca).
  */
 export async function GET(
   request: Request,
@@ -121,8 +121,8 @@ export async function GET(
         throw error;
       }
     } else if (user.role === "client" && user.companyId === row.quote.companyId) {
-      // Cliente nunca vê rascunho — se comporta como inexistente
-      if (row.quote.status === "draft") {
+      // Cliente nunca vê rascunho nem solicitação — se comportam como inexistentes
+      if (row.quote.status === "draft" || row.quote.status === "requested") {
         return NextResponse.json(
           { error: "Orçamento não encontrado." },
           { status: 404 },
@@ -135,9 +135,13 @@ export async function GET(
       );
     }
   } else {
-    // Acesso pelo link público: token precisa ser exato e não pode ser rascunho
+    // Acesso pelo link público: token exato e não pode ser rascunho nem solicitação
     const token = new URL(request.url).searchParams.get("token");
-    if (token !== row.quote.publicToken || row.quote.status === "draft") {
+    if (
+      token !== row.quote.publicToken ||
+      row.quote.status === "draft" ||
+      row.quote.status === "requested"
+    ) {
       return NextResponse.json(
         { error: "Orçamento não encontrado." },
         { status: 404 },

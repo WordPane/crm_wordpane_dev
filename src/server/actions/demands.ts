@@ -22,8 +22,16 @@ import {
   type Demand,
 } from "@/lib/db/schema";
 import {
+  allocateQuota,
+  computeProjectPlanBalance,
+  getPlanIdCoveringProject,
+  PaymentPendingError,
+  paymentPendingMessage,
+  QuotaExceededError,
+  quotaExceededMessage,
   releaseQuotaForDemand,
   updateQuotaKindForDemand,
+  updateQuotaProjectForDemand,
   usageKindForCategory,
 } from "@/lib/queries/maintenance";
 import { getStorage } from "@/lib/storage";
@@ -236,6 +244,48 @@ export async function updateDemand(
       }
     }
 
+    // Cota do plano ao mudar de projeto: se origem e destino estão cobertos
+    // pela MESMA instância (active/pending_payment), a cota acompanha a
+    // demanda (pool é da empresa). Destino coberto por OUTRA instância →
+    // estorna na origem e consome no destino pela mesma via da criação de
+    // demanda (inadimplência e cota insuficiente bloqueiam a mudança, sem
+    // furo de cota grátis). Destino sem plano → só estorna.
+    const projectChanged = projectId !== demand.projectId;
+    let samePlanMove = false;
+    const kind = usageKindForCategory(data.category);
+    if (projectChanged) {
+      const [fromPlan, toPlan] = await Promise.all([
+        demand.projectId
+          ? getPlanIdCoveringProject(demand.projectId)
+          : Promise.resolve(null),
+        projectId
+          ? getPlanIdCoveringProject(projectId)
+          : Promise.resolve(null),
+      ]);
+      samePlanMove = Boolean(fromPlan && fromPlan === toPlan && projectId);
+      if (!samePlanMove) {
+        if (projectId && toPlan) {
+          // Valida o destino ANTES de estornar: sem saldo ou inadimplente,
+          // aborta sem mexer na demanda nem na cota da origem
+          const balance = await computeProjectPlanBalance(projectId);
+          if (balance) {
+            if (balance.status !== "active") throw new PaymentPendingError();
+            if (balance.available[kind] <= 0) {
+              throw new QuotaExceededError(kind);
+            }
+          }
+        }
+        await releaseQuotaForDemand(demandId);
+        if (projectId && toPlan) {
+          const allocation = await allocateQuota(db, projectId, kind, demandId);
+          if (allocation === "quota_exceeded") {
+            throw new QuotaExceededError(kind);
+          }
+          if (allocation === "payment_pending") throw new PaymentPendingError();
+        }
+      }
+    }
+
     await db
       .update(demands)
       .set({
@@ -248,15 +298,15 @@ export async function updateDemand(
       })
       .where(eq(demands.id, demandId));
 
-    // Cota do plano: mudou de projeto → estorna (a cota era do projeto
-    // original); só mudou a categoria → ajusta o tipo do consumo
-    if (projectId !== demand.projectId) {
-      await releaseQuotaForDemand(demandId);
-    } else if (data.category !== demand.category) {
-      await updateQuotaKindForDemand(
-        demandId,
-        usageKindForCategory(data.category),
-      );
+    // Mesma instância → a cota acompanha a demanda para o projeto novo.
+    // Sem mudança de projeto, só mudou a categoria → ajusta o tipo.
+    if (samePlanMove && projectId) {
+      await updateQuotaProjectForDemand(demandId, projectId);
+      if (data.category !== demand.category) {
+        await updateQuotaKindForDemand(demandId, kind);
+      }
+    } else if (!projectChanged && data.category !== demand.category) {
+      await updateQuotaKindForDemand(demandId, kind);
     }
 
     await logActivity({
@@ -272,6 +322,12 @@ export async function updateDemand(
     revalidatePath("/portal/demandas");
     return { success: true, id: demandId };
   } catch (error) {
+    if (error instanceof QuotaExceededError) {
+      return { error: quotaExceededMessage(error.kind) };
+    }
+    if (error instanceof PaymentPendingError) {
+      return { error: paymentPendingMessage() };
+    }
     return actionError(error);
   }
 }

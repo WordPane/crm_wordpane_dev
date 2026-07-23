@@ -16,7 +16,7 @@ const optionalText = (max: number) =>
 // ─────────────────────────── Demanda (portal do cliente) ───────────────────────────
 
 /** Metadados de um arquivo já enviado (uploadFile). */
-const demandAttachmentSchema = z.object({
+export const demandAttachmentSchema = z.object({
   fileKey: z.string().trim().min(1, "Arquivo inválido.").max(2000),
   fileName: z.string().trim().min(1, "Nome inválido.").max(255),
   fileSize: z.number().int().min(0),

@@ -1,6 +1,6 @@
 "use server";
 
-import { asc, eq, inArray, max } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 import {
@@ -9,17 +9,14 @@ import {
   requireTeam,
   requireUser,
 } from "@/lib/access/permissions";
-import { logActivity } from "@/lib/activities";
 import { db } from "@/lib/db";
 import {
-  milestones,
   projects,
   projectTemplateMilestones,
   projectTemplateTasks,
   projectTemplates,
-  tasks,
-  taskStatuses,
 } from "@/lib/db/schema";
+import { materializeProjectTemplate } from "@/lib/project-templates";
 import { projectTemplateSchema } from "@/lib/validations/template";
 import {
   actionError,
@@ -144,91 +141,12 @@ export async function applyProjectTemplate(
     if (!project) return { error: "Projeto não encontrado." };
     await assertProjectAccess(user, project);
 
-    const [template] = await db
-      .select()
-      .from(projectTemplates)
-      .where(eq(projectTemplates.id, templateId))
-      .limit(1);
-    if (!template) return { error: "Modelo não encontrado." };
-
-    const milestoneRows = await db
-      .select()
-      .from(projectTemplateMilestones)
-      .where(eq(projectTemplateMilestones.templateId, templateId))
-      .orderBy(asc(projectTemplateMilestones.position));
-    if (milestoneRows.length === 0) {
-      return { error: "Este modelo não tem etapas." };
-    }
-
-    const taskRows = await db
-      .select()
-      .from(projectTemplateTasks)
-      .where(
-        inArray(
-          projectTemplateTasks.milestoneId,
-          milestoneRows.map((m) => m.id),
-        ),
-      )
-      .orderBy(asc(projectTemplateTasks.position));
-
-    const [maxRow] = await db
-      .select({ value: max(milestones.position) })
-      .from(milestones)
-      .where(eq(milestones.projectId, projectId));
-    const basePosition = (maxRow?.value ?? -1) + 1;
-
-    // Tarefas nascem com o 1º status ativo (mesmo padrão do createTask)
-    const [firstStatus] = await db
-      .select({ id: taskStatuses.id })
-      .from(taskStatuses)
-      .where(eq(taskStatuses.active, true))
-      .orderBy(asc(taskStatuses.position))
-      .limit(1);
-
-    await db.transaction(async (tx) => {
-      for (const [i, tm] of milestoneRows.entries()) {
-        const [milestone] = await tx
-          .insert(milestones)
-          .values({
-            projectId,
-            name: tm.name,
-            description: tm.description,
-            position: basePosition + i,
-          })
-          .returning({ id: milestones.id });
-
-        const tmTasks = taskRows.filter((t) => t.milestoneId === tm.id);
-        if (tmTasks.length > 0) {
-          await tx.insert(tasks).values(
-            tmTasks.map((t) => ({
-              projectId,
-              milestoneId: milestone.id,
-              title: t.title,
-              description: t.description,
-              priority: t.priority,
-              statusId: firstStatus?.id ?? null,
-              origin: "interna" as const,
-              visibleToClient: t.visibleToClient,
-              createdBy: user.id,
-            })),
-          );
-        }
-      }
-    });
-
-    await logActivity({
-      actorId: user.id,
-      companyId: project.companyId,
+    const result = await materializeProjectTemplate(
       projectId,
-      entityType: "project",
-      entityId: projectId,
-      action: "project.template_applied",
-      metadata: {
-        name: template.name,
-        milestones: milestoneRows.length,
-        tasks: taskRows.length,
-      },
-    });
+      templateId,
+      user.id,
+    );
+    if (!result.ok) return { error: result.error };
 
     revalidatePath(`/admin/projetos/${projectId}`);
     revalidatePath("/admin/projetos");

@@ -21,6 +21,7 @@ const ORIGIN_KIND_LABELS = {
   project: "Projeto",
   task: "Tarefa",
   demand: "Demanda",
+  quote: "Orçamento",
 } as const;
 
 function fileIcon(mimeType: string | null) {

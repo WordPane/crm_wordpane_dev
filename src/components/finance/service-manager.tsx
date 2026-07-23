@@ -9,6 +9,7 @@ import { toast } from "sonner";
 
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -34,7 +35,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { CompanyServiceItem } from "@/lib/queries/finance";
+import type { CompanyServiceItem, ServiceListItem } from "@/lib/queries/finance";
 import type { Service } from "@/lib/db/schema";
 import { formatCurrency } from "@/lib/utils/format";
 import { cn } from "@/lib/utils";
@@ -54,11 +55,14 @@ import {
   activateService,
   createService,
   deactivateService,
+  setServiceTeamMembers,
   toggleServiceActive,
   updateService,
 } from "@/server/actions/finance";
 
 type SelectOption = { id: string; name: string };
+
+const NONE = "__none__";
 
 function centsToInput(cents: number): string {
   return (cents / 100).toLocaleString("pt-BR", {
@@ -92,15 +96,19 @@ export function ServiceManager({
   services,
   companyServices,
   companies,
+  templates,
+  teamUsers,
   canManage,
 }: {
-  services: Service[];
+  services: ServiceListItem[];
   companyServices: CompanyServiceItem[];
   companies: SelectOption[];
+  templates: SelectOption[];
+  teamUsers: SelectOption[];
   canManage: boolean;
 }) {
   const router = useRouter();
-  const [editing, setEditing] = useState<Service | "new" | null>(null);
+  const [editing, setEditing] = useState<ServiceListItem | "new" | null>(null);
   const [activating, setActivating] = useState<Service | null>(null);
   const [deactivating, setDeactivating] = useState<CompanyServiceItem | null>(null);
   const [, startTransition] = useTransition();
@@ -299,6 +307,8 @@ export function ServiceManager({
       {editing && (
         <ServiceFormDialog
           service={editing === "new" ? null : editing}
+          templates={templates}
+          teamUsers={teamUsers}
           open
           onOpenChange={(open) => {
             if (!open) setEditing(null);
@@ -344,15 +354,22 @@ export function ServiceManager({
 
 function ServiceFormDialog({
   service,
+  templates,
+  teamUsers,
   open,
   onOpenChange,
 }: {
-  service: Service | null;
+  service: ServiceListItem | null;
+  templates: SelectOption[];
+  teamUsers: SelectOption[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  const [memberIds, setMemberIds] = useState<Set<string>>(
+    () => new Set(service?.memberUserIds ?? []),
+  );
 
   const form = useForm<ServiceFormValues>({
     resolver: zodResolver(serviceFormSchema),
@@ -363,10 +380,25 @@ function ServiceFormDialog({
       billing: service?.billing ?? "one_time",
       cycle: service?.cycle ?? "monthly",
       serviceCode: service?.serviceCode ?? "",
+      quoteRequestEnabled: service?.quoteRequestEnabled ?? false,
+      projectTemplateId: service?.projectTemplateId ?? "",
     },
   });
   const { errors, isSubmitting } = form.formState;
   const billing = useWatch({ control: form.control, name: "billing" });
+  const quoteRequestEnabled = useWatch({
+    control: form.control,
+    name: "quoteRequestEnabled",
+  });
+
+  function toggleMember(userId: string, checked: boolean) {
+    setMemberIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(userId);
+      else next.delete(userId);
+      return next;
+    });
+  }
 
   async function onSubmit(values: ServiceFormValues) {
     setError(null);
@@ -377,6 +409,18 @@ function ServiceFormDialog({
       setError(result.error);
       return;
     }
+    // A equipe automática é persistida em chamada separada (substitui tudo).
+    const serviceId = service ? service.id : result.id;
+    if (serviceId) {
+      const membersResult = await setServiceTeamMembers(serviceId, [
+        ...memberIds,
+      ]);
+      if ("error" in membersResult) {
+        toast.error(
+          `Serviço salvo, mas a equipe não foi atualizada: ${membersResult.error}`,
+        );
+      }
+    }
     toast.success(service ? "Serviço atualizado." : "Serviço criado.");
     onOpenChange(false);
     router.refresh();
@@ -384,7 +428,7 @@ function ServiceFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{service ? "Editar serviço" : "Novo serviço"}</DialogTitle>
           <DialogDescription>
@@ -497,6 +541,132 @@ function ServiceFormDialog({
               </Field>
             )}
           </div>
+
+          <Controller
+            control={form.control}
+            name="quoteRequestEnabled"
+            render={({ field }) => (
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={() => field.onChange(!field.value)}
+                onKeyDown={(e) => {
+                  if (e.key === " " || e.key === "Enter") {
+                    e.preventDefault();
+                    field.onChange(!field.value);
+                  }
+                }}
+                className="flex cursor-pointer items-center gap-3 rounded-lg border border-border px-3 py-2.5"
+              >
+                <Checkbox
+                  checked={field.value}
+                  onCheckedChange={(value) => field.onChange(value)}
+                  onClick={(e) => e.stopPropagation()}
+                  aria-label="Disponível para solicitação de orçamento no portal"
+                />
+                <div>
+                  <p className="text-sm font-medium">
+                    Disponível para solicitação de orçamento no portal
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Clientes podem pedir orçamento deste serviço pelo portal.
+                  </p>
+                </div>
+              </div>
+            )}
+          />
+
+          {quoteRequestEnabled && (
+            <>
+              <Field
+                label="Modelo de projeto"
+                error={errors.projectTemplateId?.message}
+              >
+                <Controller
+                  control={form.control}
+                  name="projectTemplateId"
+                  render={({ field }) => (
+                    <Select
+                      value={field.value || NONE}
+                      onValueChange={(value) =>
+                        field.onChange(value === NONE ? "" : value)
+                      }
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Nenhum">
+                          {(value: string | null) =>
+                            !value || value === NONE
+                              ? "Nenhum"
+                              : (templates.find((t) => t.id === value)?.name ??
+                                "Nenhum")
+                          }
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={NONE}>Nenhum</SelectItem>
+                        {templates.map((t) => (
+                          <SelectItem key={t.id} value={t.id}>
+                            {t.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Etapas e tarefas do modelo são incluídas no projeto gerado na
+                  aprovação do orçamento.
+                </p>
+              </Field>
+
+              <div className="space-y-1.5">
+                <Label>Equipe automática</Label>
+                <div className="max-h-40 space-y-1 overflow-y-auto rounded-lg border border-border p-2">
+                  {teamUsers.length === 0 ? (
+                    <p className="px-2 py-4 text-center text-sm text-muted-foreground">
+                      Nenhum membro ativo na equipe.
+                    </p>
+                  ) : (
+                    teamUsers.map((u) => {
+                      const checked = memberIds.has(u.id);
+                      return (
+                        <div
+                          key={u.id}
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => toggleMember(u.id, !checked)}
+                          onKeyDown={(e) => {
+                            if (e.key === " " || e.key === "Enter") {
+                              e.preventDefault();
+                              toggleMember(u.id, !checked);
+                            }
+                          }}
+                          className={cn(
+                            "flex cursor-pointer items-center gap-3 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-muted",
+                            checked && "bg-[rgba(0,209,100,0.06)]",
+                          )}
+                        >
+                          <Checkbox
+                            checked={checked}
+                            onCheckedChange={(value) =>
+                              toggleMember(u.id, value)
+                            }
+                            onClick={(e) => e.stopPropagation()}
+                            aria-label={`Incluir ${u.name}`}
+                          />
+                          <span className="truncate">{u.name}</span>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Membros atribuídos automaticamente ao projeto gerado na
+                  aprovação do orçamento solicitado.
+                </p>
+              </div>
+            </>
+          )}
 
           {error && (
             <p className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">

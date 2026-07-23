@@ -38,7 +38,6 @@ import { listCompanies } from "@/lib/queries/companies";
 import { listProjectLinks } from "@/lib/queries/links";
 import {
   getProjectPlanBalance,
-  listActiveMaintenancePackages,
   listActiveMaintenancePlans,
 } from "@/lib/queries/maintenance";
 import { getProject, listActiveProjectStatuses } from "@/lib/queries/projects";
@@ -103,7 +102,6 @@ export default async function ProjectDetailPage({
     templates,
     planBalance,
     maintenancePlans,
-    maintenancePackages,
   ] = await Promise.all([
     listActiveProjectStatuses(user),
     listActiveTaskStatuses(user),
@@ -116,7 +114,6 @@ export default async function ProjectDetailPage({
     listProjectTemplateOptions(user),
     getProjectPlanBalance(user, project.id),
     listActiveMaintenancePlans(user),
-    listActiveMaintenancePackages(),
   ]);
 
   const totalTasks = tasks.length;
@@ -229,9 +226,9 @@ export default async function ProjectDetailPage({
 
           <ProjectPlanSection
             projectId={project.id}
+            companyId={company.id}
             balance={planBalance}
             plans={maintenancePlans}
-            packages={maintenancePackages}
           />
 
           <Card>

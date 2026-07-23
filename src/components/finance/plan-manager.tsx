@@ -75,9 +75,11 @@ const emptyPackage: PackageDraft = {
 export function PlanManager({
   plans,
   packages,
+  canManage = true,
 }: {
   plans: MaintenancePlan[];
   packages: MaintenancePackage[];
+  canManage?: boolean;
 }) {
   const router = useRouter();
   const [planDraft, setPlanDraft] = useState<PlanDraft | null>(null);
@@ -119,12 +121,14 @@ export function PlanManager({
             Cotas mensais de demandas (ajustes e páginas novas) atribuídas a
             projetos de clientes. A cota renova a cada ciclo mensal.
           </CardDescription>
-          <CardAction>
-            <Button size="sm" onClick={() => setPlanDraft(emptyPlan)}>
-              <Plus />
-              Novo plano
-            </Button>
-          </CardAction>
+          {canManage && (
+            <CardAction>
+              <Button size="sm" onClick={() => setPlanDraft(emptyPlan)}>
+                <Plus />
+                Novo plano
+              </Button>
+            </CardAction>
+          )}
         </CardHeader>
         <CardContent>
           {plans.length === 0 ? (
@@ -156,22 +160,26 @@ export function PlanManager({
                       páginas/mês · {formatCurrency(plan.valueCents)}/mês
                     </span>
                   </span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    disabled={pending}
-                    onClick={() => togglePlan(plan)}
-                  >
-                    {plan.active ? "Desativar" : "Ativar"}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label={`Editar ${plan.name}`}
-                    onClick={() => setEditingPlan(plan)}
-                  >
-                    <Pencil className="size-4" />
-                  </Button>
+                  {canManage && (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={pending}
+                        onClick={() => togglePlan(plan)}
+                      >
+                        {plan.active ? "Desativar" : "Ativar"}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={`Editar ${plan.name}`}
+                        onClick={() => setEditingPlan(plan)}
+                      >
+                        <Pencil className="size-4" />
+                      </Button>
+                    </>
+                  )}
                 </li>
               ))}
             </ul>
@@ -186,12 +194,14 @@ export function PlanManager({
             Créditos avulsos que o cliente compra quando a cota mensal do
             plano acaba. Consomem na ordem de compra e não expiram.
           </CardDescription>
-          <CardAction>
-            <Button size="sm" onClick={() => setPackageDraft(emptyPackage)}>
-              <Plus />
-              Novo pacote
-            </Button>
-          </CardAction>
+          {canManage && (
+            <CardAction>
+              <Button size="sm" onClick={() => setPackageDraft(emptyPackage)}>
+                <Plus />
+                Novo pacote
+              </Button>
+            </CardAction>
+          )}
         </CardHeader>
         <CardContent>
           {packages.length === 0 ? (
@@ -223,22 +233,26 @@ export function PlanManager({
                       {formatCurrency(pkg.valueCents)}
                     </span>
                   </span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    disabled={pending}
-                    onClick={() => togglePackage(pkg)}
-                  >
-                    {pkg.active ? "Desativar" : "Ativar"}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label={`Editar ${pkg.name}`}
-                    onClick={() => setEditingPackage(pkg)}
-                  >
-                    <Pencil className="size-4" />
-                  </Button>
+                  {canManage && (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={pending}
+                        onClick={() => togglePackage(pkg)}
+                      >
+                        {pkg.active ? "Desativar" : "Ativar"}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={`Editar ${pkg.name}`}
+                        onClick={() => setEditingPackage(pkg)}
+                      >
+                        <Pencil className="size-4" />
+                      </Button>
+                    </>
+                  )}
                 </li>
               ))}
             </ul>

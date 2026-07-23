@@ -53,8 +53,9 @@ export default async function EditQuotePage({
   if (!detail) notFound();
   await assertCompanyAccess(user, detail.quote.companyId);
 
-  // Só rascunhos são editáveis — volta para o detalhe caso contrário
-  if (detail.quote.status !== "draft") {
+  // Rascunhos e solicitações do cliente são editáveis — volta para o
+  // detalhe caso contrário
+  if (detail.quote.status !== "draft" && detail.quote.status !== "requested") {
     redirect(`/admin/orcamentos/${id}`);
   }
 
@@ -99,7 +100,7 @@ export default async function EditQuotePage({
           <CardTitle>Dados do orçamento</CardTitle>
           <CardDescription>
             Alterações são permitidas enquanto o orçamento estiver em
-            rascunho.
+            rascunho ou aguardando avaliação da solicitação.
           </CardDescription>
         </CardHeader>
         <CardContent>

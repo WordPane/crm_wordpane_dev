@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 
 import { CompanyStatusChip } from "@/components/chips";
 import { CompanyForm } from "@/components/companies/company-form";
+import { CompanyPlanSection } from "@/components/companies/company-plan-section";
 import { CompanyUsersSection } from "@/components/companies/company-users-section";
 import { DemandList } from "@/components/demands/demand-list";
 import { ProjectsTable } from "@/components/projects/projects-table";
@@ -29,13 +30,18 @@ import {
   listCompanyUsers,
 } from "@/lib/queries/companies";
 import { listDemands, listScopedMilestones } from "@/lib/queries/demands";
+import {
+  getCompanyPlanInstances,
+  listActiveMaintenancePackages,
+  listActiveMaintenancePlans,
+} from "@/lib/queries/maintenance";
 import { listProjects } from "@/lib/queries/projects";
 import { listTeamSelectOptions } from "@/lib/queries/team";
 import { companyToFormValues } from "@/lib/validations/company";
 
 export const metadata: Metadata = { title: "Detalhes do cliente" };
 
-const TABS = ["dados", "usuarios", "projetos", "demandas"] as const;
+const TABS = ["dados", "usuarios", "projetos", "demandas", "manutencao"] as const;
 type TabValue = (typeof TABS)[number];
 
 function isTab(value: string | undefined): value is TabValue {
@@ -66,7 +72,7 @@ export default async function CompanyDetailPage({
   }
   if (!company) notFound();
 
-  const [companyUsers, admins, companyProjects, companyDemands, milestones, teamUsers] =
+  const [companyUsers, admins, companyProjects, companyDemands, milestones, teamUsers, planInstances, maintenancePlans, maintenancePackages] =
     await Promise.all([
       listCompanyUsers(user, id),
       user.role === "super_admin"
@@ -76,6 +82,9 @@ export default async function CompanyDetailPage({
       listDemands(user, { companyId: id }),
       listScopedMilestones(user),
       listTeamSelectOptions(user),
+      getCompanyPlanInstances(user, id),
+      listActiveMaintenancePlans(user),
+      listActiveMaintenancePackages(),
     ]);
 
   return (
@@ -118,6 +127,7 @@ export default async function CompanyDetailPage({
           <TabsTrigger value="usuarios">Usuários</TabsTrigger>
           <TabsTrigger value="projetos">Projetos</TabsTrigger>
           <TabsTrigger value="demandas">Demandas</TabsTrigger>
+          <TabsTrigger value="manutencao">Manutenção</TabsTrigger>
         </TabsList>
 
         <TabsContent value="dados" className="pt-4">
@@ -253,6 +263,18 @@ export default async function CompanyDetailPage({
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+        <TabsContent value="manutencao" className="pt-4">
+          <CompanyPlanSection
+            companyId={company.id}
+            instances={planInstances}
+            companyProjects={companyProjects.map((p) => ({
+              id: p.id,
+              name: p.name,
+            }))}
+            plans={maintenancePlans}
+            packages={maintenancePackages}
+          />
         </TabsContent>
       </Tabs>
     </div>

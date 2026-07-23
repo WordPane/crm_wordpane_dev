@@ -6,22 +6,26 @@ import { z } from "zod";
 
 import {
   assertCompanyAccess,
+  ForbiddenError,
   requireTeam,
   requireUser,
 } from "@/lib/access/permissions";
 import { logActivity } from "@/lib/activities";
 import { db } from "@/lib/db";
 import {
+  attachments,
   projects,
   projectStatuses,
   quoteItems,
   quotes,
+  services,
 } from "@/lib/db/schema";
 import {
   clientUsersOfCompany,
   notifyUsers,
   teamUsersOfCompany,
 } from "@/lib/notifications";
+import { automateApprovedQuote } from "@/lib/quotes/automation";
 import {
   formatCurrency,
   formatDate,
@@ -29,6 +33,7 @@ import {
 } from "@/lib/utils/format";
 import {
   quotePayloadSchema,
+  quoteRequestSchema,
   quoteStatusLabels,
   quoteTotalCents,
   respondQuotePublicSchema,
@@ -124,6 +129,86 @@ export async function createQuote(input: unknown): Promise<ActionResult> {
   }
 }
 
+/**
+ * Pedido de orçamento feito pelo cliente no portal: cria o quote como
+ * "requested" (sem itens — a equipe monta os valores depois) + anexos.
+ */
+export async function createQuoteRequest(input: unknown): Promise<ActionResult> {
+  try {
+    const user = await requireUser();
+    if (user.role !== "client" || !user.companyId) throw new ForbiddenError();
+    const companyId = user.companyId;
+    const data = quoteRequestSchema.parse(input);
+
+    const [service] = await db
+      .select()
+      .from(services)
+      .where(eq(services.id, data.serviceId))
+      .limit(1);
+    if (!service || !service.active || !service.quoteRequestEnabled) {
+      return { error: "Serviço indisponível para solicitação." };
+    }
+
+    const created = await db.transaction(async (tx) => {
+      const [quote] = await tx
+        .insert(quotes)
+        .values({
+          companyId,
+          title: data.title,
+          status: "requested",
+          serviceId: data.serviceId,
+          desiredDeadline: data.desiredDeadline,
+          description: data.description,
+          createdBy: user.id,
+        })
+        .returning({ id: quotes.id, number: quotes.number });
+
+      if (data.attachments && data.attachments.length > 0) {
+        await tx.insert(attachments).values(
+          data.attachments.map((file) => ({
+            quoteId: quote.id,
+            uploadedBy: user.id,
+            fileName: file.fileName,
+            fileKey: file.fileKey,
+            fileSize: file.fileSize,
+            mimeType: file.mimeType || null,
+          })),
+        );
+      }
+
+      return quote;
+    });
+
+    await logActivity({
+      actorId: user.id,
+      companyId,
+      entityType: "quote",
+      entityId: created.id,
+      action: "quote.created",
+      metadata: {
+        number: formatQuoteNumber(created.number),
+        title: data.title,
+        origem: "portal",
+      },
+    });
+
+    // Novo pedido do cliente → avisa a equipe da empresa
+    const recipients = await teamUsersOfCompany(companyId);
+    await notifyUsers(recipients, {
+      type: "quote.requested",
+      title: `Novo pedido de orçamento ${formatQuoteNumber(created.number)}`,
+      body: `Serviço: ${service.name}. Prazo desejado: ${formatDate(data.desiredDeadline)}. Pedido: "${data.title}".`,
+      href: `/admin/orcamentos/${created.id}`,
+    });
+
+    revalidatePath("/portal/orcamentos");
+    revalidatePath("/portal/dashboard");
+    return { success: true, id: created.id };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
 export async function updateQuote(
   quoteId: string,
   input: unknown,
@@ -143,8 +228,10 @@ export async function updateQuote(
     if (quote.companyId !== data.companyId) {
       await assertCompanyAccess(user, data.companyId);
     }
-    if (quote.status !== "draft") {
-      return { error: "Só é possível editar orçamentos em rascunho." };
+    if (quote.status !== "draft" && quote.status !== "requested") {
+      return {
+        error: "Só é possível editar orçamentos em rascunho ou solicitados.",
+      };
     }
 
     const totals = computeTotals(data);
@@ -198,9 +285,15 @@ export async function deleteQuote(quoteId: string): Promise<ActionResult> {
       .limit(1);
     if (!quote) return { error: "Orçamento não encontrado." };
     await assertCompanyAccess(user, quote.companyId);
-    // Super admin exclui em qualquer status; demais membros só rascunho
-    if (quote.status !== "draft" && user.role !== "super_admin") {
-      return { error: "Só é possível excluir orçamentos em rascunho." };
+    // Super admin exclui em qualquer status; demais membros só rascunho/solicitados
+    if (
+      quote.status !== "draft" &&
+      quote.status !== "requested" &&
+      user.role !== "super_admin"
+    ) {
+      return {
+        error: "Só é possível excluir orçamentos em rascunho ou solicitados.",
+      };
     }
 
     await db.transaction(async (tx) => {
@@ -233,7 +326,7 @@ export async function deleteQuote(quoteId: string): Promise<ActionResult> {
   }
 }
 
-/** Envia o orçamento ao cliente: draft → sent + notificação/e-mail. */
+/** Envia o orçamento ao cliente: draft|requested → sent + notificação/e-mail. */
 export async function sendQuote(quoteId: string): Promise<ActionResult> {
   try {
     const user = await requireUser();
@@ -246,7 +339,7 @@ export async function sendQuote(quoteId: string): Promise<ActionResult> {
       .limit(1);
     if (!quote) return { error: "Orçamento não encontrado." };
     await assertCompanyAccess(user, quote.companyId);
-    if (quote.status !== "draft") {
+    if (quote.status !== "draft" && quote.status !== "requested") {
       return { error: "Este orçamento já foi enviado ao cliente." };
     }
 
@@ -345,6 +438,17 @@ export async function respondQuote(
     });
 
     revalidateQuote(quoteId, quote.companyId);
+
+    // Aprovação dispara a automação (projeto + cobrança). Best-effort:
+    // a resposta do cliente nunca falha por causa dela.
+    if (data.action === "approved") {
+      try {
+        await automateApprovedQuote(quoteId);
+      } catch (automationError) {
+        console.error(`Automação do orçamento ${quoteId} falhou:`, automationError);
+      }
+    }
+
     return { success: true, id: quoteId };
   } catch (error) {
     return actionError(error);
@@ -569,6 +673,17 @@ export async function respondQuotePublic(
     });
 
     revalidateQuote(quote.id, quote.companyId);
+
+    // Aprovação dispara a automação (projeto + cobrança). Best-effort:
+    // a resposta via link público nunca falha por causa dela.
+    if (data.action === "approved") {
+      try {
+        await automateApprovedQuote(quote.id);
+      } catch (automationError) {
+        console.error(`Automação do orçamento ${quote.id} falhou:`, automationError);
+      }
+    }
+
     return { success: true, id: quote.id };
   } catch (error) {
     return actionError(error);

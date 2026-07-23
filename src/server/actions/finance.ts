@@ -1,7 +1,8 @@
 "use server";
 
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 
 import {
   assertCompanyAccess,
@@ -26,6 +27,8 @@ import {
   invoices,
   quotes,
   services,
+  serviceTeamMembers,
+  users,
 } from "@/lib/db/schema";
 import {
   cancelInvoiceForCharge,
@@ -34,14 +37,12 @@ import {
 } from "@/lib/invoices";
 import {
   clientUsersOfCompany,
+  notifyChargeCreated,
   notifyChargeReminder,
   notifyUsers,
 } from "@/lib/notifications";
-import {
-  formatCurrency,
-  formatDate,
-  formatQuoteNumber,
-} from "@/lib/utils/format";
+import { generateChargeForQuote } from "@/lib/quotes/automation";
+import { formatCurrency, formatDate } from "@/lib/utils/format";
 import {
   activateServiceSchema,
   chargeFormSchema,
@@ -63,27 +64,6 @@ function revalidateFinance(companyId: string) {
   revalidatePath("/admin/financeiro/servicos");
   revalidatePath("/portal/financeiro");
   revalidatePath(`/admin/clientes/${companyId}`);
-}
-
-/** Notifica os usuários da empresa sobre uma nova cobrança. */
-async function notifyChargeCreated(
-  companyId: string,
-  description: string,
-  valueCents: number,
-  dueDate: string,
-) {
-  const recipients = await clientUsersOfCompany(companyId);
-  await notifyUsers(recipients, {
-    type: "charge.created",
-    title: `Nova cobrança: ${description}`,
-    body: `Uma cobrança no valor de ${formatCurrency(valueCents)} com vencimento em ${formatDate(dueDate)} foi gerada para a sua empresa.`,
-    href: "/portal/financeiro",
-    rows: [
-      { label: "Descrição", value: description },
-      { label: "Valor", value: formatCurrency(valueCents) },
-      { label: "Vencimento", value: formatDate(dueDate) },
-    ],
-  });
 }
 
 // ─────────────────────────── Catálogo de serviços ───────────────────────────
@@ -108,6 +88,8 @@ export async function createService(input: unknown): Promise<ActionResult> {
         billing: data.billing,
         cycle: data.cycle,
         serviceCode: data.serviceCode || null,
+        quoteRequestEnabled: data.quoteRequestEnabled,
+        projectTemplateId: data.projectTemplateId || null,
       })
       .returning({ id: services.id });
 
@@ -141,6 +123,8 @@ export async function updateService(
         billing: data.billing,
         cycle: data.cycle,
         serviceCode: data.serviceCode || null,
+        quoteRequestEnabled: data.quoteRequestEnabled,
+        projectTemplateId: data.projectTemplateId || null,
         updatedAt: new Date(),
       })
       .where(eq(services.id, serviceId));
@@ -170,6 +154,70 @@ export async function toggleServiceActive(
       .update(services)
       .set({ active: !service.active, updatedAt: new Date() })
       .where(eq(services.id, serviceId));
+
+    revalidatePath("/admin/financeiro/servicos");
+    return { success: true };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+/**
+ * Substitui a equipe vinculada ao serviço (copiada para o projeto gerado na
+ * aprovação de um orçamento solicitado). Só super admin; todos os ids
+ * precisam ser usuários ativos da equipe (admin ou super_admin).
+ */
+export async function setServiceTeamMembers(
+  serviceId: string,
+  userIds: string[],
+): Promise<ActionResult> {
+  try {
+    const user = await requireUser();
+    requireSuperAdmin(user);
+    if (
+      !z.uuid().safeParse(serviceId).success ||
+      userIds.some((id) => !z.uuid().safeParse(id).success)
+    ) {
+      return { error: "Dados inválidos." };
+    }
+
+    const [service] = await db
+      .select({ id: services.id })
+      .from(services)
+      .where(eq(services.id, serviceId))
+      .limit(1);
+    if (!service) return { error: "Serviço não encontrado." };
+
+    const uniqueUserIds = [...new Set(userIds)];
+    if (uniqueUserIds.length > 0) {
+      const members = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(
+          and(
+            inArray(users.id, uniqueUserIds),
+            eq(users.status, "active"),
+            inArray(users.role, ["admin", "super_admin"]),
+          ),
+        );
+      if (members.length !== uniqueUserIds.length) {
+        return {
+          error:
+            "Todos os membros devem ser usuários ativos da equipe (admin ou super admin).",
+        };
+      }
+    }
+
+    await db.transaction(async (tx) => {
+      await tx
+        .delete(serviceTeamMembers)
+        .where(eq(serviceTeamMembers.serviceId, serviceId));
+      if (uniqueUserIds.length > 0) {
+        await tx.insert(serviceTeamMembers).values(
+          uniqueUserIds.map((userId) => ({ serviceId, userId })),
+        );
+      }
+    });
 
     revalidatePath("/admin/financeiro/servicos");
     return { success: true };
@@ -457,79 +505,17 @@ export async function createChargeFromQuote(
       return { error: "Só é possível cobrar orçamento aprovado." };
     }
 
-    const [existing] = await db
-      .select({ id: charges.id })
-      .from(charges)
-      .where(eq(charges.quoteId, quoteId))
-      .limit(1);
-    if (existing) {
-      return { error: "Este orçamento já possui uma cobrança." };
-    }
-
-    const number = formatQuoteNumber(quote.number);
-    const description = `${number} — ${quote.title}`;
-
-    const [charge] = await db
-      .insert(charges)
-      .values({
-        companyId: quote.companyId,
-        quoteId,
-        description,
-        valueCents: quote.totalCents,
-        billingType: data.billingType,
-        dueDate: data.dueDate,
-        createdBy: user.id,
-      })
-      .returning({ id: charges.id });
-
-    try {
-      const customerId = await ensureCustomer(quote.companyId);
-      const payment = await createPayment({
-        customerId,
-        billingType: data.billingType,
-        valueCents: quote.totalCents,
-        dueDate: data.dueDate,
-        description,
-        externalReference: charge.id,
-      });
-      await db
-        .update(charges)
-        .set({
-          asaasPaymentId: payment.id,
-          invoiceUrl: payment.invoiceUrl ?? null,
-          bankSlipUrl: payment.bankSlipUrl ?? null,
-        })
-        .where(eq(charges.id, charge.id));
-    } catch (error) {
-      await db.delete(charges).where(eq(charges.id, charge.id));
-      throw error;
-    }
-
-    // Empresa configurada para emitir a NF junto com a cobrança
-    await emitInvoiceForNewCharge(quote.companyId, charge.id);
-
-    await logActivity({
-      actorId: user.id,
-      companyId: quote.companyId,
-      entityType: "charge",
-      entityId: charge.id,
-      action: "charge.created",
-      metadata: {
-        description,
-        value: formatCurrency(quote.totalCents),
-        quote: number,
-      },
+    const result = await generateChargeForQuote({
+      quote,
+      billingType: data.billingType,
+      dueDate: data.dueDate,
+      createdBy: user.id,
     });
-    await notifyChargeCreated(
-      quote.companyId,
-      description,
-      quote.totalCents,
-      data.dueDate,
-    );
+    if (!result.ok) return { error: result.error };
 
     revalidateFinance(quote.companyId);
     revalidatePath(`/admin/orcamentos/${quoteId}`);
-    return { success: true, id: charge.id };
+    return { success: true, id: result.chargeId };
   } catch (error) {
     return financeError(error);
   }

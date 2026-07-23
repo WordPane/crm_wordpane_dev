@@ -15,7 +15,7 @@ import type { EmailTemplateRow } from "@/lib/email/templates";
 import { formatCurrency, formatDate } from "@/lib/utils/format";
 
 export type NotificationInput = {
-  /** comment | demand.created | demand.status | upload | quote.sent | quote.approved | quote.rejected */
+  /** Chave do evento (ex.: comment, demand.created, quote.sent, quote.requested, project.created). */
   type: string;
   title: string;
   body?: string | null;
@@ -209,6 +209,27 @@ export async function notifyTaskAssigned(input: {
       { label: "Projeto", value: input.projectName },
       { label: "Tarefa", value: input.taskTitle },
       { label: "Atribuída por", value: input.actorName },
+    ],
+  });
+}
+
+/** Notifica os usuários da empresa sobre uma nova cobrança. */
+export async function notifyChargeCreated(
+  companyId: string,
+  description: string,
+  valueCents: number,
+  dueDate: string,
+): Promise<void> {
+  const recipients = await clientUsersOfCompany(companyId);
+  await notifyUsers(recipients, {
+    type: "charge.created",
+    title: `Nova cobrança: ${description}`,
+    body: `Uma cobrança no valor de ${formatCurrency(valueCents)} com vencimento em ${formatDate(dueDate)} foi gerada para a sua empresa.`,
+    href: "/portal/financeiro",
+    rows: [
+      { label: "Descrição", value: description },
+      { label: "Valor", value: formatCurrency(valueCents) },
+      { label: "Vencimento", value: formatDate(dueDate) },
     ],
   });
 }

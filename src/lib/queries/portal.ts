@@ -42,6 +42,7 @@ import type { ActivityItem } from "@/lib/queries/activities";
 import type { AttachmentItem } from "@/lib/queries/attachments";
 import type { CommentItem } from "@/lib/queries/comments";
 import type { StatusInfo } from "@/lib/queries/projects";
+import type { QuoteAttachmentItem } from "@/lib/queries/quotes";
 
 /**
  * Queries do portal do cliente. Nunca usam requireTeam: o escopo é sempre
@@ -479,7 +480,9 @@ export async function getPortalProject(
       .from(attachments)
       .innerJoin(tasks, eq(attachments.taskId, tasks.id))
       .leftJoin(users, eq(attachments.uploadedBy, users.id))
-      .where(and(eq(tasks.projectId, id), eq(tasks.visibleToClient, true)))
+      // Todos os uploads das tarefas do projeto são visíveis ao cliente,
+      // mesmo de tarefas internas (visibleToClient = false)
+      .where(eq(tasks.projectId, id))
       .orderBy(desc(attachments.createdAt)),
     db
       .select({ id: comments.id, taskId: comments.taskId })
@@ -488,7 +491,8 @@ export async function getPortalProject(
       .where(and(eq(tasks.projectId, id), eq(tasks.visibleToClient, true))),
   ]);
 
-  // Timeline: esconde eventos de tarefas/comentários/anexos não visíveis
+  // Timeline: esconde eventos de tarefas/comentários não visíveis.
+  // Anexos são todos visíveis (projeto + qualquer tarefa do projeto).
   const visibleTaskIds = new Set(taskRows.map((t) => t.id));
   const visibleCommentIds = new Set(commentRows.map((c) => c.id));
   const visibleAttachmentIds = new Set([
@@ -806,15 +810,15 @@ export type PortalFileItem = {
   createdAt: Date;
   uploaderName: string | null;
   origin: {
-    kind: "project" | "task" | "demand";
+    kind: "project" | "task" | "demand" | "quote";
     label: string;
     href: string;
   } | null;
 };
 
 /**
- * Todos os anexos da empresa: projetos + tarefas visíveis + demandas,
- * com a origem de cada arquivo.
+ * Todos os anexos da empresa: projetos + tarefas (todas, inclusive internas)
+ * + demandas + orçamentos, com a origem de cada arquivo.
  */
 export async function listPortalFiles(
   user: SessionUser,
@@ -832,26 +836,27 @@ export async function listPortalFiles(
       projectId: attachments.projectId,
       taskId: attachments.taskId,
       demandId: attachments.demandId,
+      quoteId: attachments.quoteId,
       uploaderName: users.name,
       projectName: projects.name,
       taskTitle: tasks.title,
       taskProjectId: tasks.projectId,
       demandTitle: demands.title,
+      quoteTitle: quotes.title,
     })
     .from(attachments)
     .leftJoin(projects, eq(attachments.projectId, projects.id))
     .leftJoin(tasks, eq(attachments.taskId, tasks.id))
     .leftJoin(taskProjects, eq(tasks.projectId, taskProjects.id))
     .leftJoin(demands, eq(attachments.demandId, demands.id))
+    .leftJoin(quotes, eq(attachments.quoteId, quotes.id))
     .leftJoin(users, eq(attachments.uploadedBy, users.id))
     .where(
       or(
         eq(projects.companyId, companyId),
-        and(
-          eq(taskProjects.companyId, companyId),
-          eq(tasks.visibleToClient, true),
-        ),
+        eq(taskProjects.companyId, companyId),
         eq(demands.companyId, companyId),
+        eq(quotes.companyId, companyId),
       ),
     )
     .orderBy(desc(attachments.createdAt));
@@ -878,7 +883,13 @@ export async function listPortalFiles(
             }
           : r.demandId && r.demandTitle
             ? { kind: "demand", label: r.demandTitle, href: "/portal/demandas" }
-            : null,
+            : r.quoteId && r.quoteTitle
+              ? {
+                  kind: "quote",
+                  label: r.quoteTitle,
+                  href: `/portal/orcamentos/${r.quoteId}`,
+                }
+              : null,
   }));
 }
 
@@ -924,6 +935,10 @@ export type PortalQuoteDetail = {
   quote: Quote;
   items: QuoteItem[];
   responderName: string | null;
+  /** Nome do serviço solicitado (null = orçamento criado pela equipe). */
+  serviceName: string | null;
+  /** Anexos enviados na solicitação. */
+  attachments: QuoteAttachmentItem[];
 };
 
 /**
@@ -936,9 +951,10 @@ export async function getPortalQuote(
 ): Promise<PortalQuoteDetail | null> {
   const companyId = requireClientCompanyId(user);
 
-  const [quote] = await db
-    .select()
+  const [row] = await db
+    .select({ quote: quotes, serviceName: services.name })
     .from(quotes)
+    .leftJoin(services, eq(quotes.serviceId, services.id))
     .where(
       and(
         eq(quotes.id, id),
@@ -948,14 +964,26 @@ export async function getPortalQuote(
     )
     .limit(1);
 
-  if (!quote) return null;
+  if (!row) return null;
+  const { quote, serviceName } = row;
 
-  const [items, responder] = await Promise.all([
+  const [items, quoteAttachments, responder] = await Promise.all([
     db
       .select()
       .from(quoteItems)
       .where(eq(quoteItems.quoteId, id))
       .orderBy(asc(quoteItems.position)),
+    db
+      .select({
+        id: attachments.id,
+        fileName: attachments.fileName,
+        fileSize: attachments.fileSize,
+        mimeType: attachments.mimeType,
+        createdAt: attachments.createdAt,
+      })
+      .from(attachments)
+      .where(eq(attachments.quoteId, id))
+      .orderBy(asc(attachments.createdAt)),
     quote.respondedBy
       ? db
           .select({ name: users.name })
@@ -965,7 +993,13 @@ export async function getPortalQuote(
       : Promise.resolve([]),
   ]);
 
-  return { quote, items, responderName: responder[0]?.name ?? null };
+  return {
+    quote,
+    items,
+    responderName: responder[0]?.name ?? null,
+    serviceName,
+    attachments: quoteAttachments,
+  };
 }
 
 // ─────────────────────────── Financeiro ───────────────────────────

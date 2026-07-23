@@ -1,14 +1,23 @@
 import { z } from "zod";
 
 import type { Quote } from "@/lib/db/schema";
+import { businessToday } from "@/lib/utils/format";
+import { demandAttachmentSchema } from "@/lib/validations/portal";
 
-export const quoteStatuses = ["draft", "sent", "approved", "rejected"] as const;
+export const quoteStatuses = [
+  "requested",
+  "draft",
+  "sent",
+  "approved",
+  "rejected",
+] as const;
 
 export const quoteStatusLabels: Record<Quote["status"], string> = {
   draft: "Rascunho",
   sent: "Aguardando resposta",
   approved: "Aprovado",
   rejected: "Recusado",
+  requested: "Solicitado",
 };
 
 export const quoteDiscountTypes = ["amount", "percent"] as const;
@@ -132,6 +141,35 @@ export const quotePayloadSchema = z.object({
 });
 
 export type QuotePayload = z.infer<typeof quotePayloadSchema>;
+
+// ─────────────────────────── Solicitação de orçamento (portal) ───────────────────────────
+
+/** Pedido de orçamento feito pelo cliente no portal (cria o quote como "requested"). */
+export const quoteRequestSchema = z.object({
+  title: z
+    .string()
+    .trim()
+    .min(1, "Informe o título do pedido.")
+    .max(220, "Máximo de 220 caracteres."),
+  serviceId: z.uuid("Selecione o tipo de serviço."),
+  /** "YYYY-MM-DD", hoje ou futura (mesmo fuso de referência dos vencimentos). */
+  desiredDeadline: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Data de prazo inválida.")
+    .refine((value) => value >= businessToday(), {
+      message: "O prazo desejado não pode ser uma data passada.",
+    }),
+  description: z
+    .string()
+    .trim()
+    .min(10, "Descreva o pedido com ao menos 10 caracteres."),
+  attachments: z
+    .array(demandAttachmentSchema)
+    .max(10, "Máximo de 10 arquivos por pedido.")
+    .optional(),
+});
+
+export type QuoteRequestValues = z.infer<typeof quoteRequestSchema>;
 
 // ─────────────────────────── Resposta do cliente (portal) ───────────────────────────
 

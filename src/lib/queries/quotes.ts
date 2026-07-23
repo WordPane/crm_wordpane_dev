@@ -8,10 +8,12 @@ import {
 } from "@/lib/access/permissions";
 import { db } from "@/lib/db";
 import {
+  attachments,
   companies,
   projects,
   quoteItems,
   quotes,
+  services,
   users,
   type Quote,
   type QuoteItem,
@@ -89,6 +91,14 @@ export async function listQuotes(
   }));
 }
 
+export type QuoteAttachmentItem = {
+  id: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: string | null;
+  createdAt: Date;
+};
+
 export type QuoteDetail = {
   quote: Quote;
   items: QuoteItem[];
@@ -98,6 +108,10 @@ export type QuoteDetail = {
   project: { id: string; name: string } | null;
   /** Orçamento do qual este foi duplicado (linhagem de versões). */
   origin: { id: string; number: number } | null;
+  /** Nome do serviço solicitado pelo cliente (null = orçamento criado pela equipe). */
+  serviceName: string | null;
+  /** Anexos enviados pelo cliente na solicitação. */
+  attachments: QuoteAttachmentItem[];
 };
 
 /** Orçamento completo (itens, empresa, autor, quem respondeu, projeto gerado). */
@@ -120,6 +134,7 @@ export async function getQuoteById(id: string): Promise<QuoteDetail | null> {
       projectName: projects.name,
       originId: originQuote.id,
       originNumber: originQuote.number,
+      serviceName: services.name,
     })
     .from(quotes)
     .innerJoin(companies, eq(quotes.companyId, companies.id))
@@ -127,16 +142,30 @@ export async function getQuoteById(id: string): Promise<QuoteDetail | null> {
     .leftJoin(responder, eq(quotes.respondedBy, responder.id))
     .leftJoin(projects, eq(quotes.projectId, projects.id))
     .leftJoin(originQuote, eq(quotes.duplicatedFromId, originQuote.id))
+    .leftJoin(services, eq(quotes.serviceId, services.id))
     .where(eq(quotes.id, id))
     .limit(1);
 
   if (!row) return null;
 
-  const items = await db
-    .select()
-    .from(quoteItems)
-    .where(eq(quoteItems.quoteId, id))
-    .orderBy(asc(quoteItems.position));
+  const [items, quoteAttachments] = await Promise.all([
+    db
+      .select()
+      .from(quoteItems)
+      .where(eq(quoteItems.quoteId, id))
+      .orderBy(asc(quoteItems.position)),
+    db
+      .select({
+        id: attachments.id,
+        fileName: attachments.fileName,
+        fileSize: attachments.fileSize,
+        mimeType: attachments.mimeType,
+        createdAt: attachments.createdAt,
+      })
+      .from(attachments)
+      .where(eq(attachments.quoteId, id))
+      .orderBy(asc(attachments.createdAt)),
+  ]);
 
   return {
     quote: row.quote,
@@ -159,7 +188,36 @@ export async function getQuoteById(id: string): Promise<QuoteDetail | null> {
       row.originId && row.originNumber !== null
         ? { id: row.originId, number: row.originNumber }
         : null,
+    serviceName: row.serviceName,
+    attachments: quoteAttachments,
   };
+}
+
+export type QuoteRequestableService = {
+  id: string;
+  name: string;
+  description: string | null;
+};
+
+/**
+ * Serviços que o cliente pode solicitar no portal (ativos com a flag
+ * quoteRequestEnabled), em ordem alfabética. Sem guarda de auth: a página
+ * do portal já exige sessão.
+ */
+export async function listQuoteRequestableServices(): Promise<
+  QuoteRequestableService[]
+> {
+  return db
+    .select({
+      id: services.id,
+      name: services.name,
+      description: services.description,
+    })
+    .from(services)
+    .where(
+      and(eq(services.active, true), eq(services.quoteRequestEnabled, true)),
+    )
+    .orderBy(asc(services.name));
 }
 
 export type PublicQuote = {
@@ -170,7 +228,8 @@ export type PublicQuote = {
 
 /**
  * Orçamento pelo token do link público — null quando o token é inválido,
- * não existe ou o orçamento ainda é rascunho (a página responde notFound).
+ * não existe ou o orçamento ainda é rascunho/solicitação (a página responde
+ * notFound: pedido sem itens/preços não é público).
  */
 export async function getQuoteByToken(
   token: string,
@@ -186,7 +245,13 @@ export async function getQuoteByToken(
     })
     .from(quotes)
     .innerJoin(companies, eq(quotes.companyId, companies.id))
-    .where(and(eq(quotes.publicToken, token), ne(quotes.status, "draft")))
+    .where(
+      and(
+        eq(quotes.publicToken, token),
+        ne(quotes.status, "draft"),
+        ne(quotes.status, "requested"),
+      ),
+    )
     .limit(1);
 
   if (!row) return null;

@@ -8,14 +8,15 @@ import {
   requireUser,
 } from "@/lib/access/permissions";
 import { db } from "@/lib/db";
-import { attachments, demands, projects, tasks } from "@/lib/db/schema";
+import { attachments, demands, projects, quotes, tasks } from "@/lib/db/schema";
 import { getStorage } from "@/lib/storage";
 
-/** Dono do anexo (empresa + projeto quando houver): via tarefa→projeto, projeto ou demanda. */
+/** Dono do anexo (empresa + projeto quando houver): via tarefa→projeto, projeto, demanda ou orçamento. */
 async function resolveOwner(attachment: {
   taskId: string | null;
   projectId: string | null;
   demandId: string | null;
+  quoteId: string | null;
 }): Promise<{ companyId: string; projectId: string | null } | null> {
   if (attachment.taskId) {
     const [row] = await db
@@ -41,6 +42,14 @@ async function resolveOwner(attachment: {
       .select({ companyId: demands.companyId })
       .from(demands)
       .where(eq(demands.id, attachment.demandId))
+      .limit(1);
+    return row ? { companyId: row.companyId, projectId: null } : null;
+  }
+  if (attachment.quoteId) {
+    const [row] = await db
+      .select({ companyId: quotes.companyId })
+      .from(quotes)
+      .where(eq(quotes.id, attachment.quoteId))
       .limit(1);
     return row ? { companyId: row.companyId, projectId: null } : null;
   }
@@ -80,7 +89,11 @@ export async function GET(
   }
 
   try {
-    if (owner.projectId) {
+    if (user.role === "client") {
+      // Cliente acessa qualquer anexo da própria empresa (projeto, tarefa,
+      // demanda ou orçamento) — alinhado à listagem do portal
+      if (user.companyId !== owner.companyId) throw new ForbiddenError();
+    } else if (owner.projectId) {
       await assertProjectAccess(user, {
         id: owner.projectId,
         companyId: owner.companyId,

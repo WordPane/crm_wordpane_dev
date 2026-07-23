@@ -1,6 +1,7 @@
 "use client";
 
 import { Loader2, ShieldCheck, ShoppingCart, TriangleAlert } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -80,6 +81,7 @@ export function PortalPlanCard({
 
   const lowBalance =
     balance.available.adjustment <= 1 || balance.available.page <= 0;
+  const paymentPending = balance.status === "pending_payment";
 
   function buy(packageId: string) {
     setSelected(packageId);
@@ -108,12 +110,16 @@ export function PortalPlanCard({
         <CardDescription>
           Demandas do ciclo atual ({formatDate(balance.periodStart)} →{" "}
           {formatDate(balance.periodEnd)}). A cota renova todo mês.
+          {balance.shared &&
+            " Compartilhada entre os projetos da sua empresa."}
         </CardDescription>
         <CardAction>
-          <Button size="sm" variant="outline" onClick={() => setBuying(true)}>
-            <ShoppingCart />
-            Adquirir pacote
-          </Button>
+          {!paymentPending && (
+            <Button size="sm" variant="outline" onClick={() => setBuying(true)}>
+              <ShoppingCart />
+              Adquirir pacote
+            </Button>
+          )}
         </CardAction>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -132,7 +138,20 @@ export function PortalPlanCard({
           />
         </div>
 
-        {lowBalance && (
+        {paymentPending && (
+          <div className="flex flex-wrap items-center gap-3 rounded-lg border border-amber-400/40 bg-amber-400/10 px-3 py-2 text-sm text-amber-300">
+            <TriangleAlert className="size-4 shrink-0" />
+            <span className="flex-1">
+              Plano aguardando pagamento do ciclo — as demandas ficam bloqueadas
+              até a quitação.
+            </span>
+            <Button size="sm" render={<Link href="/portal/financeiro" />}>
+              Pagar agora
+            </Button>
+          </div>
+        )}
+
+        {!paymentPending && lowBalance && (
           <p className="flex items-center gap-2 rounded-lg border border-amber-400/40 bg-amber-400/10 px-3 py-2 text-sm text-amber-300">
             <TriangleAlert className="size-4 shrink-0" />
             Sua cota está acabando. Adquira um pacote extra para continuar

@@ -12,7 +12,11 @@ import {
 } from "@/components/ui/card";
 import { requireUser } from "@/lib/access/permissions";
 import { getBranding } from "@/lib/brand/settings";
-import { computeProjectPlanBalance } from "@/lib/queries/maintenance";
+import {
+  computeProjectPlanBalance,
+  getPlanIdCoveringProject,
+  type ProjectPlanBalance,
+} from "@/lib/queries/maintenance";
 import { listPortalProjects } from "@/lib/queries/portal";
 
 export const metadata: Metadata = { title: "Nova demanda" };
@@ -22,9 +26,21 @@ export default async function PortalNewDemandPage() {
   const projects = await listPortalProjects(user);
   const brand = await getBranding();
 
-  // Saldo do plano de manutenção por projeto (projetos sem plano ficam fora)
+  // Saldo do plano de manutenção por projeto (projetos sem plano ficam fora).
+  // Projetos cobertos pela MESMA instância compartilham o pool — cache por
+  // instância no escopo do request para não recalcular o mesmo saldo.
+  const balanceByInstance = new Map<string, Promise<ProjectPlanBalance | null>>();
   const balances = await Promise.all(
-    projects.map((p) => computeProjectPlanBalance(p.id)),
+    projects.map(async (p) => {
+      const instanceId = await getPlanIdCoveringProject(p.id);
+      if (!instanceId) return null;
+      let balance = balanceByInstance.get(instanceId);
+      if (!balance) {
+        balance = computeProjectPlanBalance(p.id);
+        balanceByInstance.set(instanceId, balance);
+      }
+      return balance;
+    }),
   );
   const plans = Object.fromEntries(
     projects.flatMap((p, i) => {
@@ -37,6 +53,7 @@ export default async function PortalNewDemandPage() {
             planName: b.plan.name,
             adjustmentsLeft: b.available.adjustment,
             pagesLeft: b.available.page,
+            pendingPayment: b.status === "pending_payment",
           },
         ],
       ];
