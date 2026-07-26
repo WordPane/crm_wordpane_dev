@@ -7,6 +7,7 @@ import { AsaasError, createPayment, ensureCustomer } from "@/lib/asaas/client";
 import { db } from "@/lib/db";
 import {
   charges,
+  projectLinks,
   projectMembers,
   projects,
   projectStatuses,
@@ -18,6 +19,7 @@ import {
   type Quote,
   type Service,
 } from "@/lib/db/schema";
+import { createTemporarySite, isEnhanceConfigured } from "@/lib/enhance/client";
 import { emitInvoiceForNewCharge } from "@/lib/invoices";
 import {
   clientUsersOfCompany,
@@ -264,6 +266,30 @@ export async function automateApprovedQuote(quoteId: string): Promise<void> {
         .onConflictDoNothing();
     }
 
+    // Site no domínio temporário do painel de hospedagem: o link vai para
+    // os "Links de visualização" do projeto e o cliente acompanha o
+    // desenvolvimento. Best-effort: falha no painel não trava a automação
+    let siteSummary = "";
+    if (isEnhanceConfigured()) {
+      try {
+        const site = await createTemporarySite();
+        await db.insert(projectLinks).values({
+          projectId: project.id,
+          url: site.url,
+          description: "Site de desenvolvimento (domínio temporário)",
+          createdBy,
+        });
+        siteSummary = `Site temporário criado: ${site.url}.`;
+      } catch (error) {
+        console.error(
+          `Falha ao criar site temporário do projeto ${project.id}:`,
+          error,
+        );
+        siteSummary =
+          "O site temporário não pôde ser criado no painel — crie manualmente.";
+      }
+    }
+
     const team = await teamUsersOfCompany(quote.companyId);
 
     // Cobrança: vencimento em 3 dias, meio de pagamento escolhido pelo cliente
@@ -319,7 +345,10 @@ export async function automateApprovedQuote(quoteId: string): Promise<void> {
           ? `A equipe do serviço foi adicionada ao projeto (${memberIds.length} membros).`
           : "Nenhum membro de equipe vinculado ao serviço foi adicionado ao projeto.",
         chargeSummary,
-      ].join(" "),
+        siteSummary,
+      ]
+        .filter(Boolean)
+        .join(" "),
       href: `/admin/orcamentos/${quoteId}`,
     });
 
