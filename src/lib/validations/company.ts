@@ -8,11 +8,16 @@ export const personTypeLabels: Record<Company["personType"], string> = {
   pj: "Pessoa jurídica (CNPJ)",
   pf: "Pessoa física (CPF)",
 };
-export const invoiceEmissions = ["apos_pagamento", "junto_cobranca"] as const;
+export const invoiceEmissions = [
+  "nao_emitir",
+  "apos_pagamento",
+  "junto_cobranca",
+] as const;
 export const invoiceEmissionLabels: Record<
   Company["invoiceEmission"],
   string
 > = {
+  nao_emitir: "Não emitir",
   apos_pagamento: "Após o pagamento",
   junto_cobranca: "Junto com a cobrança",
 };
@@ -110,7 +115,7 @@ export const emptyCompanyValues: CompanyFormValues = {
   site: "",
   email: "",
   status: "ativo",
-  invoiceEmission: "apos_pagamento",
+  invoiceEmission: "nao_emitir",
   observacoes: "",
 };
 

@@ -124,6 +124,7 @@ export const invoiceStatusEnum = pgEnum("invoice_status", [
 export const invoiceEmissionEnum = pgEnum("invoice_emission", [
   "apos_pagamento",
   "junto_cobranca",
+  "nao_emitir",
 ]);
 export const personTypeEnum = pgEnum("person_type", ["pj", "pf"]);
 
@@ -153,10 +154,11 @@ export const companies = pgTable(
     status: companyStatusEnum("status").notNull().default("ativo"),
     observacoes: text("observacoes"),
     asaasCustomerId: varchar("asaas_customer_id", { length: 40 }), // cliente no Asaas (criado sob demanda)
-    // Momento da emissão automática da NFS-e (definido pela equipe)
+    // Emissão automática da NFS-e: não emitir (padrão), junto da cobrança
+    // ou após o pagamento (definido pela equipe)
     invoiceEmission: invoiceEmissionEnum("invoice_emission")
       .notNull()
-      .default("apos_pagamento"),
+      .default("nao_emitir"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

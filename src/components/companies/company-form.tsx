@@ -524,9 +524,9 @@ export function CompanyForm(props: CompanyFormProps) {
             />
           </Field>
           <p className="self-end pb-2 text-xs text-muted-foreground">
-            Define se a nota é emitida automaticamente quando a cobrança é
-            gerada ou somente após o pagamento. A emissão manual continua
-            disponível no financeiro.
+            Define se a nota é emitida automaticamente — junto da cobrança
+            ou após o pagamento — ou se não é emitida. A emissão manual
+            continua disponível no financeiro.
           </p>
         </div>
       </section>

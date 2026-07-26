@@ -1,0 +1,1 @@
+ALTER TYPE "public"."invoice_emission" ADD VALUE 'nao_emitir';
