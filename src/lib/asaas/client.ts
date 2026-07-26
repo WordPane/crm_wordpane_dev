@@ -167,7 +167,9 @@ export async function ensureCustomer(companyId: string): Promise<string> {
         {
           ...customerData,
           externalReference: company.id,
-          notificationDisabled: false,
+          // Notificações automáticas do Asaas (WhatsApp/SMS/voz/correios) são
+          // tarifadas por envio — o CRM tem suas próprias notificações
+          notificationDisabled: true,
         },
       );
       customerId = created.id;
@@ -179,8 +181,13 @@ export async function ensureCustomer(companyId: string): Promise<string> {
       .where(eq(companies.id, company.id));
   }
 
-  // Mantém o cadastro do Asaas em dia (documento, contato e endereço)
-  await request(settings, "PUT", `/customers/${customerId}`, customerData);
+  // Mantém o cadastro do Asaas em dia (documento, contato e endereço).
+  // O notificationDisabled garante que clientes criados antes da mudança
+  // também parem de receber (e tarifar) as notificações automáticas.
+  await request(settings, "PUT", `/customers/${customerId}`, {
+    ...customerData,
+    notificationDisabled: true,
+  });
 
   return customerId;
 }
