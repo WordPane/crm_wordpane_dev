@@ -15,7 +15,7 @@ import {
 import { getIssuer } from "@/lib/issuer";
 import {
   clientUsersOfCompany,
-  notifyUsers,
+  notifyUsersSafe,
   teamUsersOfCompany,
 } from "@/lib/notifications";
 import { formatCurrency } from "@/lib/utils/format";
@@ -236,13 +236,13 @@ export async function processInvoiceAuthorized(payload: {
     teamUsersOfCompany(charge.companyId),
     clientUsersOfCompany(charge.companyId),
   ]);
-  await notifyUsers(team, {
+  await notifyUsersSafe(team, {
     type: "invoice.authorized",
     title: `Nota fiscal emitida: ${charge.description}`,
     body: `A nota fiscal de ${formatCurrency(charge.valueCents)} foi autorizada pela prefeitura.`,
     href: "/admin/financeiro",
   });
-  await notifyUsers(clients, {
+  await notifyUsersSafe(clients, {
     type: "invoice.authorized",
     title: `Nota fiscal disponível: ${charge.description}`,
     body: `A nota fiscal de ${formatCurrency(charge.valueCents)} já está disponível em PDF e XML no seu portal.`,
@@ -276,7 +276,7 @@ export async function processInvoiceError(payload: {
   if (!charge) return;
 
   const team = await teamUsersOfCompany(charge.companyId);
-  await notifyUsers(team, {
+  await notifyUsersSafe(team, {
     type: "invoice.error",
     title: `Falha ao emitir nota fiscal: ${charge.description}`,
     body: message,

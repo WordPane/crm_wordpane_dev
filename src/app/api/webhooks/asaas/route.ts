@@ -7,7 +7,7 @@ import {
   type WebhookPayment,
 } from "@/lib/asaas/process-payment-event";
 import { db } from "@/lib/db";
-import { webhookEvents } from "@/lib/db/schema";
+import { webhookEvents, webhookFailedEvents } from "@/lib/db/schema";
 import {
   processInvoiceAuthorized,
   processInvoiceCanceled,
@@ -76,6 +76,21 @@ export async function POST(request: Request) {
     await processEvent(body);
   } catch (error) {
     console.error(`Erro ao processar webhook ${body.event} (${body.id}):`, error);
+    // Guarda o evento falho para diagnóstico (best-effort — não pode
+    // impedir o 5xx que sinaliza a reentrega ao Asaas)
+    try {
+      await db
+        .insert(webhookFailedEvents)
+        .values({
+          id: body.id,
+          event: body.event ?? null,
+          payload: body,
+          errorMessage: error instanceof Error ? error.message : String(error),
+        })
+        .onConflictDoNothing();
+    } catch (logError) {
+      console.error("Falha ao registrar evento de webhook com erro:", logError);
+    }
     return NextResponse.json(
       { error: "Falha ao processar o evento." },
       { status: 500 },

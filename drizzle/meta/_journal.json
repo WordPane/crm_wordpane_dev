@@ -204,6 +204,13 @@
       "when": 1785034321944,
       "tag": "0028_nao-emitir-default",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1785067599821,
+      "tag": "0029_rich_wendigo",
+      "breakpoints": true
     }
   ]
 }

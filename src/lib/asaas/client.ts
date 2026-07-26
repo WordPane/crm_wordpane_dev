@@ -357,6 +357,28 @@ export async function cancelInvoice(invoiceId: string): Promise<void> {
   await request(settings, "POST", `/invoices/${invoiceId}/cancel`);
 }
 
+/** Detalhe de uma NFS-e (GET /invoices/{id}) — reconciliação de status. */
+export type AsaasInvoiceDetail = {
+  id: string;
+  status?: string;
+  number?: string | number | null;
+  pdfUrl?: string | null;
+  xmlUrl?: string | null;
+  statusDescription?: string | null;
+};
+
+/** Consulta uma NFS-e pelo id (usado pela reconciliação de status). */
+export async function getInvoice(
+  asaasInvoiceId: string,
+): Promise<AsaasInvoiceDetail> {
+  const settings = await requireSettings();
+  return request<AsaasInvoiceDetail>(
+    settings,
+    "GET",
+    `/invoices/${asaasInvoiceId}`,
+  );
+}
+
 // ─────────────────────────── Teste de conexão ───────────────────────────
 
 /** Valida a API key com uma chamada barata (lista 1 cliente). */

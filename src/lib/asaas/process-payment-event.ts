@@ -18,7 +18,7 @@ import {
 } from "@/lib/invoices";
 import {
   clientUsersOfCompany,
-  notifyUsers,
+  notifyUsersSafe,
   teamUsersOfCompany,
 } from "@/lib/notifications";
 import { formatCurrency, formatDate } from "@/lib/utils/format";
@@ -129,7 +129,7 @@ async function ensureSubscriptionChargeMirror(
     .returning();
 
   const recipients = await clientUsersOfCompany(ownerCompanyId);
-  await notifyUsers(recipients, {
+  await notifyUsersSafe(recipients, {
     type: "charge.created",
     title: `Nova cobrança: ${payment.description ?? "Assinatura"}`,
     body: `Uma cobrança recorrente no valor de ${formatCurrency(valueCents)} com vencimento em ${formatDate(payment.dueDate)} foi gerada.`,
@@ -192,7 +192,7 @@ async function syncPackageWithCharge(chargeId: string, event: string) {
         .where(eq(projectPlanProjects.projectPlanId, pkg.projectPlanId))
         .limit(1);
       const clients = await clientUsersOfCompany(instance.companyId);
-      await notifyUsers(clients, {
+      await notifyUsersSafe(clients, {
         type: "plan.package_activated",
         title: `Pacote "${pkg.name}" ativado`,
         body: "Pagamento confirmado — os créditos do pacote já estão disponíveis nos projetos do seu plano.",
@@ -241,7 +241,7 @@ async function syncPlanInstanceWithCharge(
       .set({ status: "active", updatedAt: new Date() })
       .where(eq(projectPlans.id, instance.id));
     const clients = await clientUsersOfCompany(instance.companyId);
-    await notifyUsers(clients, {
+    await notifyUsersSafe(clients, {
       type: "plan.activated",
       title: "Plano de manutenção ativo",
       body: "Pagamento confirmado — a cota do ciclo já está disponível nos projetos do seu plano.",
@@ -264,7 +264,7 @@ async function syncPlanInstanceWithCharge(
         .where(eq(projectPlans.id, instance.id));
     }
     const team = await teamUsersOfCompany(instance.companyId);
-    await notifyUsers(team, {
+    await notifyUsersSafe(team, {
       type: "plan.payment_overdue",
       title: "Plano de manutenção em atraso",
       body: `A cobrança "${charge.description}" venceu sem pagamento — as demandas do cliente foram bloqueadas até a quitação.`,
@@ -350,7 +350,7 @@ export async function processPaymentEvent(
         },
       });
       const team = await teamUsersOfCompany(charge.companyId);
-      await notifyUsers(team, {
+      await notifyUsersSafe(team, {
         type: "charge.received",
         title: `Cobrança paga: ${charge.description}`,
         body: `O pagamento de ${formatCurrency(charge.valueCents)} foi confirmado pelo Asaas.`,
@@ -366,7 +366,7 @@ export async function processPaymentEvent(
     case "PAYMENT_OVERDUE": {
       await setChargeStatus(charge.id, "overdue");
       const clients = await clientUsersOfCompany(charge.companyId);
-      await notifyUsers(clients, {
+      await notifyUsersSafe(clients, {
         type: "charge.overdue",
         title: `Cobrança vencida: ${charge.description}`,
         body: `A cobrança de ${formatCurrency(charge.valueCents)} venceu em ${formatDate(charge.dueDate)} e ainda está em aberto.`,

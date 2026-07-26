@@ -926,6 +926,21 @@ export const webhookEvents = pgTable("webhook_events", {
     .defaultNow(),
 });
 
+/**
+ * Eventos de webhook que falharam no processamento (respondemos 5xx e o
+ * Asaas reentrega). Guarda o payload e o erro para diagnóstico sem
+ * depender dos logs da plataforma de hospedagem.
+ */
+export const webhookFailedEvents = pgTable("webhook_failed_events", {
+  id: text("id").primaryKey(), // evt_... do Asaas
+  event: text("event"),
+  payload: jsonb("payload"),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
 // ─────────────────────────── Cadastro público (aprovação manual) ───────────────────────────
 
 export const clientRegistrations = pgTable(

@@ -44,6 +44,23 @@ export async function notifyUsers(
   await emailNotificationRecipients(ids, n);
 }
 
+/**
+ * notifyUsers que nunca lança: usada no processamento de webhooks, onde
+ * uma falha de notificação (insert no banco, SMTP) NÃO pode derrubar o
+ * evento — o erro vira log e o processamento segue. Transições de estado
+ * continuam podendo falhar normalmente (viram 5xx → reentrega).
+ */
+export async function notifyUsersSafe(
+  userIds: string[],
+  n: NotificationInput,
+): Promise<void> {
+  try {
+    await notifyUsers(userIds, n);
+  } catch (error) {
+    console.error(`Falha ao notificar (${n.type}):`, error);
+  }
+}
+
 /** Envia a notificação por e-mail aos usuários ativos (nunca lança exceção). */
 async function emailNotificationRecipients(
   ids: string[],

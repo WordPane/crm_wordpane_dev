@@ -1,18 +1,24 @@
 import { and, asc, inArray, isNotNull, lt } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
-import { getPayment } from "@/lib/asaas/client";
+import { getInvoice, getPayment } from "@/lib/asaas/client";
 import { processPaymentEvent } from "@/lib/asaas/process-payment-event";
 import { db } from "@/lib/db";
-import { charges, type Charge } from "@/lib/db/schema";
+import { charges, invoices, type Charge } from "@/lib/db/schema";
+import {
+  processInvoiceAuthorized,
+  processInvoiceCanceled,
+  processInvoiceError,
+} from "@/lib/invoices";
 
 /**
  * GET /api/cron/reconciliar-pagamentos — reconciliação diária com o Asaas.
- * A confirmação de pagamento chega pelo webhook; se um evento se perder
- * (endpoint fora do ar, timeout, falha de processamento), a cobrança
- * ficaria pendente para sempre. Este cron consulta o status real no Asaas
- * das cobranças em aberto e aplica as MESMAS transições do webhook (via
- * processPaymentEvent: status, notificações, NF, pacotes e planos).
+ * A confirmação de pagamento e os eventos de NFS-e chegam pelo webhook;
+ * se um evento se perder (endpoint fora do ar, timeout, falha de
+ * processamento, fila pausada), o estado local ficaria errado para
+ * sempre. Este cron consulta o status real no Asaas das cobranças em
+ * aberto e das notas aguardando autorização, aplicando as MESMAS
+ * transições do webhook (processPaymentEvent / processInvoice*).
  * Disparado pelo Vercel Cron (vercel.json), 1x ao dia às 11:40 UTC (8h40
  * BRT) — antes do cron de lembretes, para não lembrar quem já pagou.
  * Protegido pelo header Authorization: Bearer $CRON_SECRET.
@@ -87,11 +93,70 @@ export async function GET(request: Request) {
     }
   }
 
+  // NFS-e: notas aguardando autorização cujo evento INVOICE_* se perdeu
+  // (fila de webhook pausada) ficariam "scheduled" para sempre
+  const pendingInvoices = await db
+    .select()
+    .from(invoices)
+    .where(
+      and(
+        inArray(invoices.status, ["scheduled", "synchronized"]),
+        isNotNull(invoices.asaasInvoiceId),
+        lt(invoices.createdAt, graceThreshold),
+      ),
+    )
+    .orderBy(asc(invoices.createdAt))
+    .limit(100);
+
+  let invoicesSynced = 0;
+  const invoiceErrors: { invoiceId: string; error: string }[] = [];
+
+  for (const invoice of pendingInvoices) {
+    const asaasInvoiceId = invoice.asaasInvoiceId;
+    if (!asaasInvoiceId) continue;
+    try {
+      const remote = await getInvoice(asaasInvoiceId);
+      switch (remote.status) {
+        case "AUTHORIZED":
+          await processInvoiceAuthorized({
+            id: remote.id,
+            number: remote.number,
+            pdfUrl: remote.pdfUrl,
+            xmlUrl: remote.xmlUrl,
+          });
+          invoicesSynced += 1;
+          break;
+        case "ERROR":
+          await processInvoiceError({
+            id: remote.id,
+            message: remote.statusDescription,
+          });
+          invoicesSynced += 1;
+          break;
+        case "CANCELED":
+          await processInvoiceCanceled({ id: remote.id });
+          invoicesSynced += 1;
+          break;
+        default:
+          break; // ainda agendada/processando no Asaas
+      }
+    } catch (error) {
+      console.error(`Reconciliação: falha na nota ${invoice.id}:`, error);
+      invoiceErrors.push({
+        invoiceId: invoice.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
   return NextResponse.json({
     ok: true,
     checked: openCharges.length,
     synced,
     skipped,
     errors,
+    invoicesChecked: pendingInvoices.length,
+    invoicesSynced,
+    invoiceErrors,
   });
 }
