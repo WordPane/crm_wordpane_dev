@@ -1,30 +1,42 @@
 import type { Metadata } from "next";
-import { Calendar, FolderKanban } from "lucide-react";
-import Link from "next/link";
+import { FolderKanban } from "lucide-react";
 import { notFound } from "next/navigation";
 
-import { StatusColorChip } from "@/components/chips";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
+import { ProjectFilters } from "@/components/projects/project-filters";
+import { ProjectsTable } from "@/components/projects/projects-table";
+import { Card, CardContent } from "@/components/ui/card";
 import { ForbiddenError, requireUser } from "@/lib/access/permissions";
-import { listPortalProjects } from "@/lib/queries/portal";
-import { formatDate } from "@/lib/utils/format";
-import { projectTypeLabels } from "@/lib/validations/project";
+import {
+  listPortalProjects,
+  listPortalProjectStatuses,
+} from "@/lib/queries/portal";
 
 export const metadata: Metadata = { title: "Projetos" };
 
-export default async function PortalProjectsPage() {
+function first(value: string | string[] | undefined): string {
+  return (Array.isArray(value) ? value[0] : value)?.trim() ?? "";
+}
+
+export default async function PortalProjectsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{
+    q?: string | string[];
+    status?: string | string[];
+  }>;
+}) {
   const user = await requireUser();
 
-  let projects;
+  const params = await searchParams;
+  const search = first(params.q);
+  const statusId = first(params.status);
+
+  let projects, statuses;
   try {
-    projects = await listPortalProjects(user);
+    [projects, statuses] = await Promise.all([
+      listPortalProjects(user, { search, statusId }),
+      listPortalProjectStatuses(user),
+    ]);
   } catch (error) {
     if (error instanceof ForbiddenError) notFound();
     throw error;
@@ -35,69 +47,45 @@ export default async function PortalProjectsPage() {
       <div>
         <h1 className="text-2xl font-extrabold">Projetos</h1>
         <p className="text-sm text-muted-foreground">
+          {projects.length}{" "}
           {projects.length === 1
-            ? "1 projeto da sua empresa"
-            : `${projects.length} projetos da sua empresa`}
+            ? "projeto encontrado"
+            : "projetos encontrados"}
+          {search && <> para &ldquo;{search}&rdquo;</>}
         </p>
       </div>
+
+      <ProjectFilters search={search} statusId={statusId} statuses={statuses} />
 
       {projects.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center gap-3 py-16 text-center">
             <FolderKanban className="size-12 text-muted-foreground/40" />
-            <p className="font-medium">Nenhum projeto por aqui ainda</p>
-            <p className="text-sm text-muted-foreground">
-              Quando a equipe iniciar um projeto para você, ele aparece aqui.
-            </p>
+            {search || statusId ? (
+              <>
+                <p className="font-medium">Nenhum projeto encontrado</p>
+                <p className="text-sm text-muted-foreground">
+                  Ajuste os filtros ou a busca para ver mais resultados.
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="font-medium">Nenhum projeto por aqui ainda</p>
+                <p className="text-sm text-muted-foreground">
+                  Quando a equipe iniciar um projeto para você, ele aparece
+                  aqui.
+                </p>
+              </>
+            )}
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {projects.map((project) => {
-            const percent =
-              project.totalTasks > 0
-                ? Math.round((project.doneTasks / project.totalTasks) * 100)
-                : 0;
-            return (
-              <Link key={project.id} href={`/portal/projetos/${project.id}`}>
-                <Card className="h-full transition-colors hover:border-[rgba(0,209,100,0.4)]">
-                  <CardHeader>
-                    <div className="flex min-w-0 items-start justify-between gap-2">
-                      <CardTitle className="min-w-0 flex-1 break-words text-base">
-                        {project.name}
-                      </CardTitle>
-                      {project.status && (
-                        <StatusColorChip
-                          name={project.status.name}
-                          color={project.status.color}
-                        />
-                      )}
-                    </div>
-                    <CardDescription>
-                      {projectTypeLabels[project.type]}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div className="flex items-center gap-3">
-                      <Progress value={percent} className="flex-1" />
-                      <span className="text-xs text-muted-foreground tabular-nums">
-                        {percent}%
-                      </span>
-                    </div>
-                    <p className="flex items-center justify-between text-xs text-muted-foreground">
-                      <span>
-                        {project.doneTasks} de {project.totalTasks} tarefas
-                      </span>
-                      <span className="inline-flex items-center gap-1">
-                        <Calendar className="size-3" />
-                        {formatDate(project.dueDate)}
-                      </span>
-                    </p>
-                  </CardContent>
-                </Card>
-              </Link>
-            );
-          })}
+        <div className="overflow-hidden rounded-xl bg-card ring-1 ring-foreground/10 [&_td:first-child]:pl-4 [&_td:last-child]:pr-4 [&_th:first-child]:pl-4 [&_th:last-child]:pr-4">
+          <ProjectsTable
+            items={projects}
+            showCompany={false}
+            hrefBase="/portal/projetos"
+          />
         </div>
       )}
     </div>

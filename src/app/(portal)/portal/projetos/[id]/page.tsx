@@ -18,6 +18,7 @@ import {
   StatusColorChip,
 } from "@/components/chips";
 import { PortalPlanCard } from "@/components/portal/portal-plan-card";
+import { ProjectTabsPersist } from "@/components/projects/project-tabs-persist";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Card,
@@ -27,13 +28,17 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ForbiddenError, requireUser } from "@/lib/access/permissions";
+import type { Task } from "@/lib/db/schema";
 import {
   computeProjectPlanBalance,
   listActiveMaintenancePackages,
 } from "@/lib/queries/maintenance";
 import { getPortalProject } from "@/lib/queries/portal";
+import type { StatusInfo } from "@/lib/queries/projects";
 import { formatDate, initials, timeAgo } from "@/lib/utils/format";
+import { projectTypeLabels } from "@/lib/validations/project";
 import {
   createPortalAttachment,
   deletePortalAttachment,
@@ -41,13 +46,60 @@ import {
 
 export const metadata: Metadata = { title: "Projeto" };
 
+const TABS = [
+  "visao",
+  "etapas",
+  "tarefas",
+  "timeline",
+  "arquivos",
+  "links",
+] as const;
+type TabValue = (typeof TABS)[number];
+
+function isTab(value: string | undefined): value is TabValue {
+  return TABS.includes(value as TabValue);
+}
+
+type PortalTask = Task & { status: StatusInfo | null };
+
+/** Linha de tarefa (link para o detalhe) — mesmo visual da lista do admin. */
+function TaskRow({ projectId, task }: { projectId: string; task: PortalTask }) {
+  return (
+    <li>
+      <Link
+        href={`/portal/projetos/${projectId}/tarefas/${task.id}`}
+        className="flex flex-wrap items-center gap-2 rounded-xl bg-white/[0.02] p-3 ring-1 ring-foreground/10 transition-colors hover:ring-primary/40"
+      >
+        <ListChecks className="size-4 shrink-0 text-muted-foreground" />
+        <span className="min-w-0 flex-1 truncate text-sm font-medium">
+          {task.title}
+        </span>
+        {task.status && (
+          <StatusColorChip name={task.status.name} color={task.status.color} />
+        )}
+        <PriorityChip priority={task.priority} />
+        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+          <Calendar className="size-3" />
+          {formatDate(task.dueDate)}
+        </span>
+      </Link>
+    </li>
+  );
+}
+
 export default async function PortalProjectDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ tab?: string | string[] }>;
 }) {
   const user = await requireUser();
   const { id } = await params;
+  const { tab } = await searchParams;
+  const tabValue = Array.isArray(tab) ? tab[0] : tab;
+  const hasExplicitTab = isTab(tabValue);
+  const activeTab: TabValue = hasExplicitTab ? tabValue : "visao";
 
   let detail;
   try {
@@ -72,8 +124,8 @@ export default async function PortalProjectDetailPage({
   const percent =
     totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
 
-  const tasksByMilestone = new Map<string | null, typeof tasks>();
-  for (const task of tasks) {
+  const tasksByMilestone = new Map<string | null, PortalTask[]>();
+  for (const task of tasks as PortalTask[]) {
     const list = tasksByMilestone.get(task.milestoneId) ?? [];
     list.push(task);
     tasksByMilestone.set(task.milestoneId, list);
@@ -94,12 +146,10 @@ export default async function PortalProjectDetailPage({
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="text-2xl font-extrabold break-words">{project.name}</h1>
           {status && <StatusColorChip name={status.name} color={status.color} />}
+          <PriorityChip priority={project.priority} />
         </div>
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
-          <span className="inline-flex items-center gap-1.5">
-            <Calendar className="size-4" />
-            Prazo: {formatDate(project.dueDate)}
-          </span>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+          <span>{projectTypeLabels[project.type]}</span>
           {owner && (
             <span className="inline-flex items-center gap-2">
               <Avatar className="size-6">
@@ -113,284 +163,319 @@ export default async function PortalProjectDetailPage({
               Responsável: {owner.name}
             </span>
           )}
+          <span className="inline-flex items-center gap-1.5">
+            <Calendar className="size-4" />
+            {formatDate(project.startDate)} → {formatDate(project.dueDate)}
+          </span>
         </div>
       </div>
 
-      {/* ─── Descrição + progresso ─── */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Sobre o projeto</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {project.description ? (
-              <p className="text-sm whitespace-pre-wrap text-muted-foreground">
-                {project.description}
-              </p>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Sem descrição cadastrada.
-              </p>
-            )}
-          </CardContent>
-        </Card>
+      {/* ─── Tabs ─── */}
+      <ProjectTabsPersist initialTab={activeTab} hasExplicitTab={hasExplicitTab}>
+        <TabsList>
+          <TabsTrigger value="visao">Visão geral</TabsTrigger>
+          <TabsTrigger value="etapas">Etapas</TabsTrigger>
+          <TabsTrigger value="tarefas">Tarefas</TabsTrigger>
+          <TabsTrigger value="timeline">Timeline</TabsTrigger>
+          <TabsTrigger value="arquivos">Arquivos</TabsTrigger>
+          <TabsTrigger value="links">Links</TabsTrigger>
+        </TabsList>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Progresso geral</CardTitle>
-            <CardDescription>
-              {doneTasks} de {totalTasks} tarefas concluídas
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-center gap-3">
-              <Progress value={percent} className="flex-1" />
-              <span className="text-sm font-medium tabular-nums">{percent}%</span>
-            </div>
-            <dl className="space-y-1.5 text-sm">
-              <div className="flex justify-between">
-                <dt className="text-muted-foreground">Início</dt>
-                <dd>{formatDate(project.startDate)}</dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="text-muted-foreground">Prazo</dt>
-                <dd>{formatDate(project.dueDate)}</dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="text-muted-foreground">Etapas</dt>
-                <dd>{milestones.length}</dd>
-              </div>
-            </dl>
-          </CardContent>
-        </Card>
-      </div>
+        <TabsContent value="visao" className="space-y-6 pt-4">
+          <div className="grid gap-6 lg:grid-cols-3">
+            <Card className="lg:col-span-2">
+              <CardHeader>
+                <CardTitle>Descrição</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {project.description ? (
+                  <p className="text-sm whitespace-pre-wrap text-muted-foreground">
+                    {project.description}
+                  </p>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    Sem descrição cadastrada.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
 
-      {/* ─── Plano de manutenção (só projetos com plano ativo) ─── */}
-      {planBalance && (
-        <PortalPlanCard
-          projectId={project.id}
-          balance={planBalance}
-          packages={maintenancePackages}
-        />
-      )}
+            <Card>
+              <CardHeader>
+                <CardTitle>Progresso geral</CardTitle>
+                <CardDescription>
+                  {doneTasks} de {totalTasks} tarefas concluídas
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <Progress value={percent} className="flex-1" />
+                  <span className="text-sm font-medium tabular-nums">
+                    {percent}%
+                  </span>
+                </div>
+                <dl className="space-y-1.5 text-sm">
+                  <div className="flex justify-between">
+                    <dt className="text-muted-foreground">Início</dt>
+                    <dd>{formatDate(project.startDate)}</dd>
+                  </div>
+                  <div className="flex justify-between">
+                    <dt className="text-muted-foreground">Prazo</dt>
+                    <dd>{formatDate(project.dueDate)}</dd>
+                  </div>
+                  <div className="flex justify-between">
+                    <dt className="text-muted-foreground">Concluído em</dt>
+                    <dd>{formatDate(project.completedAt)}</dd>
+                  </div>
+                  <div className="flex justify-between">
+                    <dt className="text-muted-foreground">Etapas</dt>
+                    <dd>{milestones.length}</dd>
+                  </div>
+                </dl>
+              </CardContent>
+            </Card>
+          </div>
 
-      {/* ─── Etapas ─── */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Flag className="size-4" />
-            Etapas
-          </CardTitle>
-          <CardDescription>
-            Fases do projeto e as tarefas visíveis para você.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {milestones.length === 0 && looseTasks.length === 0 ? (
-            <p className="py-6 text-center text-sm text-muted-foreground">
-              Nenhuma etapa cadastrada ainda.
-            </p>
-          ) : (
-            <>
-              {milestones.map((milestone) => {
-                const milestoneTasks = tasksByMilestone.get(milestone.id) ?? [];
-                return (
-                  <section key={milestone.id} className="space-y-2">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="text-sm font-semibold">{milestone.name}</h3>
-                      <MilestoneStatusChip status={milestone.status} />
-                      {milestone.dueDate && (
-                        <span className="text-xs text-muted-foreground">
-                          até {formatDate(milestone.dueDate)}
+          {/* Plano de manutenção (só projetos com plano ativo) */}
+          {planBalance && (
+            <PortalPlanCard
+              projectId={project.id}
+              balance={planBalance}
+              packages={maintenancePackages}
+            />
+          )}
+        </TabsContent>
+
+        <TabsContent value="etapas" className="pt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Flag className="size-4" />
+                Etapas
+              </CardTitle>
+              <CardDescription>Fases do projeto.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {milestones.length === 0 ? (
+                <p className="py-6 text-center text-sm text-muted-foreground">
+                  Nenhuma etapa cadastrada ainda.
+                </p>
+              ) : (
+                milestones.map((milestone) => {
+                  const milestoneTasks =
+                    tasksByMilestone.get(milestone.id) ?? [];
+                  const milestoneDone = milestoneTasks.filter(
+                    (t) => t.status?.isFinal,
+                  ).length;
+                  return (
+                    <section
+                      key={milestone.id}
+                      className="rounded-xl p-3 ring-1 ring-foreground/10"
+                    >
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="text-sm font-semibold">
+                          {milestone.name}
+                        </h3>
+                        <MilestoneStatusChip status={milestone.status} />
+                        {milestone.dueDate && (
+                          <span className="text-xs text-muted-foreground">
+                            até {formatDate(milestone.dueDate)}
+                          </span>
+                        )}
+                        <span className="ml-auto text-xs text-muted-foreground tabular-nums">
+                          {milestoneDone} de {milestoneTasks.length} tarefas
                         </span>
+                      </div>
+                      {milestone.description && (
+                        <p className="mt-1 text-sm whitespace-pre-wrap text-muted-foreground">
+                          {milestone.description}
+                        </p>
                       )}
-                    </div>
-                    {milestoneTasks.length === 0 ? (
-                      <p className="text-xs text-muted-foreground">
-                        Nenhuma tarefa visível nesta etapa.
-                      </p>
-                    ) : (
+                    </section>
+                  );
+                })
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="tarefas" className="pt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ListChecks className="size-4" />
+                Tarefas
+              </CardTitle>
+              <CardDescription>
+                Tarefas visíveis para você, agrupadas por etapa.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {tasks.length === 0 ? (
+                <p className="py-6 text-center text-sm text-muted-foreground">
+                  Nenhuma tarefa visível para você ainda.
+                </p>
+              ) : (
+                <>
+                  {milestones.map((milestone) => {
+                    const milestoneTasks =
+                      tasksByMilestone.get(milestone.id) ?? [];
+                    if (milestoneTasks.length === 0) return null;
+                    return (
+                      <section key={milestone.id} className="space-y-2">
+                        <h3 className="text-sm font-semibold">
+                          {milestone.name}
+                        </h3>
+                        <ul className="space-y-1.5">
+                          {milestoneTasks.map((task) => (
+                            <TaskRow
+                              key={task.id}
+                              projectId={project.id}
+                              task={task}
+                            />
+                          ))}
+                        </ul>
+                      </section>
+                    );
+                  })}
+
+                  {looseTasks.length > 0 && (
+                    <section className="space-y-2">
+                      <h3 className="text-sm font-semibold text-muted-foreground">
+                        Sem etapa
+                      </h3>
                       <ul className="space-y-1.5">
-                        {milestoneTasks.map((task) => (
-                          <li key={task.id}>
-                            <Link
-                              href={`/portal/projetos/${project.id}/tarefas/${task.id}`}
-                              className="flex flex-wrap items-center gap-2 rounded-xl bg-white/[0.02] p-3 ring-1 ring-foreground/10 transition-colors hover:ring-primary/40"
-                            >
-                              <ListChecks className="size-4 shrink-0 text-muted-foreground" />
-                              <span className="min-w-0 flex-1 truncate text-sm font-medium">
-                                {task.title}
-                              </span>
-                              {task.status && (
-                                <StatusColorChip
-                                  name={task.status.name}
-                                  color={task.status.color}
-                                />
-                              )}
-                              <PriorityChip priority={task.priority} />
-                              <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                                <Calendar className="size-3" />
-                                {formatDate(task.dueDate)}
-                              </span>
-                            </Link>
-                          </li>
+                        {looseTasks.map((task) => (
+                          <TaskRow
+                            key={task.id}
+                            projectId={project.id}
+                            task={task}
+                          />
                         ))}
                       </ul>
-                    )}
-                  </section>
-                );
-              })}
-
-              {looseTasks.length > 0 && (
-                <section className="space-y-2">
-                  <h3 className="text-sm font-semibold text-muted-foreground">
-                    Sem etapa
-                  </h3>
-                  <ul className="space-y-1.5">
-                    {looseTasks.map((task) => (
-                      <li key={task.id}>
-                        <Link
-                          href={`/portal/projetos/${project.id}/tarefas/${task.id}`}
-                          className="flex flex-wrap items-center gap-2 rounded-xl bg-white/[0.02] p-3 ring-1 ring-foreground/10 transition-colors hover:ring-primary/40"
-                        >
-                          <ListChecks className="size-4 shrink-0 text-muted-foreground" />
-                          <span className="min-w-0 flex-1 truncate text-sm font-medium">
-                            {task.title}
-                          </span>
-                          {task.status && (
-                            <StatusColorChip
-                              name={task.status.name}
-                              color={task.status.color}
-                            />
-                          )}
-                          <PriorityChip priority={task.priority} />
-                          <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                            <Calendar className="size-3" />
-                            {formatDate(task.dueDate)}
-                          </span>
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                </section>
+                    </section>
+                  )}
+                </>
               )}
-            </>
-          )}
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-      {/* ─── Links de visualização ─── */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Link2 className="size-4" />
-            Links de visualização
-          </CardTitle>
-          <CardDescription>
-            Ambientes de homologação, previews e URLs úteis do projeto.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {links.length === 0 ? (
-            <p className="py-6 text-center text-sm text-muted-foreground">
-              Nenhum link disponível no momento.
-            </p>
-          ) : (
-            <ul className="space-y-2">
-              {links.map((link) => (
-                <li
-                  key={link.id}
-                  className="rounded-xl bg-white/[0.02] p-3 ring-1 ring-foreground/10"
-                >
-                  <div className="flex flex-wrap items-center gap-2">
-                    <a
-                      href={link.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex min-w-0 items-center gap-1.5 text-sm font-medium break-all text-foreground transition-colors hover:text-primary"
+        <TabsContent value="timeline" className="pt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Timeline do projeto</CardTitle>
+              <CardDescription>
+                Atividades registradas no projeto, da mais recente à mais
+                antiga.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ActivityTimeline activities={activities} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="arquivos" className="space-y-6 pt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Arquivos do projeto</CardTitle>
+              <CardDescription>
+                Documentos gerais — você também pode enviar arquivos aqui.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <AttachmentList
+                attachments={detail.projectAttachments}
+                projectId={project.id}
+                currentUserId={user.id}
+                currentUserRole={user.role}
+                createAction={createPortalAttachment}
+                deleteAction={deletePortalAttachment}
+                taskHrefBase={`/portal/projetos/${project.id}/tarefas`}
+              />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Anexos das tarefas</CardTitle>
+              <CardDescription>
+                Arquivos enviados nas tarefas deste projeto.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <AttachmentList
+                attachments={detail.taskAttachments}
+                currentUserId={user.id}
+                currentUserRole={user.role}
+                readOnly
+                taskHrefBase={`/portal/projetos/${project.id}/tarefas`}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="links" className="pt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Link2 className="size-4" />
+                Links de visualização
+              </CardTitle>
+              <CardDescription>
+                Ambientes de homologação, previews e URLs úteis do projeto.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {links.length === 0 ? (
+                <p className="py-6 text-center text-sm text-muted-foreground">
+                  Nenhum link disponível no momento.
+                </p>
+              ) : (
+                <ul className="space-y-2">
+                  {links.map((link) => (
+                    <li
+                      key={link.id}
+                      className="rounded-xl bg-white/[0.02] p-3 ring-1 ring-foreground/10"
                     >
-                      <ExternalLink className="size-3.5 shrink-0" />
-                      {link.url}
-                    </a>
-                    {link.version && (
-                      <span className="chip border-sky-400/30 bg-sky-400/10 text-sky-300">
-                        {link.version}
-                      </span>
-                    )}
-                  </div>
-                  {link.description && (
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {link.description}
-                    </p>
-                  )}
-                  {link.notes && (
-                    <p className="mt-1 text-xs whitespace-pre-wrap text-muted-foreground/80">
-                      {link.notes}
-                    </p>
-                  )}
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Adicionado {timeAgo(link.createdAt)}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* ─── Arquivos ─── */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Arquivos do projeto</CardTitle>
-            <CardDescription>
-              Documentos gerais — você também pode enviar arquivos aqui.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <AttachmentList
-              attachments={detail.projectAttachments}
-              projectId={project.id}
-              currentUserId={user.id}
-              currentUserRole={user.role}
-              createAction={createPortalAttachment}
-              deleteAction={deletePortalAttachment}
-              taskHrefBase={`/portal/projetos/${project.id}/tarefas`}
-            />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Anexos das tarefas</CardTitle>
-            <CardDescription>
-              Arquivos enviados nas tarefas visíveis deste projeto.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <AttachmentList
-              attachments={detail.taskAttachments}
-              currentUserId={user.id}
-              currentUserRole={user.role}
-              readOnly
-              taskHrefBase={`/portal/projetos/${project.id}/tarefas`}
-            />
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* ─── Andamento ─── */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Andamento</CardTitle>
-          <CardDescription>
-            Atividades recentes do projeto, da mais nova para a mais antiga.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ActivityTimeline activities={activities} />
-        </CardContent>
-      </Card>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <a
+                          href={link.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex min-w-0 items-center gap-1.5 text-sm font-medium break-all text-foreground transition-colors hover:text-primary"
+                        >
+                          <ExternalLink className="size-3.5 shrink-0" />
+                          {link.url}
+                        </a>
+                        {link.version && (
+                          <span className="chip border-sky-400/30 bg-sky-400/10 text-sky-300">
+                            {link.version}
+                          </span>
+                        )}
+                      </div>
+                      {link.description && (
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          {link.description}
+                        </p>
+                      )}
+                      {link.notes && (
+                        <p className="mt-1 text-xs whitespace-pre-wrap text-muted-foreground/80">
+                          {link.notes}
+                        </p>
+                      )}
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Adicionado {timeAgo(link.createdAt)}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </ProjectTabsPersist>
     </div>
   );
 }

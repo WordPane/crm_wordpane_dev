@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, isNull, ne, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 import {
@@ -147,15 +147,25 @@ export type PortalProjectListItem = {
   id: string;
   name: string;
   type: Project["type"];
+  priority: Project["priority"];
+  startDate: string | null;
   dueDate: string | null;
+  completedAt: Date | null;
   status: StatusInfo | null;
+  ownerName: string | null;
   totalTasks: number;
   doneTasks: number;
+};
+
+export type PortalProjectListFilters = {
+  search?: string;
+  statusId?: string;
 };
 
 /** Projetos da empresa do cliente, com progresso das tarefas visíveis. */
 export async function listPortalProjects(
   user: SessionUser,
+  filters: PortalProjectListFilters = {},
 ): Promise<PortalProjectListItem[]> {
   const companyId = requireClientCompanyId(user);
 
@@ -164,7 +174,11 @@ export async function listPortalProjects(
       id: projects.id,
       name: projects.name,
       type: projects.type,
+      priority: projects.priority,
+      startDate: projects.startDate,
       dueDate: projects.dueDate,
+      completedAt: projects.completedAt,
+      ownerName: users.name,
       statusId: projectStatuses.id,
       statusName: projectStatuses.name,
       statusColor: projectStatuses.color,
@@ -172,7 +186,14 @@ export async function listPortalProjects(
     })
     .from(projects)
     .leftJoin(projectStatuses, eq(projects.statusId, projectStatuses.id))
-    .where(eq(projects.companyId, companyId))
+    .leftJoin(users, eq(projects.ownerId, users.id))
+    .where(
+      and(
+        eq(projects.companyId, companyId),
+        filters.search ? ilike(projects.name, `%${filters.search}%`) : undefined,
+        filters.statusId ? eq(projects.statusId, filters.statusId) : undefined,
+      ),
+    )
     .orderBy(asc(projects.createdAt));
 
   if (rows.length === 0) return [];
@@ -183,7 +204,11 @@ export async function listPortalProjects(
     id: r.id,
     name: r.name,
     type: r.type,
+    priority: r.priority,
+    startDate: r.startDate,
     dueDate: r.dueDate,
+    completedAt: r.completedAt,
+    ownerName: r.ownerName,
     status: r.statusId
       ? {
           id: r.statusId,
@@ -195,6 +220,23 @@ export async function listPortalProjects(
     totalTasks: progress.get(r.id)?.total ?? 0,
     doneTasks: progress.get(r.id)?.done ?? 0,
   }));
+}
+
+/** Status de projeto ativos (filtro da listagem do portal — configuração global, sem dados sensíveis). */
+export async function listPortalProjectStatuses(
+  user: SessionUser,
+): Promise<StatusInfo[]> {
+  requireClientCompanyId(user);
+  return db
+    .select({
+      id: projectStatuses.id,
+      name: projectStatuses.name,
+      color: projectStatuses.color,
+      isFinal: projectStatuses.isFinal,
+    })
+    .from(projectStatuses)
+    .where(eq(projectStatuses.active, true))
+    .orderBy(asc(projectStatuses.position), asc(projectStatuses.name));
 }
 
 /** Mapa projectId → total/concluídas considerando só tarefas visíveis ao cliente. */

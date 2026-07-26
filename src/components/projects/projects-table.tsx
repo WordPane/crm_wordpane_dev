@@ -33,13 +33,21 @@ function ProjectProgress({
   );
 }
 
-/** Tabela de projetos — usada na lista global e na aba da empresa (compacta). */
+/** Item da tabela: empresa opcional (o portal não exibe a coluna). */
+type ProjectsTableItem = Omit<ProjectListItem, "companyId" | "companyName"> & {
+  companyId?: string;
+  companyName?: string;
+};
+
+/** Tabela de projetos — usada na lista global, na aba da empresa e no portal do cliente. */
 export function ProjectsTable({
   items,
   showCompany = true,
+  hrefBase = "/admin/projetos",
 }: {
-  items: ProjectListItem[];
+  items: ProjectsTableItem[];
   showCompany?: boolean;
+  hrefBase?: string;
 }) {
   return (
     <Table>
@@ -62,7 +70,7 @@ export function ProjectsTable({
             <TableRow key={p.id}>
               <TableCell>
                 <Link
-                  href={`/admin/projetos/${p.id}`}
+                  href={`${hrefBase}/${p.id}`}
                   className="font-medium text-foreground transition-colors hover:text-primary"
                 >
                   {p.name}

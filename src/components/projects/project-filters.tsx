@@ -28,9 +28,10 @@ export function ProjectFilters({
 }: {
   search: string;
   statusId: string;
-  companyId: string;
+  companyId?: string;
   statuses: StatusInfo[];
-  companies: SelectOption[];
+  /** Quando omitido, o filtro de empresa não é exibido (portal do cliente). */
+  companies?: SelectOption[];
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -91,28 +92,30 @@ export function ProjectFilters({
         </SelectContent>
       </Select>
 
-      <Select
-        value={companyId || ALL}
-        onValueChange={(v) => updateParam("empresa", !v || v === ALL ? "" : v)}
-      >
-        <SelectTrigger aria-label="Filtrar por empresa">
-          <SelectValue placeholder="Empresa">
-            {(value: string | null) =>
-              !value || value === ALL
-                ? "Todas as empresas"
-                : (companies.find((c) => c.id === value)?.name ?? "Empresa")
-            }
-          </SelectValue>
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value={ALL}>Todas as empresas</SelectItem>
-          {companies.map((c) => (
-            <SelectItem key={c.id} value={c.id}>
-              {c.name}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      {companies && (
+        <Select
+          value={companyId || ALL}
+          onValueChange={(v) => updateParam("empresa", !v || v === ALL ? "" : v)}
+        >
+          <SelectTrigger aria-label="Filtrar por empresa">
+            <SelectValue placeholder="Empresa">
+              {(value: string | null) =>
+                !value || value === ALL
+                  ? "Todas as empresas"
+                  : (companies.find((c) => c.id === value)?.name ?? "Empresa")
+              }
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALL}>Todas as empresas</SelectItem>
+            {companies.map((c) => (
+              <SelectItem key={c.id} value={c.id}>
+                {c.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
     </div>
   );
 }
