@@ -94,6 +94,14 @@ export default async function PortalQuoteDetailPage({
                 <span className="font-medium">{serviceName}</span>
               </div>
             )}
+            {quote.totalCents > 0 && (
+              <div className="flex justify-between gap-4">
+                <span className="text-muted-foreground">Valor</span>
+                <span className="font-medium">
+                  {formatCurrency(quote.totalCents)}
+                </span>
+              </div>
+            )}
             {quote.desiredDeadline && (
               <div className="flex justify-between gap-4">
                 <span className="text-muted-foreground">Prazo desejado</span>

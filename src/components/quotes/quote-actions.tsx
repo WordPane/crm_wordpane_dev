@@ -1,6 +1,6 @@
 "use client";
 
-import { Copy, FolderPlus, Send, Trash2 } from "lucide-react";
+import { Check, Copy, FolderPlus, Send, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import {
+  approveRequestedQuote,
   createProjectFromQuote,
   deleteQuote,
   duplicateQuote,
@@ -41,6 +42,41 @@ export function SendQuoteButton({
           const result = await sendQuote(quoteId);
           if ("error" in result) return result.error;
           toast.success("Orçamento enviado ao cliente.");
+          router.refresh();
+          return null;
+        }}
+      />
+    </>
+  );
+}
+
+/** Aprova direto um pedido feito pelo cliente (dispara a automação). */
+export function ApproveRequestButton({
+  quoteId,
+  quoteNumber,
+}: {
+  quoteId: string;
+  quoteNumber: string;
+}) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <Button onClick={() => setOpen(true)}>
+        <Check />
+        Aprovar pedido
+      </Button>
+      <ConfirmDialog
+        open={open}
+        onOpenChange={setOpen}
+        title="Aprovar pedido de orçamento"
+        description={`O pedido ${quoteNumber} será aprovado diretamente: o projeto, a equipe e a cobrança serão criados automaticamente e o cliente será notificado.`}
+        confirmLabel="Aprovar"
+        onConfirm={async () => {
+          const result = await approveRequestedQuote(quoteId);
+          if ("error" in result) return result.error;
+          toast.success("Pedido aprovado — projeto e cobrança em criação.");
           router.refresh();
           return null;
         }}

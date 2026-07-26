@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { uploadFile } from "@/lib/upload";
-import { formatFileSize } from "@/lib/utils/format";
+import { formatCurrency, formatFileSize } from "@/lib/utils/format";
 import { cn } from "@/lib/utils";
 import type { PortalDemandAttachment } from "@/lib/validations/portal";
 import {
@@ -61,7 +61,12 @@ function Field({
 export function PortalQuoteRequestForm({
   services,
 }: {
-  services: { id: string; name: string; description: string | null }[];
+  services: {
+    id: string;
+    name: string;
+    description: string | null;
+    defaultValueCents: number | null;
+  }[];
 }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -185,6 +190,12 @@ export function PortalQuoteRequestForm({
                       {selected.description}
                     </p>
                   )}
+                  {selected?.defaultValueCents != null &&
+                    selected.defaultValueCents > 0 && (
+                      <p className="text-sm font-medium text-foreground">
+                        Valor: {formatCurrency(selected.defaultValueCents)}
+                      </p>
+                    )}
                 </>
               );
             }}

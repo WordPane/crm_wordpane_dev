@@ -150,6 +150,14 @@ export async function createQuoteRequest(input: unknown): Promise<ActionResult> 
     }
 
     const created = await db.transaction(async (tx) => {
+      // O pedido já nasce com o valor base do catálogo: o cliente vê o
+      // valor no formulário e a equipe pode aprovar direto (ou ajustar
+      // os itens antes de enviar/aprovar)
+      const baseValueCents =
+        service.defaultValueCents && service.defaultValueCents > 0
+          ? service.defaultValueCents
+          : 0;
+
       const [quote] = await tx
         .insert(quotes)
         .values({
@@ -159,9 +167,22 @@ export async function createQuoteRequest(input: unknown): Promise<ActionResult> 
           serviceId: data.serviceId,
           desiredDeadline: data.desiredDeadline,
           description: data.description,
+          totalCents: baseValueCents,
           createdBy: user.id,
         })
         .returning({ id: quotes.id, number: quotes.number });
+
+      if (baseValueCents > 0) {
+        await tx.insert(quoteItems).values({
+          quoteId: quote.id,
+          serviceId: service.id,
+          description: service.name,
+          quantity: "1",
+          unitPriceCents: baseValueCents,
+          totalCents: baseValueCents,
+          position: 0,
+        });
+      }
 
       if (data.attachments && data.attachments.length > 0) {
         await tx.insert(attachments).values(
@@ -204,6 +225,82 @@ export async function createQuoteRequest(input: unknown): Promise<ActionResult> 
     revalidatePath("/portal/orcamentos");
     revalidatePath("/portal/dashboard");
     return { success: true, id: created.id };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+/**
+ * Aprovação direta pela equipe de um pedido feito pelo cliente
+ * (status "requested"): dispensa a devolução para aprovação do cliente
+ * e dispara a mesma automação da aprovação pelo portal/link público
+ * (projeto com modelo de etapas, equipe do serviço, cobrança e NF).
+ */
+export async function approveRequestedQuote(
+  quoteId: string,
+): Promise<ActionResult> {
+  try {
+    const user = await requireUser();
+    requireTeam(user);
+
+    const [quote] = await db
+      .select()
+      .from(quotes)
+      .where(eq(quotes.id, quoteId))
+      .limit(1);
+    if (!quote) return { error: "Orçamento não encontrado." };
+    await assertCompanyAccess(user, quote.companyId);
+    if (quote.status !== "requested") {
+      return { error: "Só é possível aprovar pedidos aguardando avaliação." };
+    }
+    if (quote.totalCents <= 0) {
+      return {
+        error: "Adicione itens e valores ao orçamento antes de aprovar.",
+      };
+    }
+
+    await db
+      .update(quotes)
+      .set({
+        status: "approved",
+        respondedAt: new Date(),
+        respondedBy: user.id,
+        updatedAt: new Date(),
+      })
+      .where(eq(quotes.id, quoteId));
+
+    await logActivity({
+      actorId: user.id,
+      companyId: quote.companyId,
+      entityType: "quote",
+      entityId: quoteId,
+      action: "quote.approved",
+      metadata: {
+        number: formatQuoteNumber(quote.number),
+        title: quote.title,
+        origem: "equipe",
+      },
+    });
+
+    // O cliente é avisado que o pedido dele foi aprovado
+    const clients = await clientUsersOfCompany(quote.companyId);
+    await notifyUsers(clients, {
+      type: "quote.approved",
+      title: `Pedido de orçamento ${formatQuoteNumber(quote.number)} aprovado`,
+      body: `Seu pedido "${quote.title}" foi aprovado pela equipe no valor de ${formatCurrency(quote.totalCents)}. O projeto já está sendo iniciado.`,
+      href: `/portal/orcamentos/${quoteId}`,
+    });
+
+    // Automação best-effort (projeto + equipe + cobrança): nunca derruba
+    // a aprovação — em falha, a equipe é avisada para concluir manualmente
+    try {
+      await automateApprovedQuote(quoteId);
+    } catch (error) {
+      console.error(`Automação do orçamento ${quoteId} falhou:`, error);
+    }
+
+    revalidateQuote(quoteId, quote.companyId);
+    return { success: true, id: quoteId };
   } catch (error) {
     return actionError(error);
   }

@@ -6,6 +6,7 @@ import { notFound } from "next/navigation";
 import { ChargeStatusChip, QuoteStatusChip } from "@/components/chips";
 import { ChargeFromQuoteButton } from "@/components/finance/charge-from-quote-button";
 import {
+  ApproveRequestButton,
   CopyPublicLinkButton,
   CreateProjectButton,
   DeleteQuoteButton,
@@ -104,6 +105,9 @@ export default async function QuoteDetailPage({
       </div>
 
       <div className="flex flex-wrap gap-2">
+        {quote.status === "requested" && (
+          <ApproveRequestButton quoteId={quote.id} quoteNumber={number} />
+        )}
         {(quote.status === "draft" || quote.status === "requested") && (
           <>
             <SendQuoteButton quoteId={quote.id} quoteNumber={number} />

@@ -197,6 +197,7 @@ export type QuoteRequestableService = {
   id: string;
   name: string;
   description: string | null;
+  defaultValueCents: number | null;
 };
 
 /**
@@ -212,6 +213,7 @@ export async function listQuoteRequestableServices(): Promise<
       id: services.id,
       name: services.name,
       description: services.description,
+      defaultValueCents: services.defaultValueCents,
     })
     .from(services)
     .where(
