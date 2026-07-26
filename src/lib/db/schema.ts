@@ -403,6 +403,8 @@ export const projectTemplateMilestones = pgTable(
       .references(() => projectTemplates.id, { onDelete: "cascade" }),
     name: varchar("name", { length: 160 }).notNull(),
     description: text("description"),
+    // dias após o início do projeto para o vencimento da etapa
+    dueInDays: integer("due_in_days"),
     position: integer("position").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -424,6 +426,8 @@ export const projectTemplateTasks = pgTable(
     description: text("description"),
     priority: priorityEnum("priority").notNull().default("media"),
     visibleToClient: boolean("visible_to_client").notNull().default(true),
+    // dias após o início do projeto para o vencimento da tarefa
+    dueInDays: integer("due_in_days"),
     position: integer("position").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()

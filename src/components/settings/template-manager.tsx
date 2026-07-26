@@ -56,11 +56,15 @@ type TaskDraft = {
   description: string;
   priority: (typeof priorities)[number];
   visibleToClient: boolean;
+  /** Prazo em dias após o início do projeto (string vazia = sem prazo). */
+  dueInDays: string;
 };
 
 type MilestoneDraft = {
   key: string;
   name: string;
+  /** Prazo em dias após o início do projeto (string vazia = sem prazo). */
+  dueInDays: string;
   tasks: TaskDraft[];
 };
 
@@ -74,12 +78,14 @@ function toDrafts(template: ProjectTemplateItem): MilestoneDraft[] {
   return template.milestones.map((m) => ({
     key: nextKey(),
     name: m.name,
+    dueInDays: m.dueInDays?.toString() ?? "",
     tasks: m.tasks.map((t) => ({
       key: nextKey(),
       title: t.title,
       description: t.description ?? "",
       priority: t.priority,
       visibleToClient: t.visibleToClient,
+      dueInDays: t.dueInDays?.toString() ?? "",
     })),
   }));
 }
@@ -227,7 +233,7 @@ function TemplateEditorDialog({
   const [name, setName] = useState(template?.name ?? "");
   const [description, setDescription] = useState(template?.description ?? "");
   const [milestones, setMilestones] = useState<MilestoneDraft[]>(() =>
-    template ? toDrafts(template) : [{ key: nextKey(), name: "", tasks: [] }],
+    template ? toDrafts(template) : [{ key: nextKey(), name: "", dueInDays: "", tasks: [] }],
   );
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -247,11 +253,13 @@ function TemplateEditorDialog({
         milestones: milestones.map((m) => ({
           name: m.name,
           description: "",
+          dueInDays: m.dueInDays,
           tasks: m.tasks.map((t) => ({
             title: t.title,
             description: t.description,
             priority: t.priority,
             visibleToClient: t.visibleToClient,
+            dueInDays: t.dueInDays,
           })),
         })),
       });
@@ -302,6 +310,10 @@ function TemplateEditorDialog({
 
           <div className="space-y-3">
             <Label>Etapas do modelo *</Label>
+            <p className="text-xs text-muted-foreground">
+              Os prazos são opcionais e contam em dias corridos a partir do
+              início do projeto (ex.: 7 = vence 7 dias após o início).
+            </p>
             {milestones.map((milestone, mi) => (
               <div
                 key={milestone.key}
@@ -316,6 +328,18 @@ function TemplateEditorDialog({
                     value={milestone.name}
                     onChange={(e) =>
                       updateMilestone(mi, { name: e.target.value })
+                    }
+                  />
+                  <Input
+                    type="number"
+                    min={0}
+                    className="w-24 shrink-0"
+                    placeholder="Dias"
+                    title="Prazo da etapa, em dias corridos após o início do projeto (vazio = sem prazo)"
+                    aria-label="Prazo da etapa em dias"
+                    value={milestone.dueInDays}
+                    onChange={(e) =>
+                      updateMilestone(mi, { dueInDays: e.target.value })
                     }
                   />
                   <Button
@@ -461,19 +485,39 @@ function TemplateEditorDialog({
                           <X className="size-4" />
                         </Button>
                       </div>
-                      <Input
-                        placeholder="Descrição da tarefa (opcional)"
-                        value={task.description}
-                        onChange={(e) =>
-                          updateMilestone(mi, {
-                            tasks: milestone.tasks.map((t, i) =>
-                              i === ti
-                                ? { ...t, description: e.target.value }
-                                : t,
-                            ),
-                          })
-                        }
-                      />
+                      <div className="flex items-center gap-2">
+                        <Input
+                          placeholder="Descrição da tarefa (opcional)"
+                          value={task.description}
+                          onChange={(e) =>
+                            updateMilestone(mi, {
+                              tasks: milestone.tasks.map((t, i) =>
+                                i === ti
+                                  ? { ...t, description: e.target.value }
+                                  : t,
+                              ),
+                            })
+                          }
+                        />
+                        <Input
+                          type="number"
+                          min={0}
+                          className="w-24 shrink-0"
+                          placeholder="Dias"
+                          title="Prazo da tarefa, em dias corridos após o início do projeto (vazio = sem prazo)"
+                          aria-label="Prazo da tarefa em dias"
+                          value={task.dueInDays}
+                          onChange={(e) =>
+                            updateMilestone(mi, {
+                              tasks: milestone.tasks.map((t, i) =>
+                                i === ti
+                                  ? { ...t, dueInDays: e.target.value }
+                                  : t,
+                              ),
+                            })
+                          }
+                        />
+                      </div>
                     </div>
                   ))}
                   <Button
@@ -489,6 +533,7 @@ function TemplateEditorDialog({
                             description: "",
                             priority: "media",
                             visibleToClient: true,
+                            dueInDays: "",
                           },
                         ],
                       })
@@ -506,7 +551,7 @@ function TemplateEditorDialog({
               onClick={() =>
                 setMilestones((prev) => [
                   ...prev,
-                  { key: nextKey(), name: "", tasks: [] },
+                  { key: nextKey(), name: "", dueInDays: "", tasks: [] },
                 ])
               }
             >

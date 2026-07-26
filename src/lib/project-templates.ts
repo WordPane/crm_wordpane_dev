@@ -1,3 +1,4 @@
+import { addDays, format, parseISO } from "date-fns";
 import { asc, eq, inArray, max } from "drizzle-orm";
 
 import { logActivity } from "@/lib/activities";
@@ -11,13 +12,17 @@ import {
   tasks,
   taskStatuses,
 } from "@/lib/db/schema";
+import { businessToday } from "@/lib/utils/format";
 
 /**
  * Núcleo de `applyProjectTemplate` SEM auth: copia as etapas do modelo para
  * o projeto (ao final das existentes) e suas tarefas (1º status ativo, sem
- * responsável/prazo, origem "interna"). `createdBy` é o autor registrado nas
- * tarefas e no log — null quando a materialização partiu do sistema
- * (automação de orçamento aprovado via link público).
+ * responsável, origem "interna"). O prazo relativo do modelo (`dueInDays`,
+ * em dias corridos) vira `dueDate` real contada a partir do `startDate` do
+ * projeto — ou de hoje, quando o projeto não tem data de início.
+ * `createdBy` é o autor registrado nas tarefas e no log — null quando a
+ * materialização partiu do sistema (automação de orçamento aprovado via
+ * link público).
  */
 export async function materializeProjectTemplate(
   projectId: string,
@@ -27,7 +32,11 @@ export async function materializeProjectTemplate(
   { ok: true; milestones: number; tasks: number } | { ok: false; error: string }
 > {
   const [project] = await db
-    .select({ id: projects.id, companyId: projects.companyId })
+    .select({
+      id: projects.id,
+      companyId: projects.companyId,
+      startDate: projects.startDate,
+    })
     .from(projects)
     .where(eq(projects.id, projectId))
     .limit(1);
@@ -74,6 +83,12 @@ export async function materializeProjectTemplate(
     .orderBy(asc(taskStatuses.position))
     .limit(1);
 
+  // Prazo relativo (dias corridos) vira data real a partir do início do
+  // projeto — ou de hoje, quando o projeto não tem data de início
+  const base = project.startDate ?? businessToday();
+  const toDueDate = (days: number | null): string | null =>
+    days == null ? null : format(addDays(parseISO(base), days), "yyyy-MM-dd");
+
   await db.transaction(async (tx) => {
     for (const [i, tm] of milestoneRows.entries()) {
       const [milestone] = await tx
@@ -82,6 +97,7 @@ export async function materializeProjectTemplate(
           projectId,
           name: tm.name,
           description: tm.description,
+          dueDate: toDueDate(tm.dueInDays),
           position: basePosition + i,
         })
         .returning({ id: milestones.id });
@@ -95,6 +111,7 @@ export async function materializeProjectTemplate(
             title: t.title,
             description: t.description,
             priority: t.priority,
+            dueDate: toDueDate(t.dueInDays),
             statusId: firstStatus?.id ?? null,
             origin: "interna" as const,
             visibleToClient: t.visibleToClient,

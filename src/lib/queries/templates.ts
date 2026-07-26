@@ -19,12 +19,14 @@ export type TemplateTaskItem = {
   description: string | null;
   priority: ProjectTemplateTask["priority"];
   visibleToClient: boolean;
+  dueInDays: number | null;
 };
 
 export type TemplateMilestoneItem = {
   id: string;
   name: string;
   description: string | null;
+  dueInDays: number | null;
   tasks: TemplateTaskItem[];
 };
 
@@ -66,6 +68,7 @@ export async function listProjectTemplates(
       description: t.description,
       priority: t.priority,
       visibleToClient: t.visibleToClient,
+      dueInDays: t.dueInDays,
     });
     tasksByMilestone.set(t.milestoneId, list);
   }
@@ -77,6 +80,7 @@ export async function listProjectTemplates(
       id: m.id,
       name: m.name,
       description: m.description,
+      dueInDays: m.dueInDays,
       tasks: tasksByMilestone.get(m.id) ?? [],
     });
     milestonesByTemplate.set(m.templateId, list);

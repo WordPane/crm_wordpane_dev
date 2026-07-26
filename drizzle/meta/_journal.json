@@ -183,6 +183,13 @@
       "when": 1784836606495,
       "tag": "0025_greedy_jack_power",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1784849220054,
+      "tag": "0026_motionless_daimon_hellstrom",
+      "breakpoints": true
     }
   ]
 }

@@ -11,6 +11,21 @@ const optionalText = (max: number) =>
     .optional()
     .or(z.literal(""));
 
+/**
+ * Prazo relativo opcional, em dias corridos após o início do projeto.
+ * Vem de input numérico do formulário (coerce, como em maintenance.ts);
+ * "" ou null = sem prazo.
+ */
+const optionalDueInDays = z.preprocess(
+  (value) => (value === "" || value === null ? undefined : value),
+  z.coerce
+    .number()
+    .int("Informe um número inteiro.")
+    .min(0, "Não pode ser negativo.")
+    .max(3650, "Máximo de 3650 dias.")
+    .optional(),
+);
+
 export const templateTaskSchema = z.object({
   title: z
     .string()
@@ -20,6 +35,7 @@ export const templateTaskSchema = z.object({
   description: optionalText(5000),
   priority: z.enum(priorities),
   visibleToClient: z.boolean(),
+  dueInDays: optionalDueInDays,
 });
 
 export const templateMilestoneSchema = z.object({
@@ -29,6 +45,7 @@ export const templateMilestoneSchema = z.object({
     .min(1, "Nome é obrigatório.")
     .max(160, "Máximo de 160 caracteres."),
   description: optionalText(2000),
+  dueInDays: optionalDueInDays,
   tasks: z.array(templateTaskSchema).max(100, "Máximo de 100 tarefas por etapa."),
 });
 

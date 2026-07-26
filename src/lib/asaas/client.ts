@@ -74,6 +74,17 @@ export type AsaasPayment = {
   bankSlipUrl?: string;
 };
 
+/** Detalhe completo de uma cobrança (GET /payments/{id}) — reconciliação. */
+export type AsaasPaymentDetail = AsaasPayment & {
+  externalReference?: string | null;
+  subscription?: string | null;
+  value?: number;
+  dueDate?: string;
+  description?: string;
+  billingType?: string;
+  deleted?: boolean;
+};
+
 export type AsaasSubscription = { id: string };
 
 export type AsaasPixQrCode = {
@@ -198,6 +209,18 @@ export async function createPayment(input: {
 export async function deletePayment(asaasPaymentId: string): Promise<void> {
   const settings = await requireSettings();
   await request(settings, "DELETE", `/payments/${asaasPaymentId}`);
+}
+
+/** Consulta uma cobrança pelo id (usado pela reconciliação de status). */
+export async function getPayment(
+  asaasPaymentId: string,
+): Promise<AsaasPaymentDetail> {
+  const settings = await requireSettings();
+  return request<AsaasPaymentDetail>(
+    settings,
+    "GET",
+    `/payments/${asaasPaymentId}`,
+  );
 }
 
 /**

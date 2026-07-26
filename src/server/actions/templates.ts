@@ -80,6 +80,7 @@ export async function saveProjectTemplate(
             templateId,
             name: m.name,
             description: nullIfEmpty(m.description),
+            dueInDays: m.dueInDays ?? null,
             position: mi,
           })
           .returning({ id: projectTemplateMilestones.id });
@@ -91,6 +92,7 @@ export async function saveProjectTemplate(
               description: nullIfEmpty(t.description),
               priority: t.priority,
               visibleToClient: t.visibleToClient,
+              dueInDays: t.dueInDays ?? null,
               position: ti,
             })),
           );
