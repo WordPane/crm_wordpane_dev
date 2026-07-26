@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm";
 
+import { toCrmReference } from "@/lib/asaas/external-reference";
 import { db } from "@/lib/db";
 import { companies } from "@/lib/db/schema";
 import { getAsaasSettings, type AsaasSettings } from "@/lib/asaas/settings";
@@ -200,7 +201,7 @@ export async function createPayment(input: {
   valueCents: number;
   dueDate: string; // YYYY-MM-DD
   description: string;
-  externalReference: string; // charge.id (conciliação no webhook)
+  externalReference: string; // charge.id — gravado no Asaas como "CRM-<id>"
 }): Promise<AsaasPayment> {
   const settings = await requireSettings();
   return request<AsaasPayment>(settings, "POST", "/payments", {
@@ -209,7 +210,7 @@ export async function createPayment(input: {
     value: input.valueCents / 100,
     dueDate: input.dueDate,
     description: input.description,
-    externalReference: input.externalReference,
+    externalReference: toCrmReference(input.externalReference),
   });
 }
 
@@ -271,7 +272,7 @@ export async function createSubscription(input: {
   nextDueDate: string; // YYYY-MM-DD (vencimento da 1ª cobrança)
   cycle: LocalCycle;
   description: string;
-  externalReference: string; // companyService.id
+  externalReference: string; // companyService.id/projectPlans.id — vira "CRM-<id>"
 }): Promise<AsaasSubscription> {
   const settings = await requireSettings();
   return request<AsaasSubscription>(settings, "POST", "/subscriptions", {
@@ -281,7 +282,7 @@ export async function createSubscription(input: {
     nextDueDate: input.nextDueDate,
     cycle: asaasCycle[input.cycle],
     description: input.description,
-    externalReference: input.externalReference,
+    externalReference: toCrmReference(input.externalReference),
   });
 }
 

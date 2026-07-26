@@ -1,6 +1,7 @@
 import { and, eq, ne, sql } from "drizzle-orm";
 
 import { logActivity } from "@/lib/activities";
+import { chargeIdFromReference } from "@/lib/asaas/external-reference";
 import { db } from "@/lib/db";
 import {
   charges,
@@ -54,11 +55,16 @@ const BILLING_TYPE_REVERSE: Record<string, Charge["billingType"]> = {
 
 /** Localiza a cobrança local: externalReference (charge.id) → fallback asaasPaymentId. */
 async function findCharge(payment: WebhookPayment) {
-  if (payment.externalReference) {
+  // Só consulta por id quando a referência tem formato de UUID (nossa ou
+  // legada): referências de outros sistemas da conta (ex.: "MPAY-...") — ou
+  // não-UUID em geral — quebrariam o cast do Postgres e derrubariam o
+  // webhook com 500, envenenando a fila de eventos
+  const chargeId = chargeIdFromReference(payment.externalReference);
+  if (chargeId) {
     const [charge] = await db
       .select()
       .from(charges)
-      .where(eq(charges.id, payment.externalReference))
+      .where(eq(charges.id, chargeId))
       .limit(1);
     if (charge) return charge;
   }
