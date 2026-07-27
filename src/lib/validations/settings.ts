@@ -71,6 +71,10 @@ export const brandSettingsSchema = z.object({
   /** URL http (blob), fileKey do storage local ou path estático "/brand/...". */
   logoUrl: z.string().trim().min(1, "Envie a logo.").max(500),
   faviconUrl: z.string().trim().min(1, "Envie o favicon.").max(500),
+  /** Site principal da marca — link do rodapé dos e-mails. */
+  websiteUrl: z
+    .url("Informe uma URL válida (ex.: https://www.exemplo.com).")
+    .max(255, "Máximo de 255 caracteres."),
   primaryColor: z
     .string()
     .regex(/^#[0-9a-fA-F]{6}$/, "Cor inválida (use #RRGGBB)."),

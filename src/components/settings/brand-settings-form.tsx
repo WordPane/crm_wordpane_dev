@@ -244,6 +244,18 @@ export function BrandSettingsForm({ brand }: { brand: BrandConfig }) {
             />
           </Field>
 
+          <Field
+            label="Site principal *"
+            htmlFor="brand-website"
+            error={errors.websiteUrl?.message}
+          >
+            <Input
+              id="brand-website"
+              placeholder="https://www.exemplo.com"
+              {...form.register("websiteUrl")}
+            />
+          </Field>
+
           <div className="grid gap-4 sm:grid-cols-2">
             {renderColorField("primaryColor", "Cor primária *")}
             {renderColorField("backgroundColor", "Cor de fundo *")}

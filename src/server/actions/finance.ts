@@ -292,12 +292,7 @@ export async function createCharge(input: unknown): Promise<ActionResult> {
         value: formatCurrency(valueCents),
       },
     });
-    await notifyChargeCreated(
-      data.companyId,
-      data.description,
-      valueCents,
-      data.dueDate,
-    );
+    await notifyChargeCreated(charge.id);
 
     revalidateFinance(data.companyId);
     return { success: true, id: charge.id };

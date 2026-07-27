@@ -117,12 +117,7 @@ export async function generateChargeForQuote(input: {
         quote: number,
       },
     });
-    await notifyChargeCreated(
-      quote.companyId,
-      description,
-      quote.totalCents,
-      input.dueDate,
-    );
+    await notifyChargeCreated(charge.id);
 
     return { ok: true, chargeId: charge.id };
   } catch (error) {

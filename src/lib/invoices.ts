@@ -242,11 +242,29 @@ export async function processInvoiceAuthorized(payload: {
     body: `A nota fiscal de ${formatCurrency(charge.valueCents)} foi autorizada pela prefeitura.`,
     href: "/admin/financeiro",
   });
+
+  // Cliente: e-mail com os links diretos do Asaas (PDF/XML) — sem precisar
+  // entrar no portal para baixar a nota
+  const number = payload.number != null ? String(payload.number) : null;
   await notifyUsersSafe(clients, {
     type: "invoice.authorized",
     title: `Nota fiscal disponível: ${charge.description}`,
-    body: `A nota fiscal de ${formatCurrency(charge.valueCents)} já está disponível em PDF e XML no seu portal.`,
+    body: `A nota fiscal${number ? ` nº ${number}` : ""} de ${formatCurrency(charge.valueCents)} já está disponível. Baixe o PDF ou o XML diretamente pelos links abaixo — eles também ficam guardados no seu portal.`,
     href: "/portal/financeiro",
+    rows: [
+      { label: "Serviço", value: charge.description },
+      { label: "Valor", value: formatCurrency(charge.valueCents) },
+      ...(number ? [{ label: "Número da NF", value: number }] : []),
+    ],
+    cta: payload.pdfUrl
+      ? { label: "Baixar nota fiscal (PDF)", url: payload.pdfUrl }
+      : undefined,
+    links: [
+      ...(payload.xmlUrl
+        ? [{ label: "Baixar XML da nota", url: payload.xmlUrl }]
+        : []),
+      { label: "Ver no portal", url: "/portal/financeiro" },
+    ],
   });
 }
 

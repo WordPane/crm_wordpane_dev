@@ -1,5 +1,6 @@
 import { and, eq, inArray, or, type SQL } from "drizzle-orm";
 
+import { getPixQrCode } from "@/lib/asaas/client";
 import { getBranding } from "@/lib/brand/settings";
 import { db } from "@/lib/db";
 import {
@@ -9,10 +10,13 @@ import {
   users,
   type Charge,
 } from "@/lib/db/schema";
-import { sendEmail } from "@/lib/email/mailer";
+import { sendEmail, type SendEmailQrCode } from "@/lib/email/mailer";
 import { getEmailSettings } from "@/lib/email/settings";
-import type { EmailTemplateRow } from "@/lib/email/templates";
-import { formatCurrency, formatDate } from "@/lib/utils/format";
+import type {
+  EmailTemplateCta,
+  EmailTemplateRow,
+} from "@/lib/email/templates";
+import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils/format";
 
 export type NotificationInput = {
   /** Chave do evento (ex.: comment, demand.created, quote.sent, quote.requested, project.created). */
@@ -22,6 +26,15 @@ export type NotificationInput = {
   href?: string | null;
   /** Linhas label/valor exibidas no corpo do e-mail (opcional). */
   rows?: EmailTemplateRow[];
+  /**
+   * CTA customizado do e-mail (padrão: "Ver no CRM" apontando para o href).
+   * URL absoluta ou caminho "/..." (resolvido com a appUrl).
+   */
+  cta?: EmailTemplateCta;
+  /** Links secundários do e-mail (ex.: baixar boleto, baixar XML da NF). */
+  links?: EmailTemplateCta[];
+  /** Bloco PIX do e-mail (QR anexo + copia-e-cola). */
+  qrCode?: SendEmailQrCode;
 };
 
 /** Insere notificações em lote (deduplica destinatários, ignora lista vazia). */
@@ -79,6 +92,19 @@ async function emailNotificationRecipients(
       .where(and(inArray(users.id, ids), eq(users.status, "active")));
     if (recipients.length === 0) return;
 
+    // URLs relativas ("/portal/...") viram absolutas com a appUrl configurada
+    const resolveUrl = (url: string) =>
+      url.startsWith("/") ? `${settings.appUrl}${url}` : url;
+    const cta = n.cta
+      ? { label: n.cta.label, url: resolveUrl(n.cta.url) }
+      : n.href
+        ? { label: "Ver no CRM", url: resolveUrl(n.href) }
+        : undefined;
+    const links = n.links?.map((link) => ({
+      label: link.label,
+      url: resolveUrl(link.url),
+    }));
+
     const results = await Promise.allSettled(
       recipients.map((recipient) =>
         sendEmail({
@@ -87,9 +113,9 @@ async function emailNotificationRecipients(
           title: n.title,
           intro: n.body ?? n.title,
           rows: n.rows,
-          cta: n.href
-            ? { label: "Ver no CRM", url: `${settings.appUrl}${n.href}` }
-            : undefined,
+          cta,
+          links,
+          qrCode: n.qrCode,
         }),
       ),
     );
@@ -230,50 +256,139 @@ export async function notifyTaskAssigned(input: {
   });
 }
 
-/** Notifica os usuários da empresa sobre uma nova cobrança. */
-export async function notifyChargeCreated(
-  companyId: string,
-  description: string,
-  valueCents: number,
-  dueDate: string,
-): Promise<void> {
-  const recipients = await clientUsersOfCompany(companyId);
+/** Rótulo amigável do meio de pagamento (linhas do e-mail). */
+const BILLING_TYPE_LABELS: Record<Charge["billingType"], string> = {
+  pix: "PIX",
+  boleto: "Boleto bancário",
+  credit_card: "Cartão de crédito",
+  undefined: "A escolher na página de pagamento",
+};
+
+/**
+ * Blocos de pagamento do e-mail da cobrança:
+ * - CTA com o link direto da cobrança no Asaas (invoiceUrl)
+ * - boleto → link secundário para baixar o PDF do boleto
+ * - PIX → QR Code anexo + código copia-e-cola (best-effort: se a consulta
+ *   ao Asaas falhar, o e-mail sai só com o link)
+ * - sempre um link secundário para o portal
+ */
+async function chargePaymentBlocks(charge: Charge): Promise<{
+  cta?: EmailTemplateCta;
+  links: EmailTemplateCta[];
+  qrCode?: SendEmailQrCode;
+}> {
+  let cta: EmailTemplateCta | undefined;
+  let qrCode: SendEmailQrCode | undefined;
+  const links: EmailTemplateCta[] = [];
+
+  if (charge.invoiceUrl) {
+    const label =
+      charge.billingType === "credit_card"
+        ? "Pagar com cartão"
+        : charge.billingType === "undefined"
+          ? "Pagar agora"
+          : "Abrir cobrança no Asaas";
+    cta = { label, url: charge.invoiceUrl };
+  }
+
+  if (charge.billingType === "boleto" && charge.bankSlipUrl) {
+    links.push({ label: "Baixar boleto em PDF", url: charge.bankSlipUrl });
+  }
+
+  if (charge.billingType === "pix" && charge.asaasPaymentId) {
+    try {
+      const qr = await getPixQrCode(charge.asaasPaymentId);
+      qrCode = {
+        imageBase64: qr.encodedImage,
+        payload: qr.payload,
+        note: `QR válido até ${formatDateTime(qr.expirationDate)}. Depois do pagamento, a confirmação chega em instantes.`,
+      };
+    } catch (error) {
+      console.error(
+        `QR PIX da cobrança ${charge.id} não entrou no e-mail:`,
+        error,
+      );
+    }
+  }
+
+  links.push({ label: "Acompanhar no portal", url: "/portal/financeiro" });
+
+  return { cta, links, qrCode };
+}
+
+/** Introdução do e-mail de cobrança criada, conforme o meio de pagamento. */
+function chargeCreatedIntro(charge: Charge): string {
+  const base = `Uma cobrança no valor de ${formatCurrency(charge.valueCents)} com vencimento em ${formatDate(charge.dueDate)} foi gerada para a sua empresa.`;
+  switch (charge.billingType) {
+    case "pix":
+      return `${base} Pague agora escaneando o QR Code abaixo, ou abra a cobrança no Asaas pelo botão.`;
+    case "boleto":
+      return `${base} O boleto já está disponível para download — pague pelo link abaixo ou abra a cobrança no Asaas.`;
+    case "credit_card":
+      return `${base} Pague com cartão de crédito pelo link abaixo.`;
+    default:
+      return `${base} Escolha a forma de pagamento (PIX, boleto ou cartão) na página da cobrança.`;
+  }
+}
+
+function chargeRows(charge: Charge): EmailTemplateRow[] {
+  return [
+    { label: "Descrição", value: charge.description },
+    { label: "Valor", value: formatCurrency(charge.valueCents) },
+    { label: "Vencimento", value: formatDate(charge.dueDate) },
+    { label: "Forma de pagamento", value: BILLING_TYPE_LABELS[charge.billingType] },
+  ];
+}
+
+/**
+ * Notifica os usuários da empresa sobre uma nova cobrança (notificação
+ * interna + e-mail com link direto da cobrança, boleto ou QR PIX).
+ */
+export async function notifyChargeCreated(chargeId: string): Promise<void> {
+  const [charge] = await db
+    .select()
+    .from(charges)
+    .where(eq(charges.id, chargeId))
+    .limit(1);
+  if (!charge) return;
+
+  const recipients = await clientUsersOfCompany(charge.companyId);
+  const payment = await chargePaymentBlocks(charge);
   await notifyUsers(recipients, {
     type: "charge.created",
-    title: `Nova cobrança: ${description}`,
-    body: `Uma cobrança no valor de ${formatCurrency(valueCents)} com vencimento em ${formatDate(dueDate)} foi gerada para a sua empresa.`,
+    title: `Nova cobrança: ${charge.description}`,
+    body: chargeCreatedIntro(charge),
     href: "/portal/financeiro",
-    rows: [
-      { label: "Descrição", value: description },
-      { label: "Valor", value: formatCurrency(valueCents) },
-      { label: "Vencimento", value: formatDate(dueDate) },
-    ],
+    rows: chargeRows(charge),
+    cta: payment.cta,
+    links: payment.links,
+    qrCode: payment.qrCode,
   });
 }
 
 /**
  * Lembrete de cobrança em aberto/vencida para os usuários da empresa
- * (notificação interna + e-mail com o link do portal).
+ * (notificação interna + e-mail com os mesmos blocos de pagamento).
  * Atualiza `lastReminderAt` — usado pelo lembrete diário (cron) e pelo
  * reenvio manual no financeiro.
  */
 export async function notifyChargeReminder(charge: Charge): Promise<void> {
   const overdue = charge.status === "overdue";
   const recipients = await clientUsersOfCompany(charge.companyId);
+  const payment = await chargePaymentBlocks(charge);
   await notifyUsers(recipients, {
     type: "charge.reminder",
     title: overdue
       ? `Cobrança vencida: ${charge.description}`
       : `Lembrete de cobrança: ${charge.description}`,
     body: overdue
-      ? `A cobrança de ${formatCurrency(charge.valueCents)} venceu em ${formatDate(charge.dueDate)} e ainda está em aberto. Regularize pelo portal.`
-      : `Lembramos que a cobrança de ${formatCurrency(charge.valueCents)} com vencimento em ${formatDate(charge.dueDate)} segue em aberto.`,
+      ? `A cobrança de ${formatCurrency(charge.valueCents)} venceu em ${formatDate(charge.dueDate)} e ainda está em aberto. Regularize agora pelo link abaixo${charge.billingType === "pix" ? " ou pelo QR Code PIX" : ""}.`
+      : `Lembramos que a cobrança de ${formatCurrency(charge.valueCents)} com vencimento em ${formatDate(charge.dueDate)} segue em aberto. Pague pelo link abaixo${charge.billingType === "pix" ? " ou pelo QR Code PIX" : ""}.`,
     href: "/portal/financeiro",
-    rows: [
-      { label: "Descrição", value: charge.description },
-      { label: "Valor", value: formatCurrency(charge.valueCents) },
-      { label: "Vencimento", value: formatDate(charge.dueDate) },
-    ],
+    rows: chargeRows(charge),
+    cta: payment.cta,
+    links: payment.links,
+    qrCode: payment.qrCode,
   });
 
   await db

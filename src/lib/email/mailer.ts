@@ -8,12 +8,25 @@ import {
   type EmailSettings,
 } from "@/lib/email/settings";
 import {
+  PIX_QR_CID,
   renderEmailTemplate,
   renderPlainTextFallback,
   type EmailTemplateBrand,
   type EmailTemplateCta,
+  type EmailTemplateFooter,
   type EmailTemplateRow,
 } from "@/lib/email/templates";
+import { getIssuer } from "@/lib/issuer";
+
+/** Bloco PIX do e-mail: QR em base64 (vira anexo CID) + copia-e-cola. */
+export type SendEmailQrCode = {
+  /** PNG do QR Code em base64. */
+  imageBase64: string;
+  /** Código PIX copia-e-cola. */
+  payload: string;
+  /** Observação abaixo do código (ex.: validade). */
+  note?: string;
+};
 
 export type SendEmailInput = {
   to: string;
@@ -22,6 +35,9 @@ export type SendEmailInput = {
   intro: string;
   rows?: EmailTemplateRow[];
   cta?: EmailTemplateCta;
+  /** Links secundários em texto, abaixo do CTA (ex.: baixar boleto/XML). */
+  links?: EmailTemplateCta[];
+  qrCode?: SendEmailQrCode;
 };
 
 export type SendEmailResult = { ok: true } | { ok: false; error: string };
@@ -45,9 +61,10 @@ function createTransporter(settings: EmailSettings): Transporter {
  */
 export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult> {
   try {
-    const [settings, brandConfig] = await Promise.all([
+    const [settings, brandConfig, issuer] = await Promise.all([
       getEmailSettings(),
       getBranding(),
+      getIssuer(),
     ]);
     if (!settings) {
       console.warn(`E-mail para ${input.to} não enviado: SMTP não configurado.`);
@@ -65,6 +82,15 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
       backgroundColor: colors.background,
       cardColor: colors.card,
     };
+    const footer: EmailTemplateFooter = {
+      portalUrl: settings.appUrl,
+      websiteUrl: brandConfig.websiteUrl,
+      companyName: issuer.displayName,
+      legalLine: `${issuer.razaoSocial} · CNPJ ${issuer.cnpj}`,
+      addressLine: issuer.addressLine,
+      supportEmail: issuer.email,
+      phone: issuer.phone,
+    };
 
     const transporter = createTransporter(settings);
     await transporter.sendMail({
@@ -78,6 +104,11 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
         intro: input.intro,
         rows: input.rows,
         cta: input.cta,
+        links: input.links,
+        qrCode: input.qrCode
+          ? { payload: input.qrCode.payload, note: input.qrCode.note }
+          : undefined,
+        footer,
       }),
       text: renderPlainTextFallback({
         brand,
@@ -85,7 +116,24 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
         intro: input.intro,
         rows: input.rows,
         cta: input.cta,
+        links: input.links,
+        qrCode: input.qrCode
+          ? { payload: input.qrCode.payload, note: input.qrCode.note }
+          : undefined,
+        footer,
       }),
+      // QR PIX: anexo referenciado pelo <img src="cid:..."> do HTML
+      // (data URI em base64 é bloqueado pelo Gmail/Outlook)
+      attachments: input.qrCode
+        ? [
+            {
+              filename: "qrcode-pix.png",
+              content: input.qrCode.imageBase64,
+              encoding: "base64",
+              cid: PIX_QR_CID,
+            },
+          ]
+        : undefined,
     });
 
     return { ok: true };

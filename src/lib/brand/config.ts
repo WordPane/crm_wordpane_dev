@@ -9,6 +9,8 @@ export type BrandConfig = {
   /** URL http (blob), fileKey do storage local ou path estático "/brand/...". */
   logoUrl: string;
   faviconUrl: string;
+  /** Site principal da marca — link do rodapé dos e-mails. */
+  websiteUrl: string;
   /** #RRGGBB */
   primaryColor: string;
   backgroundColor: string;
@@ -19,6 +21,7 @@ export const DEFAULT_BRAND: BrandConfig = {
   appName: "WordPane CRM",
   logoUrl: "/brand/logo-white.png",
   faviconUrl: "/brand/favicon.png",
+  websiteUrl: "https://www.wordpane.dev",
   primaryColor: "#00d164",
   backgroundColor: "#071928",
 };
