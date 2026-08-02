@@ -24,15 +24,15 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
     theme_color: brand.primaryColor,
     icons: [
       {
-        src: "/api/brand/icon",
+        src: "/brand/icon-512.png",
         sizes: "512x512",
-        type: "image/svg+xml",
+        type: "image/png",
         purpose: "any",
       },
       {
-        src: "/api/brand/icon",
+        src: "/brand/icon-512.png",
         sizes: "512x512",
-        type: "image/svg+xml",
+        type: "image/png",
         purpose: "maskable",
       },
       {

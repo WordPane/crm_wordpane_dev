@@ -84,11 +84,15 @@ export type DashboardUpload = {
 
 export type DashboardComment = {
   id: string;
-  excerpt: string;
+  body: string;
   createdAt: Date;
   authorName: string | null;
   taskTitle: string;
   href: string;
+  /** Nomes dos usuários mencionados com @. */
+  mentionNames: string[];
+  /** Tarefas mencionadas com # (para links no resumo). */
+  taskMentions: { id: string; title: string }[];
 };
 
 /** Receita mensal (cobranças pagas) para o gráfico da dashboard. */
@@ -535,7 +539,7 @@ async function listRecentUploads(
   }));
 }
 
-/** Últimos 8 comentários do escopo, com autor e tarefa. */
+/** Últimos 8 comentários do escopo, com autor, tarefa e menções resolvidas. */
 async function listRecentComments(
   scope: ProjectScope,
 ): Promise<DashboardComment[]> {
@@ -543,6 +547,8 @@ async function listRecentComments(
     .select({
       id: comments.id,
       body: comments.body,
+      mentions: comments.mentions,
+      taskMentions: comments.taskMentions,
       createdAt: comments.createdAt,
       authorName: users.name,
       taskId: tasks.id,
@@ -563,12 +569,38 @@ async function listRecentComments(
     .orderBy(desc(comments.createdAt))
     .limit(8);
 
+  const mentionIds = [...new Set(rows.flatMap((r) => r.mentions ?? []))];
+  const mentionNames = new Map<string, string>();
+  if (mentionIds.length > 0) {
+    const mentioned = await db
+      .select({ id: users.id, name: users.name })
+      .from(users)
+      .where(inArray(users.id, mentionIds));
+    for (const u of mentioned) mentionNames.set(u.id, u.name);
+  }
+
+  const taskMentionIds = [...new Set(rows.flatMap((r) => r.taskMentions ?? []))];
+  const taskMentionTitles = new Map<string, string>();
+  if (taskMentionIds.length > 0) {
+    const mentionedTasks = await db
+      .select({ id: tasks.id, title: tasks.title })
+      .from(tasks)
+      .where(inArray(tasks.id, taskMentionIds));
+    for (const t of mentionedTasks) taskMentionTitles.set(t.id, t.title);
+  }
+
   return rows.map((r) => ({
     id: r.id,
-    excerpt: r.body.slice(0, 140),
+    body: r.body,
     createdAt: r.createdAt,
     authorName: r.authorName,
     taskTitle: r.taskTitle,
     href: `/admin/tarefas/${r.taskId}`,
+    mentionNames: (r.mentions ?? [])
+      .map((id) => mentionNames.get(id))
+      .filter((name): name is string => Boolean(name)),
+    taskMentions: (r.taskMentions ?? [])
+      .map((id) => ({ id, title: taskMentionTitles.get(id) ?? "Tarefa" }))
+      .filter((t) => t.title),
   }));
 }

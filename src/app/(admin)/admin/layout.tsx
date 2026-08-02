@@ -59,7 +59,10 @@ export default async function AdminLayout({
         <div className="flex min-h-screen flex-col lg:pl-60">
           <header
             className="glass sticky top-0 z-30 flex min-h-16 items-center justify-between gap-3 border-b border-border px-4 lg:justify-end lg:px-6"
-            style={{ paddingTop: "env(safe-area-inset-top)" }}
+            style={{
+              paddingTop: "env(safe-area-inset-top)",
+              minHeight: "calc(4rem + env(safe-area-inset-top))",
+            }}
           >
             <MobileMenuButton />
             <div className="flex items-center gap-3">

@@ -15,6 +15,7 @@ import {
 import Link from "next/link";
 
 import { ActivityTimeline } from "@/components/activities/activity-timeline";
+import { CommentExcerpt } from "@/components/dashboard/comment-excerpt";
 import { RevenueChart } from "@/components/dashboard/revenue-chart";
 import {
   Card,
@@ -438,9 +439,13 @@ export default async function AdminDashboardPage() {
                           {comment.taskTitle}
                         </Link>
                       </p>
-                      <p className="mt-0.5 line-clamp-2 text-sm text-muted-foreground">
-                        {comment.excerpt}
-                      </p>
+                      <div className="mt-0.5">
+                        <CommentExcerpt
+                          body={comment.body}
+                          mentionNames={comment.mentionNames}
+                          taskMentions={comment.taskMentions}
+                        />
+                      </div>
                       <p className="mt-1 text-xs text-muted-foreground/70">
                         {timeAgo(comment.createdAt)}
                       </p>
