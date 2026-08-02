@@ -211,6 +211,48 @@
       "when": 1785067599821,
       "tag": "0029_rich_wendigo",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1785627783869,
+      "tag": "0030_busy_magneto",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1785629732445,
+      "tag": "0031_absent_patriot",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1785630171577,
+      "tag": "0032_dear_mysterio",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1785630666816,
+      "tag": "0033_rapid_kingpin",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1785631063000,
+      "tag": "0034_rapid_kingpin_idx",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1785631316525,
+      "tag": "0035_fixed_ben_grimm",
+      "breakpoints": true
     }
   ]
 }

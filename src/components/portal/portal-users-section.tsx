@@ -100,68 +100,70 @@ export function PortalUsersSection({
               </p>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead>Nome</TableHead>
-                  <TableHead>E-mail</TableHead>
-                  <TableHead>Cargo</TableHead>
-                  <TableHead>Telefone</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="w-10" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {users.map((u) => (
-                  <TableRow key={u.id}>
-                    <TableCell className="font-medium">
-                      <span className="flex items-center gap-2">
-                        {u.name}
-                        {u.isCompanyAdmin && <CompanyAdminChip />}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {u.email}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {u.position ?? "—"}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {u.phone ?? "—"}
-                    </TableCell>
-                    <TableCell>
-                      <UserStatusChip status={u.status} />
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger
-                          render={
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              aria-label="Ações"
-                            />
-                          }
-                        >
-                          <MoreHorizontal className="size-4" />
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={() => {
-                              setEditing(u);
-                              setDialogOpen(true);
-                            }}
-                          >
-                            <Pencil />
-                            Editar
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
+            <div className="overflow-x-auto">
+              <Table className="min-w-[48rem]">
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="whitespace-nowrap pl-4">Nome</TableHead>
+                    <TableHead className="whitespace-nowrap">E-mail</TableHead>
+                    <TableHead className="whitespace-nowrap">Cargo</TableHead>
+                    <TableHead className="whitespace-nowrap">Telefone</TableHead>
+                    <TableHead className="whitespace-nowrap">Status</TableHead>
+                    <TableHead className="w-10 whitespace-nowrap pr-4" />
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {users.map((u) => (
+                    <TableRow key={u.id}>
+                      <TableCell className="whitespace-nowrap pl-4 font-medium">
+                        <span className="flex items-center gap-2">
+                          {u.name}
+                          {u.isCompanyAdmin && <CompanyAdminChip />}
+                        </span>
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-muted-foreground">
+                        {u.email}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-muted-foreground">
+                        {u.position ?? "—"}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-muted-foreground">
+                        {u.phone ?? "—"}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        <UserStatusChip status={u.status} />
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap pr-4">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger
+                            render={
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                aria-label="Ações"
+                              />
+                            }
+                          >
+                            <MoreHorizontal className="size-4" />
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setEditing(u);
+                                setDialogOpen(true);
+                              }}
+                            >
+                              <Pencil />
+                              Editar
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>

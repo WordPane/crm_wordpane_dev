@@ -21,10 +21,42 @@ export type ActivityItem = {
   action: string;
   entityType: string;
   entityId: string | null;
+  projectId: string | null;
   metadata: Record<string, unknown> | null;
   createdAt: Date;
   actor: { id: string; name: string; role: User["role"] } | null;
+  /** Link direto para a tarefa quando a atividade menciona uma tarefa. */
+  href?: string;
+  /** Link direto para a etapa quando a atividade menciona uma etapa. */
+  milestoneHref?: string;
 };
+
+/** Gera o link de admin para uma atividade que menciona tarefa. */
+export function activityHref(activity: Pick<ActivityItem, "action" | "entityType" | "entityId" | "metadata">): string | undefined {
+  if (activity.entityType === "task" && activity.entityId) {
+    return `/admin/tarefas/${activity.entityId}`;
+  }
+  const m = activity.metadata ?? {};
+  const taskId = typeof m.taskId === "string" ? m.taskId : undefined;
+  if (!taskId) return undefined;
+  if (
+    activity.action === "comment.added" ||
+    activity.action === "upload.added" ||
+    activity.action === "demand.converted"
+  ) {
+    return `/admin/tarefas/${taskId}`;
+  }
+  return undefined;
+}
+
+/** Gera o link de admin para uma atividade que menciona uma etapa. */
+export function activityMilestoneHref(
+  activity: Pick<ActivityItem, "projectId" | "metadata">,
+): string | undefined {
+  const projectId = activity.projectId;
+  if (!projectId) return undefined;
+  return `/admin/projetos/${projectId}?tab=etapas`;
+}
 
 /** Atividades do projeto (mais recentes primeiro, limite 100) — lança ForbiddenError fora do escopo. */
 export async function listProjectActivities(
@@ -110,6 +142,7 @@ async function listByCondition(condition: SQL): Promise<ActivityItem[]> {
       action: activities.action,
       entityType: activities.entityType,
       entityId: activities.entityId,
+      projectId: activities.projectId,
       metadata: activities.metadata,
       createdAt: activities.createdAt,
       actorId: users.id,
@@ -122,15 +155,23 @@ async function listByCondition(condition: SQL): Promise<ActivityItem[]> {
     .orderBy(desc(activities.createdAt))
     .limit(100);
 
-  return rows.map((r) => ({
-    id: r.id,
-    action: r.action,
-    entityType: r.entityType,
-    entityId: r.entityId,
-    metadata: (r.metadata as Record<string, unknown> | null) ?? null,
-    createdAt: r.createdAt,
-    actor: r.actorId
-      ? { id: r.actorId, name: r.actorName!, role: r.actorRole! }
-      : null,
-  }));
+  return rows.map((r) => {
+    const item: ActivityItem = {
+      id: r.id,
+      action: r.action,
+      entityType: r.entityType,
+      entityId: r.entityId,
+      projectId: r.projectId,
+      metadata: (r.metadata as Record<string, unknown> | null) ?? null,
+      createdAt: r.createdAt,
+      actor: r.actorId
+        ? { id: r.actorId, name: r.actorName!, role: r.actorRole! }
+        : null,
+    };
+    const href = activityHref(item);
+    if (href) item.href = href;
+    const milestoneHref = activityMilestoneHref(item);
+    if (milestoneHref) item.milestoneHref = milestoneHref;
+    return item;
+  });
 }

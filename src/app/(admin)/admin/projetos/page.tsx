@@ -4,11 +4,15 @@ import Link from "next/link";
 
 import { ProjectFilters } from "@/components/projects/project-filters";
 import { ProjectsTable } from "@/components/projects/projects-table";
+import { SavedViews } from "@/components/tasks/saved-views";
+import { ExportCsvButton } from "@/components/reports/export-csv-button";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { requireTeam, requireUser } from "@/lib/access/permissions";
 import { listCompanies } from "@/lib/queries/companies";
 import { listActiveProjectStatuses, listProjects } from "@/lib/queries/projects";
+import { listCurrentUserSavedViews } from "@/lib/queries/saved-views";
+import { exportProjectsCsv } from "@/server/actions/reports";
 
 export const metadata: Metadata = { title: "Projetos" };
 
@@ -23,6 +27,7 @@ export default async function ProjectsPage({
     q?: string | string[];
     status?: string | string[];
     empresa?: string | string[];
+    concluidas?: string | string[];
   }>;
 }) {
   const user = await requireUser();
@@ -32,11 +37,13 @@ export default async function ProjectsPage({
   const search = first(params.q);
   const statusId = first(params.status);
   const companyId = first(params.empresa);
+  const showDone = first(params.concluidas) === "sim";
 
-  const [items, statuses, companies] = await Promise.all([
-    listProjects(user, { search, statusId, companyId }),
+  const [items, statuses, companies, savedViews] = await Promise.all([
+    listProjects(user, { search, statusId, companyId, hideCompleted: !showDone }),
     listActiveProjectStatuses(user),
     listCompanies(user),
+    listCurrentUserSavedViews("projetos"),
   ]);
 
   const companyOptions = companies.map((c) => ({
@@ -57,16 +64,28 @@ export default async function ProjectsPage({
             {search && <> para &ldquo;{search}&rdquo;</>}
           </p>
         </div>
-        <Button render={<Link href="/admin/projetos/novo" />}>
-          <Plus />
-          Novo projeto
-        </Button>
+        <div className="flex items-center gap-2">
+          <ExportCsvButton
+            filename="projetos.csv"
+            action={exportProjectsCsv}
+            label="Exportar CSV"
+          />
+          <Button render={<Link href="/admin/projetos/novo" />}>
+            <Plus />
+            Novo projeto
+          </Button>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <SavedViews entity="projetos" views={savedViews} />
       </div>
 
       <ProjectFilters
         search={search}
         statusId={statusId}
         companyId={companyId}
+        showDone={showDone}
         statuses={statuses}
         companies={companyOptions}
       />

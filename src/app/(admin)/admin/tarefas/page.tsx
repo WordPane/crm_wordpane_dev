@@ -2,17 +2,11 @@ import type { Metadata } from "next";
 import { CalendarClock, CalendarDays, ListChecks, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 
-import { PriorityChip, StatusColorChip } from "@/components/chips";
+import { SavedViews } from "@/components/tasks/saved-views";
 import { TaskFilters } from "@/components/tasks/task-filters";
+import { TasksTable } from "@/components/tasks/tasks-table";
+import { ExportCsvButton } from "@/components/reports/export-csv-button";
 import { Card, CardContent } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { requireTeam, requireUser } from "@/lib/access/permissions";
 import { listProjects } from "@/lib/queries/projects";
 import {
@@ -21,7 +15,9 @@ import {
   listTasks,
   type TaskDueFilter,
 } from "@/lib/queries/tasks";
-import { formatDate, isOverdue } from "@/lib/utils/format";
+import { listCurrentUserSavedViews } from "@/lib/queries/saved-views";
+import { listTeamSelectOptions } from "@/lib/queries/team";
+import { exportTasksCsv } from "@/server/actions/reports";
 import { cn } from "@/lib/utils";
 import { priorities } from "@/lib/validations/project";
 import type { Task } from "@/lib/db/schema";
@@ -36,6 +32,7 @@ export default async function TasksPage({
   searchParams,
 }: {
   searchParams: Promise<{
+    q?: string | string[];
     status?: string | string[];
     prioridade?: string | string[];
     projeto?: string | string[];
@@ -47,11 +44,12 @@ export default async function TasksPage({
   requireTeam(user);
 
   const params = await searchParams;
+  const search = first(params.q);
   const statusId = first(params.status);
   const priorityParam = first(params.prioridade);
   const projectId = first(params.projeto);
   const dueParam = first(params.vencimento);
-  const showDone = first(params.concluidas) !== "nao";
+  const showDone = first(params.concluidas) === "sim";
   const priority = (priorities as readonly string[]).includes(priorityParam)
     ? (priorityParam as Task["priority"])
     : "";
@@ -61,18 +59,22 @@ export default async function TasksPage({
     ? (dueParam as TaskDueFilter)
     : "";
 
-  const [items, statuses, projects, summary] = await Promise.all([
-    listTasks(user, {
-      statusId,
-      priority: priority || undefined,
-      projectId,
-      hideCompleted: !showDone,
-      due: due || undefined,
-    }),
-    listActiveTaskStatuses(user),
-    listProjects(user),
-    getTaskSummary(user),
-  ]);
+  const [items, statuses, projects, teamUsers, summary, savedViews] =
+    await Promise.all([
+      listTasks(user, {
+        search,
+        statusId,
+        priority: priority || undefined,
+        projectId,
+        hideCompleted: !showDone,
+        due: due || undefined,
+      }),
+      listActiveTaskStatuses(user),
+      listProjects(user),
+      listTeamSelectOptions(user),
+      getTaskSummary(user),
+      listCurrentUserSavedViews("tarefas"),
+    ]);
 
   /** Monta a URL da listagem preservando os filtros atuais e trocando `overrides`. */
   function tasksHref(overrides: Record<string, string>): string {
@@ -128,12 +130,19 @@ export default async function TasksPage({
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-extrabold">Tarefas</h1>
-        <p className="text-sm text-muted-foreground">
-          {items.length}{" "}
-          {items.length === 1 ? "tarefa encontrada" : "tarefas encontradas"}
-        </p>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-extrabold">Tarefas</h1>
+          <p className="text-sm text-muted-foreground">
+            {items.length}{" "}
+            {items.length === 1 ? "tarefa encontrada" : "tarefas encontradas"}
+          </p>
+        </div>
+        <ExportCsvButton
+          filename="tarefas.csv"
+          action={exportTasksCsv}
+          label="Exportar CSV"
+        />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -171,7 +180,12 @@ export default async function TasksPage({
         ))}
       </div>
 
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <SavedViews entity="tarefas" views={savedViews} />
+      </div>
+
       <TaskFilters
+        search={search}
         statusId={statusId}
         priority={priority}
         projectId={projectId}
@@ -194,79 +208,11 @@ export default async function TasksPage({
           </CardContent>
         </Card>
       ) : (
-        <div className="overflow-hidden rounded-xl bg-card ring-1 ring-foreground/10 [&_td:first-child]:pl-4 [&_td:last-child]:pr-4 [&_th:first-child]:pl-4 [&_th:last-child]:pr-4">
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead>Tarefa</TableHead>
-                <TableHead>Projeto</TableHead>
-                <TableHead>Empresa</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Prioridade</TableHead>
-                <TableHead>Responsável</TableHead>
-                <TableHead>Prazo</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {items.map((t) => {
-                const overdue = !t.completedAt && isOverdue(t.dueDate);
-                return (
-                  <TableRow key={t.id}>
-                    <TableCell>
-                      <Link
-                        href={`/admin/tarefas/${t.id}`}
-                        className="font-medium text-foreground transition-colors hover:text-primary"
-                      >
-                        {t.title}
-                      </Link>
-                    </TableCell>
-                    <TableCell>
-                      <Link
-                        href={`/admin/projetos/${t.projectId}`}
-                        className="text-muted-foreground transition-colors hover:text-foreground"
-                      >
-                        {t.projectName}
-                      </Link>
-                    </TableCell>
-                    <TableCell>
-                      <Link
-                        href={`/admin/clientes/${t.companyId}`}
-                        className="text-muted-foreground transition-colors hover:text-foreground"
-                      >
-                        {t.companyName}
-                      </Link>
-                    </TableCell>
-                    <TableCell>
-                      {t.status ? (
-                        <StatusColorChip
-                          name={t.status.name}
-                          color={t.status.color}
-                        />
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <PriorityChip priority={t.priority} />
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {t.ownerName ?? "—"}
-                    </TableCell>
-                    <TableCell
-                      className={cn(
-                        overdue
-                          ? "font-medium text-red-300"
-                          : "text-muted-foreground",
-                      )}
-                    >
-                      {formatDate(t.dueDate)}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
+        <TasksTable
+          items={items}
+          statuses={statuses}
+          teamUsers={teamUsers.map((u) => ({ id: u.id, name: u.name }))}
+        />
       )}
     </div>
   );

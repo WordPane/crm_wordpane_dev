@@ -10,6 +10,7 @@ import { users } from "@/lib/db/schema";
 import { getStorage } from "@/lib/storage";
 import { portalAvatarSchema } from "@/lib/validations/portal";
 import {
+  notificationSettingsSchema,
   passwordChangeSchema,
   profileNameSchema,
 } from "@/lib/validations/profile";
@@ -76,6 +77,30 @@ export async function updatePopupPreference(
     await db
       .update(users)
       .set({ notifyPopup: enabled === true, updatedAt: new Date() })
+      .where(eq(users.id, user.id));
+
+    revalidatePath("/admin/perfil");
+    revalidatePath("/portal/perfil");
+    return { success: true };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+/** Salva as preferências de notificação do usuário. */
+export async function updateNotificationSettings(
+  input: unknown,
+): Promise<ActionResult> {
+  try {
+    const user = await requireUser();
+    const data = notificationSettingsSchema.parse(input);
+
+    await db
+      .update(users)
+      .set({
+        notificationSettings: data,
+        updatedAt: new Date(),
+      })
       .where(eq(users.id, user.id));
 
     revalidatePath("/admin/perfil");

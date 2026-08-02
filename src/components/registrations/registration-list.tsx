@@ -80,63 +80,64 @@ export function RegistrationList({
   return (
     <>
       <div className="overflow-hidden rounded-xl bg-card ring-1 ring-foreground/10 [&_td:first-child]:pl-4 [&_td:last-child]:pr-4 [&_th:first-child]:pl-4 [&_th:last-child]:pr-4">
-        <Table>
-          <TableHeader>
-            <TableRow className="hover:bg-transparent">
-              <TableHead>Empresa</TableHead>
-              <TableHead>Responsável</TableHead>
-              <TableHead>E-mail</TableHead>
-              <TableHead>Cidade/UF</TableHead>
-              <TableHead>Data</TableHead>
-              <TableHead>Status</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {registrations.map((registration) => {
-              const expanded = expandedId === registration.id;
-              const companyName =
-                registration.nomeFantasia || registration.razaoSocial;
-              const location = [registration.cidade, registration.estado]
-                .filter(Boolean)
-                .join("/");
-              return [
-                <TableRow
-                  key={registration.id}
-                  className="cursor-pointer"
-                  onClick={() =>
-                    setExpandedId(expanded ? null : registration.id)
-                  }
-                >
-                  <TableCell>
-                    <span className="inline-flex items-center gap-1.5 font-medium text-foreground">
-                      <ChevronDown
-                        className={cn(
-                          "size-3.5 text-muted-foreground transition-transform",
-                          !expanded && "-rotate-90",
-                        )}
-                      />
-                      {companyName}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {registration.userName}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {registration.userEmail}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {location || "—"}
-                  </TableCell>
-                  <TableCell
-                    className="text-muted-foreground"
-                    title={formatDateTime(registration.createdAt)}
+        <div className="overflow-x-auto">
+          <Table className="min-w-[48rem]">
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="whitespace-nowrap">Empresa</TableHead>
+                <TableHead className="whitespace-nowrap">Responsável</TableHead>
+                <TableHead className="whitespace-nowrap">E-mail</TableHead>
+                <TableHead className="whitespace-nowrap">Cidade/UF</TableHead>
+                <TableHead className="whitespace-nowrap">Data</TableHead>
+                <TableHead className="whitespace-nowrap">Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {registrations.map((registration) => {
+                const expanded = expandedId === registration.id;
+                const companyName =
+                  registration.nomeFantasia || registration.razaoSocial;
+                const location = [registration.cidade, registration.estado]
+                  .filter(Boolean)
+                  .join("/");
+                return [
+                  <TableRow
+                    key={registration.id}
+                    className="cursor-pointer"
+                    onClick={() =>
+                      setExpandedId(expanded ? null : registration.id)
+                    }
                   >
-                    {timeAgo(registration.createdAt)}
-                  </TableCell>
-                  <TableCell>
-                    <RegistrationStatusChip status={registration.status} />
-                  </TableCell>
-                </TableRow>,
+                    <TableCell className="whitespace-nowrap">
+                      <span className="inline-flex items-center gap-1.5 font-medium text-foreground">
+                        <ChevronDown
+                          className={cn(
+                            "size-3.5 text-muted-foreground transition-transform",
+                            !expanded && "-rotate-90",
+                          )}
+                        />
+                        {companyName}
+                    </span>
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-muted-foreground">
+                      {registration.userName}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-muted-foreground">
+                      {registration.userEmail}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-muted-foreground">
+                      {location || "—"}
+                    </TableCell>
+                    <TableCell
+                      className="whitespace-nowrap text-muted-foreground"
+                      title={formatDateTime(registration.createdAt)}
+                    >
+                      {timeAgo(registration.createdAt)}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      <RegistrationStatusChip status={registration.status} />
+                    </TableCell>
+                  </TableRow>,
                 expanded ? (
                   <TableRow
                     key={`${registration.id}-detail`}
@@ -289,8 +290,9 @@ export function RegistrationList({
           </TableBody>
         </Table>
       </div>
+    </div>
 
-      <ConfirmDialog
+    <ConfirmDialog
         open={approving !== null}
         onOpenChange={(open) => {
           if (!open) setApproving(null);

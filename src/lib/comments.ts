@@ -51,6 +51,8 @@ export async function notifyCommentMentions(input: {
   taskTitle: string;
   projectId: string;
   excerpt: string;
+  /** HTML sanitizado do comentário para o corpo do e-mail. */
+  bodyHtml?: string;
   parentAuthorId: string | null;
 }): Promise<void> {
   const mentionIds = [
@@ -70,11 +72,15 @@ export async function notifyCommentMentions(input: {
     .filter((u) => u.role !== "client")
     .map((u) => u.id);
 
+  const body = input.bodyHtml?.trim() || input.excerpt;
+  const bodyIsHtml = Boolean(input.bodyHtml?.trim());
+
   if (clientIds.length > 0) {
     await notifyUsers(clientIds, {
       type: "comment.mention",
       title: `${input.authorName} mencionou você em "${input.taskTitle}"`,
-      body: input.excerpt,
+      body,
+      bodyIsHtml,
       href: `/portal/projetos/${input.projectId}/tarefas/${input.taskId}`,
     });
   }
@@ -82,7 +88,8 @@ export async function notifyCommentMentions(input: {
     await notifyUsers(teamIds, {
       type: "comment.mention",
       title: `${input.authorName} mencionou você em "${input.taskTitle}"`,
-      body: input.excerpt,
+      body,
+      bodyIsHtml,
       href: `/admin/tarefas/${input.taskId}`,
     });
   }
@@ -106,7 +113,8 @@ export async function notifyCommentMentions(input: {
       await notifyUsers([input.parentAuthorId], {
         type: "comment.reply",
         title: `${input.authorName} respondeu seu comentário em "${input.taskTitle}"`,
-        body: input.excerpt,
+        body,
+        bodyIsHtml,
         href,
       });
     }

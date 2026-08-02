@@ -12,24 +12,28 @@ export function TaskComments({
   currentUserId,
   currentUserRole,
   mentionableUsers,
+  mentionableTasks,
 }: {
   taskId: string;
   comments: CommentItem[];
   currentUserId: string;
   currentUserRole: UserRole;
   mentionableUsers: MentionableUser[];
+  mentionableTasks: { id: string; title: string }[];
 }) {
   return (
     <CommentsSection
       taskId={taskId}
       comments={comments}
       mentionableUsers={mentionableUsers}
+      mentionableTasks={mentionableTasks}
       submitAction={createComment}
       deleteAction={deleteComment}
       canDelete={(comment) =>
         comment.author?.id === currentUserId ||
         currentUserRole === "super_admin"
       }
+      taskHref={(taskId) => `/admin/tarefas/${taskId}`}
     />
   );
 }

@@ -169,6 +169,27 @@ export const companies = pgTable(
   (t) => [uniqueIndex("companies_cnpj_key").on(t.cnpj)],
 );
 
+export type NotificationChannel = "in_app" | "email" | "digest";
+
+export type NotificationSettings = {
+  /** Canais ativos por categoria. Quando omitido, usa o padrão. */
+  channels?: Partial<
+    Record<NotificationCategory, NotificationChannel[]>
+  >;
+  /** Receber e-mail digest diário em vez de imediato. */
+  digest?: boolean;
+};
+
+/** Categorias de eventos que geram notificação. */
+export type NotificationCategory =
+  | "task"
+  | "comment"
+  | "project"
+  | "demand"
+  | "quote"
+  | "charge"
+  | "system";
+
 // ─────────────────────────── Usuários ───────────────────────────
 
 export const users = pgTable(
@@ -187,6 +208,8 @@ export const users = pgTable(
     isCompanyAdmin: boolean("is_company_admin").notNull().default(false),
     // Preferência: receber popup na tela quando chega notificação nova
     notifyPopup: boolean("notify_popup").notNull().default(false),
+    /** Preferências de notificação por tipo de evento (in_app, email, digest). */
+    notificationSettings: jsonb("notification_settings").$type<NotificationSettings>(),
     // Preenchido apenas para usuários clientes (portal)
     companyId: uuid("company_id").references(() => companies.id, {
       onDelete: "cascade",
@@ -349,6 +372,7 @@ export const tasks = pgTable(
     visibleToClient: boolean("visible_to_client").notNull().default(true),
     createdBy: uuid("created_by").references(() => users.id),
     completedAt: timestamp("completed_at", { withTimezone: true }),
+    lastReminderAt: timestamp("last_reminder_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -362,6 +386,43 @@ export const tasks = pgTable(
     index("tasks_status_idx").on(t.statusId),
     index("tasks_due_idx").on(t.dueDate),
   ],
+);
+
+export const taskDependencies = pgTable(
+  "task_dependencies",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    taskId: uuid("task_id")
+      .notNull()
+      .references(() => tasks.id, { onDelete: "cascade" }),
+    dependsOnTaskId: uuid("depends_on_task_id")
+      .notNull()
+      .references(() => tasks.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("task_dependencies_task_idx").on(t.taskId),
+    uniqueIndex("task_dependencies_unique_idx").on(
+      t.taskId,
+      t.dependsOnTaskId,
+    ),
+  ],
+);
+
+export const taskDependenciesRelations = relations(
+  taskDependencies,
+  ({ one }) => ({
+    task: one(tasks, {
+      fields: [taskDependencies.taskId],
+      references: [tasks.id],
+    }),
+    dependsOnTask: one(tasks, {
+      fields: [taskDependencies.dependsOnTaskId],
+      references: [tasks.id],
+    }),
+  }),
 );
 
 export const taskChecklistItems = pgTable(
@@ -454,6 +515,7 @@ export const comments = pgTable(
       onDelete: "set null",
     }), // resposta a outro comentário (thread de 1 nível)
     mentions: jsonb("mentions").$type<string[]>(), // ids de usuários mencionados com @
+    taskMentions: jsonb("task_mentions").$type<string[]>(), // ids de tarefas mencionadas com #
     body: text("body").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -1328,6 +1390,35 @@ export const notificationsRelations = relations(notifications, ({ one }) => ({
   user: one(users, { fields: [notifications.userId], references: [users.id] }),
 }));
 
+// ─────────────────────────── Visualizações salvas ───────────────────────────
+
+export const savedViews = pgTable(
+  "saved_views",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    name: varchar("name", { length: 120 }).notNull(),
+    entity: varchar("entity", { length: 40 }).notNull(),
+    filters: jsonb("filters").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("saved_views_user_entity_name_idx").on(t.userId, t.entity, t.name),
+    index("saved_views_user_entity_idx").on(t.userId, t.entity),
+  ],
+);
+
+export const savedViewsRelations = relations(savedViews, ({ one }) => ({
+  user: one(users, { fields: [savedViews.userId], references: [users.id] }),
+}));
+
 // ─────────────────────────── Tipos ───────────────────────────
 
 export type Company = typeof companies.$inferSelect;
@@ -1372,3 +1463,5 @@ export type Activity = typeof activities.$inferSelect;
 export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
 export type Notification = typeof notifications.$inferSelect;
 export type AppSetting = typeof appSettings.$inferSelect;
+export type SavedView = typeof savedViews.$inferSelect;
+export type NewSavedView = typeof savedViews.$inferInsert;

@@ -86,6 +86,7 @@ export type PortalProfile = {
   avatarUrl: string | null;
   isCompanyAdmin: boolean;
   notifyPopup: boolean;
+  notificationSettings: import("@/lib/db/schema").NotificationSettings | null;
 };
 
 /** Dados frescos do próprio usuário (perfil/avatar — a sessão JWT pode estar velha). */
@@ -101,6 +102,7 @@ export async function getPortalProfile(
       avatarUrl: users.avatarUrl,
       isCompanyAdmin: users.isCompanyAdmin,
       notifyPopup: users.notifyPopup,
+      notificationSettings: users.notificationSettings,
     })
     .from(users)
     .where(eq(users.id, user.id))
@@ -160,6 +162,8 @@ export type PortalProjectListItem = {
 export type PortalProjectListFilters = {
   search?: string;
   statusId?: string;
+  /** Ocultar projetos com status final (concluídos/cancelados). */
+  hideCompleted?: boolean;
 };
 
 /** Projetos da empresa do cliente, com progresso das tarefas visíveis. */
@@ -192,6 +196,9 @@ export async function listPortalProjects(
         eq(projects.companyId, companyId),
         filters.search ? ilike(projects.name, `%${filters.search}%`) : undefined,
         filters.statusId ? eq(projects.statusId, filters.statusId) : undefined,
+        filters.hideCompleted
+          ? or(isNull(projectStatuses.isFinal), eq(projectStatuses.isFinal, false))
+          : undefined,
       ),
     )
     .orderBy(asc(projects.createdAt));
@@ -481,6 +488,7 @@ export async function getPortalProject(
         action: activities.action,
         entityType: activities.entityType,
         entityId: activities.entityId,
+        projectId: activities.projectId,
         metadata: activities.metadata,
         createdAt: activities.createdAt,
         actorId: users.id,
@@ -542,6 +550,23 @@ export async function getPortalProject(
     ...taskAttachmentRows.map((a) => a.id),
   ]);
 
+  function portalActivityHref(
+    activity: Pick<ActivityItem, "action" | "entityType" | "entityId" | "metadata">,
+  ): string | undefined {
+    const taskId =
+      activity.entityType === "task" && activity.entityId
+        ? activity.entityId
+        : typeof activity.metadata?.taskId === "string"
+          ? activity.metadata.taskId
+          : undefined;
+    if (!taskId) return undefined;
+    return `/portal/projetos/${id}/tarefas/${taskId}`;
+  }
+
+  function portalActivityMilestoneHref(): string | undefined {
+    return `/portal/projetos/${id}?tab=etapas`;
+  }
+
   const visibleActivities: ActivityItem[] = activityRows
     .filter((r) => {
       switch (r.entityType) {
@@ -555,17 +580,24 @@ export async function getPortalProject(
           return true;
       }
     })
-    .map((r) => ({
-      id: r.id,
-      action: r.action,
-      entityType: r.entityType,
-      entityId: r.entityId,
-      metadata: (r.metadata as Record<string, unknown> | null) ?? null,
-      createdAt: r.createdAt,
-      actor: r.actorId
-        ? { id: r.actorId, name: r.actorName!, role: r.actorRole! }
-        : null,
-    }));
+    .map((r) => {
+      const item: ActivityItem = {
+        id: r.id,
+        action: r.action,
+        entityType: r.entityType,
+        entityId: r.entityId,
+        projectId: r.projectId,
+        metadata: (r.metadata as Record<string, unknown> | null) ?? null,
+        createdAt: r.createdAt,
+        actor: r.actorId
+          ? { id: r.actorId, name: r.actorName!, role: r.actorRole! }
+          : null,
+      };
+      const href = portalActivityHref(item);
+      if (href) item.href = href;
+      item.milestoneHref = portalActivityMilestoneHref();
+      return item;
+    });
 
   return {
     project: row.project,
@@ -707,6 +739,7 @@ export async function getPortalTask(
           body: comments.body,
           parentId: comments.parentId,
           mentions: comments.mentions,
+          taskMentions: comments.taskMentions,
           createdAt: comments.createdAt,
           authorId: users.id,
           authorName: users.name,
@@ -747,6 +780,19 @@ export async function getPortalTask(
     for (const u of mentioned) mentionNameMap.set(u.id, u.name);
   }
 
+  // Títulos das tarefas mencionadas
+  const taskMentionIds = [
+    ...new Set(commentRows.flatMap((c) => c.taskMentions ?? [])),
+  ] as string[];
+  const taskMentionTitleMap = new Map<string, string>();
+  if (taskMentionIds.length > 0) {
+    const mentionedTasks = await db
+      .select({ id: tasks.id, title: tasks.title })
+      .from(tasks)
+      .where(inArray(tasks.id, taskMentionIds));
+    for (const t of mentionedTasks) taskMentionTitleMap.set(t.id, t.title);
+  }
+
   return {
     task: row.task,
     project: { id: row.project.id, name: row.project.name },
@@ -762,6 +808,9 @@ export async function getPortalTask(
       mentionNames: (c.mentions ?? [])
         .map((id) => mentionNameMap.get(id))
         .filter((name): name is string => Boolean(name)),
+      taskMentions: (c.taskMentions ?? [])
+        .map((id) => ({ id, title: taskMentionTitleMap.get(id) ?? "Tarefa" }))
+        .filter((t) => t.title),
       author: c.authorId
         ? {
             id: c.authorId,

@@ -58,6 +58,8 @@ export const portalCommentSchema = z.object({
   parentId: z.uuid().optional().or(z.literal("")),
   /** Ids de usuários mencionados com @ (máx. 10). */
   mentions: z.array(z.uuid()).max(10).optional(),
+  /** Ids de tarefas mencionadas com # (máx. 10). */
+  taskMentions: z.array(z.uuid()).max(10).optional(),
 });
 
 export type PortalCommentValues = z.infer<typeof portalCommentSchema>;

@@ -9,6 +9,7 @@ import { PriorityChip, StatusColorChip } from "@/components/chips";
 import { TaskComments } from "@/components/comments/task-comments";
 import { TaskChecklist } from "@/components/tasks/task-checklist";
 import { TaskDeleteButton } from "@/components/tasks/task-delete-button";
+import { TaskDependencies } from "@/components/tasks/task-dependencies";
 import { TaskEditDialog } from "@/components/tasks/task-edit-dialog";
 import { TaskSidebarControls } from "@/components/tasks/task-sidebar-controls";
 import {
@@ -26,11 +27,18 @@ import {
 } from "@/lib/access/permissions";
 import { listTaskActivities } from "@/lib/queries/activities";
 import { listTaskAttachments } from "@/lib/queries/attachments";
-import { listMentionableUsers, listTaskComments } from "@/lib/queries/comments";
+import {
+  listMentionableTasks,
+  listMentionableUsers,
+  listTaskComments,
+} from "@/lib/queries/comments";
 import {
   getTask,
   listActiveTaskStatuses,
   listProjectMilestonesForTask,
+  listProjectTasksForDependencies,
+  listTaskDependencies,
+  listTaskDependents,
 } from "@/lib/queries/tasks";
 import { listTeamSelectOptions } from "@/lib/queries/team";
 import { formatDate, isOverdue, timeAgo } from "@/lib/utils/format";
@@ -64,16 +72,31 @@ export default async function TaskDetailPage({
   const { task, project, company, status, creator, checklist } =
     detail;
 
-  const [statuses, teamUsers, comments, taskAttachments, taskActivities, projectMilestones, mentionableUsers] =
-    await Promise.all([
-      listActiveTaskStatuses(user),
-      listTeamSelectOptions(user),
-      listTaskComments(user, task.id),
-      listTaskAttachments(user, task.id),
-      listTaskActivities(user, task.id),
-      listProjectMilestonesForTask(user, project.id),
-      listMentionableUsers(project.id, company.id),
-    ]);
+  const [
+    statuses,
+    teamUsers,
+    comments,
+    taskAttachments,
+    taskActivities,
+    projectMilestones,
+    mentionableUsers,
+    mentionableTasks,
+    dependencies,
+    dependents,
+    availableDependencyTasks,
+  ] = await Promise.all([
+    listActiveTaskStatuses(user),
+    listTeamSelectOptions(user),
+    listTaskComments(user, task.id),
+    listTaskAttachments(user, task.id),
+    listTaskActivities(user, task.id),
+    listProjectMilestonesForTask(user, project.id),
+    listMentionableUsers(project.id, company.id),
+    listMentionableTasks(project.id),
+    listTaskDependencies(task.id),
+    listTaskDependents(task.id),
+    listProjectTasksForDependencies(project.id, task.id),
+  ]);
 
   const overdue = !task.completedAt && isOverdue(task.dueDate);
   const backHref = fromProject
@@ -169,6 +192,57 @@ export default async function TaskDetailPage({
 
           <Card>
             <CardHeader>
+              <CardTitle>Dependências</CardTitle>
+              <CardDescription>
+                Tarefas que devem ser concluídas antes desta.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <TaskDependencies
+                taskId={task.id}
+                dependencies={dependencies}
+                availableTasks={availableDependencyTasks}
+              />
+            </CardContent>
+          </Card>
+
+          {dependents.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Tarefas dependentes</CardTitle>
+                <CardDescription>
+                  Tarefas que só poderão ser concluídas após esta.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-1">
+                  {dependents.map((dep) => (
+                    <li key={dep.id} className="flex items-center gap-2">
+                      <span
+                        className={cn(
+                          "size-2 rounded-full",
+                          dep.completedAt ? "bg-emerald-400" : "bg-amber-400",
+                        )}
+                      />
+                      <Link
+                        href={`/admin/tarefas/${dep.id}`}
+                        className={cn(
+                          "text-sm hover:text-primary",
+                          dep.completedAt &&
+                            "text-muted-foreground line-through",
+                        )}
+                      >
+                        {dep.title}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          )}
+
+          <Card>
+            <CardHeader>
               <CardTitle>Comentários</CardTitle>
               <CardDescription>
                 Conversa da equipe e do cliente sobre esta tarefa.
@@ -181,6 +255,7 @@ export default async function TaskDetailPage({
                 currentUserId={user.id}
                 currentUserRole={user.role}
                 mentionableUsers={mentionableUsers}
+                mentionableTasks={mentionableTasks}
               />
             </CardContent>
           </Card>

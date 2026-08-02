@@ -183,7 +183,12 @@ export async function convertDemandToTask(
       entityType: "demand",
       entityId: demandId,
       action: "demand.converted",
-      metadata: { title: demand.title, project: project.name },
+      metadata: {
+        title: demand.title,
+        project: project.name,
+        taskId: created.id,
+        taskTitle: demand.title,
+      },
     });
 
     // A demanda some do portal — o cliente acompanha pela tarefa gerada
@@ -191,7 +196,7 @@ export async function convertDemandToTask(
     await notifyUsers(recipients, {
       type: "demand.converted",
       title: `Demanda virou tarefa: "${demand.title}"`,
-      body: `A equipe converteu sua demanda em uma tarefa do projeto "${project.name}".`,
+      body: `A equipe converteu sua demanda na tarefa "${demand.title}" do projeto "${project.name}".`,
       href: `/portal/projetos/${project.id}/tarefas/${created.id}`,
     });
 
@@ -201,6 +206,7 @@ export async function convertDemandToTask(
       ownerId: data.ownerId || null,
       taskId: created.id,
       taskTitle: demand.title,
+      projectId: project.id,
       projectName: project.name,
     });
 

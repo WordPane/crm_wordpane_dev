@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import { MilestoneStatusChip } from "@/components/chips";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Card,
   CardAction,
@@ -100,6 +101,15 @@ export function MilestonesSection({
     "view:project-milestones",
     "lista",
   );
+  const [showDone, setShowDone] = useViewPreference<"sim" | "nao">(
+    "filter:admin-show-done",
+    "nao",
+  );
+
+  const visibleMilestones = milestones.filter((m) => {
+    if (showDone === "nao" && m.status === "concluida") return false;
+    return true;
+  });
 
   function run(action: Promise<{ success: true; id?: string } | { error: string }>, successMessage: string) {
     startTransition(async () => {
@@ -188,7 +198,7 @@ export function MilestonesSection({
           Marcos (milestones) com progresso das tarefas vinculadas.
         </CardDescription>
         <CardAction>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
             <ViewToggle value={view} onChange={setView} />
             {templates.length > 0 && (
               <Button
@@ -214,7 +224,17 @@ export function MilestonesSection({
         </CardAction>
       </CardHeader>
       <CardContent>
-        {milestones.length === 0 ? (
+        <label className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
+          <Checkbox
+            checked={showDone === "sim"}
+            onCheckedChange={(checked) =>
+              setShowDone(checked ? "sim" : "nao")
+            }
+          />
+          Mostrar concluídas
+        </label>
+
+        {visibleMilestones.length === 0 ? (
           <div className="flex flex-col items-center gap-3 py-12 text-center">
             <Flag className="size-10 text-muted-foreground/40" />
             <p className="text-sm font-medium">Nenhuma etapa cadastrada</p>
@@ -225,7 +245,7 @@ export function MilestonesSection({
         ) : view === "kanban" ? (
           <div className="grid gap-3 md:grid-cols-3">
             {milestoneStatuses.map((status) => {
-              const items = milestones.filter((m) => m.status === status);
+              const items = visibleMilestones.filter((m) => m.status === status);
               return (
                 <section
                   key={status}
@@ -286,12 +306,13 @@ export function MilestonesSection({
           </div>
         ) : (
           <ul className="space-y-3">
-            {milestones.map((m, index) => {
+            {visibleMilestones.map((m) => {
               const overdue = !m.completedAt && isOverdue(m.dueDate);
               const percent =
                 m.totalTasks > 0
                   ? Math.round((m.doneTasks / m.totalTasks) * 100)
                   : 0;
+              const realIndex = milestones.findIndex((x) => x.id === m.id);
               return (
                 <li
                   key={m.id}
@@ -302,7 +323,7 @@ export function MilestonesSection({
                       variant="ghost"
                       size="icon-xs"
                       aria-label="Mover para cima"
-                      disabled={pending || index === 0}
+                      disabled={pending || realIndex === 0}
                       onClick={() =>
                         run(moveMilestone(m.id, "up"), "Etapa reordenada.")
                       }
@@ -313,7 +334,7 @@ export function MilestonesSection({
                       variant="ghost"
                       size="icon-xs"
                       aria-label="Mover para baixo"
-                      disabled={pending || index === milestones.length - 1}
+                      disabled={pending || realIndex === milestones.length - 1}
                       onClick={() =>
                         run(moveMilestone(m.id, "down"), "Etapa reordenada.")
                       }

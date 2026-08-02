@@ -15,6 +15,7 @@ import {
   isPriorityNotification,
   notificationIcon,
 } from "@/lib/notification-display";
+import { NotificationText } from "@/components/notifications/notification-text";
 import { cn } from "@/lib/utils";
 import { timeAgo } from "@/lib/utils/format";
 import { markNotificationRead } from "@/server/actions/notifications";
@@ -141,13 +142,17 @@ export function NotificationBell({
                     />
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium">
-                      {item.title}
-                    </span>
+                    <NotificationText
+                      text={item.title}
+                      href={item.href}
+                      className="block truncate text-sm font-medium"
+                    />
                     {item.body && (
-                      <span className="block truncate text-xs text-muted-foreground">
-                        {item.body}
-                      </span>
+                      <NotificationText
+                        text={item.body}
+                        href={item.href}
+                        className="block truncate text-xs text-muted-foreground"
+                      />
                     )}
                     <span className="mt-0.5 block text-xs text-muted-foreground/70">
                       {timeAgo(item.createdAt)}

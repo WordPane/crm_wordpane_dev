@@ -13,8 +13,13 @@ export default auth((req) => {
   const isPublic = isLogin || isCadastro || isPasswordReset;
   // Link público de orçamento: acessível com ou sem sessão
   const isPublicQuote = path.startsWith("/orcamento");
+  // Assets do PWA podem ser acessados sem sessão
+  const isPwaAsset =
+    path === "/manifest.webmanifest" ||
+    path === "/sw.js" ||
+    path.startsWith("/api/brand/");
 
-  if (isPublicQuote) return NextResponse.next();
+  if (isPublicQuote || isPwaAsset) return NextResponse.next();
 
   // Wizard de instalação: a página faz a própria guarda de estado/sessão
   if (path === "/setup") return NextResponse.next();

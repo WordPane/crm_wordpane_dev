@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { PortalPasswordForm } from "@/components/portal/portal-password-form";
 import { PortalProfileForm } from "@/components/portal/portal-profile-form";
 import { AvatarUpload } from "@/components/profile/avatar-upload";
+import { NotificationSettingsForm } from "@/components/profile/notification-settings-form";
 import { PopupPreferenceForm } from "@/components/profile/popup-preference-form";
 import {
   Card,
@@ -88,8 +89,11 @@ export default async function PortalProfilePage() {
             Como você quer ser avisado das novidades.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-6">
           <PopupPreferenceForm defaultEnabled={profile.notifyPopup} />
+          <NotificationSettingsForm
+            defaultSettings={profile.notificationSettings}
+          />
         </CardContent>
       </Card>
     </div>

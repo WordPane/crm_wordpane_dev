@@ -160,7 +160,7 @@ export default async function ProjectDetailPage({
 
       {/* ─── Tabs ─── */}
       <ProjectTabsPersist initialTab={activeTab} hasExplicitTab={hasExplicitTab}>
-        <TabsList>
+        <TabsList className="w-full max-w-full overflow-x-auto">
           <TabsTrigger value="visao">Visão geral</TabsTrigger>
           <TabsTrigger value="etapas">Etapas</TabsTrigger>
           <TabsTrigger value="tarefas">Tarefas</TabsTrigger>

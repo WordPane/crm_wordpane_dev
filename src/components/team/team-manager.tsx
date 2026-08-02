@@ -112,79 +112,81 @@ export function TeamManager({
             <p className="text-sm font-medium">Nenhum membro na equipe</p>
           </div>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead>Nome</TableHead>
-                <TableHead>E-mail</TableHead>
-                <TableHead>Cargo</TableHead>
-                <TableHead>Perfil</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Empresas</TableHead>
-                <TableHead className="w-10" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {members.map((m) => (
-                <TableRow key={m.id}>
-                  <TableCell className="font-medium">{m.name}</TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {m.email}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {m.position ?? "—"}
-                  </TableCell>
-                  <TableCell>
-                    <RoleChip role={m.role} />
-                  </TableCell>
-                  <TableCell>
-                    <UserStatusChip status={m.status} />
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {m.role === "super_admin"
-                      ? "Todas"
-                      : m.assignedCount === 1
-                        ? "1 empresa"
-                        : `${m.assignedCount} empresas`}
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger
-                        render={
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            aria-label="Ações"
-                          />
-                        }
-                      >
-                        <MoreHorizontal className="size-4" />
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={() => {
-                            setEditing(m);
-                            setMemberDialogOpen(true);
-                          }}
-                        >
-                          <Pencil />
-                          Editar
-                        </DropdownMenuItem>
-                        {m.role === "admin" && (
-                          <DropdownMenuItem
-                            onClick={() => setAssignmentsFor(m)}
-                          >
-                            <Building2 />
-                            Empresas atribuídas
-                          </DropdownMenuItem>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
+          <div className="overflow-x-auto">
+            <Table className="min-w-[52rem]">
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="whitespace-nowrap pl-4">Nome</TableHead>
+                  <TableHead className="whitespace-nowrap">E-mail</TableHead>
+                  <TableHead className="whitespace-nowrap">Cargo</TableHead>
+                  <TableHead className="whitespace-nowrap">Perfil</TableHead>
+                  <TableHead className="whitespace-nowrap">Status</TableHead>
+                  <TableHead className="whitespace-nowrap">Empresas</TableHead>
+                  <TableHead className="w-10 whitespace-nowrap pr-4" />
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {members.map((m) => (
+                  <TableRow key={m.id}>
+                    <TableCell className="whitespace-nowrap pl-4 font-medium">{m.name}</TableCell>
+                    <TableCell className="whitespace-nowrap text-muted-foreground">
+                      {m.email}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-muted-foreground">
+                      {m.position ?? "—"}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      <RoleChip role={m.role} />
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      <UserStatusChip status={m.status} />
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-muted-foreground">
+                      {m.role === "super_admin"
+                        ? "Todas"
+                        : m.assignedCount === 1
+                          ? "1 empresa"
+                          : `${m.assignedCount} empresas`}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap pr-4">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger
+                          render={
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              aria-label="Ações"
+                            />
+                          }
+                        >
+                          <MoreHorizontal className="size-4" />
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={() => {
+                              setEditing(m);
+                              setMemberDialogOpen(true);
+                            }}
+                          >
+                            <Pencil />
+                            Editar
+                          </DropdownMenuItem>
+                          {m.role === "admin" && (
+                            <DropdownMenuItem
+                              onClick={() => setAssignmentsFor(m)}
+                            >
+                              <Building2 />
+                              Empresas atribuídas
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         )}
       </CardContent>
 

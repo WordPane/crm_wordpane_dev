@@ -20,6 +20,7 @@ import {
   Loader2,
   MoreHorizontal,
   Plus,
+  ShieldAlert,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -102,6 +103,20 @@ function TaskRow({
       >
         {task.title}
       </Link>
+      {task.blockedByCount > 0 && (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger
+              render={<span className="inline-flex text-amber-300" />}
+            >
+              <ShieldAlert className="size-3.5" />
+            </TooltipTrigger>
+            <TooltipContent>
+              {task.blockedByCount} dependência(s) pendente(s)
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )}
       {milestoneName && (
         <span className="text-xs text-muted-foreground">{milestoneName}</span>
       )}
@@ -173,8 +188,8 @@ export function ProjectTasksSection({
     "todos",
   );
   const [showDone, setShowDone] = useViewPreference<"sim" | "nao">(
-    "filter:project-tasks-show-done",
-    "sim",
+    "filter:admin-show-done",
+    "nao",
   );
   const [collapsedJson, setCollapsedJson] = useViewPreference<string>(
     `collapse:project-tasks:${projectId}`,
@@ -339,7 +354,7 @@ export function ProjectTasksSection({
 
           <ViewToggle value={view} onChange={setView} />
 
-          <label className="ml-auto flex items-center gap-2 text-sm text-muted-foreground">
+          <label className="flex w-full items-center gap-2 text-sm text-muted-foreground sm:ml-auto sm:w-auto">
             <Checkbox
               checked={showDone === "sim"}
               onCheckedChange={(checked) =>
@@ -603,6 +618,15 @@ function DraggableTaskCard({
             {formatDate(task.dueDate)}
           </span>
         )}
+        {task.blockedByCount > 0 && (
+          <span
+            className="inline-flex items-center gap-1 text-amber-300"
+            title={`${task.blockedByCount} dependência(s) pendente(s)`}
+          >
+            <ShieldAlert className="size-3.5" />
+            Bloqueada
+          </span>
+        )}
         <span className="ml-auto">{task.ownerName ?? "—"}</span>
       </div>
     </div>
@@ -617,6 +641,9 @@ function TaskCardPreview({ task }: { task: ProjectTaskItem }) {
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         <PriorityChip priority={task.priority} />
         {task.dueDate && <span>{formatDate(task.dueDate)}</span>}
+        {task.blockedByCount > 0 && (
+          <ShieldAlert className="size-3.5 text-amber-300" />
+        )}
       </div>
     </div>
   );

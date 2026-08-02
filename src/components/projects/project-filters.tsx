@@ -4,6 +4,7 @@ import { Search } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -23,12 +24,14 @@ export function ProjectFilters({
   search,
   statusId,
   companyId,
+  showDone,
   statuses,
   companies,
 }: {
   search: string;
   statusId: string;
   companyId?: string;
+  showDone: boolean;
   statuses: StatusInfo[];
   /** Quando omitido, o filtro de empresa não é exibido (portal do cliente). */
   companies?: SelectOption[];
@@ -116,6 +119,16 @@ export function ProjectFilters({
           </SelectContent>
         </Select>
       )}
+
+      <label className="flex w-full items-center gap-2 text-sm text-muted-foreground sm:ml-auto sm:w-auto">
+        <Checkbox
+          checked={showDone}
+          onCheckedChange={(checked) =>
+            updateParam("concluidas", checked ? "sim" : "")
+          }
+        />
+        Mostrar concluídos
+      </label>
     </div>
   );
 }

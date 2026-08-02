@@ -1,23 +1,14 @@
 import type { Metadata } from "next";
-import {
-  ArrowLeft,
-  Calendar,
-  ExternalLink,
-  Flag,
-  Link2,
-  ListChecks,
-} from "lucide-react";
+import { ArrowLeft, Calendar, ExternalLink, Link2 } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { ActivityTimeline } from "@/components/activities/activity-timeline";
 import { AttachmentList } from "@/components/attachments/attachment-list";
-import {
-  MilestoneStatusChip,
-  PriorityChip,
-  StatusColorChip,
-} from "@/components/chips";
+import { PriorityChip, StatusColorChip } from "@/components/chips";
 import { PortalPlanCard } from "@/components/portal/portal-plan-card";
+import { PortalProjectMilestonesSection } from "@/components/portal/portal-project-milestones-section";
+import { PortalProjectTasksSection } from "@/components/portal/portal-project-tasks-section";
 import { ProjectTabsPersist } from "@/components/projects/project-tabs-persist";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -62,31 +53,6 @@ function isTab(value: string | undefined): value is TabValue {
 
 type PortalTask = Task & { status: StatusInfo | null };
 
-/** Linha de tarefa (link para o detalhe) — mesmo visual da lista do admin. */
-function TaskRow({ projectId, task }: { projectId: string; task: PortalTask }) {
-  return (
-    <li>
-      <Link
-        href={`/portal/projetos/${projectId}/tarefas/${task.id}`}
-        className="flex flex-wrap items-center gap-2 rounded-xl bg-white/[0.02] p-3 ring-1 ring-foreground/10 transition-colors hover:ring-primary/40"
-      >
-        <ListChecks className="size-4 shrink-0 text-muted-foreground" />
-        <span className="min-w-0 flex-1 truncate text-sm font-medium">
-          {task.title}
-        </span>
-        {task.status && (
-          <StatusColorChip name={task.status.name} color={task.status.color} />
-        )}
-        <PriorityChip priority={task.priority} />
-        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-          <Calendar className="size-3" />
-          {formatDate(task.dueDate)}
-        </span>
-      </Link>
-    </li>
-  );
-}
-
 export default async function PortalProjectDetailPage({
   params,
   searchParams,
@@ -130,7 +96,6 @@ export default async function PortalProjectDetailPage({
     list.push(task);
     tasksByMilestone.set(task.milestoneId, list);
   }
-  const looseTasks = tasksByMilestone.get(null) ?? [];
 
   return (
     <div className="space-y-6">
@@ -172,7 +137,7 @@ export default async function PortalProjectDetailPage({
 
       {/* ─── Tabs ─── */}
       <ProjectTabsPersist initialTab={activeTab} hasExplicitTab={hasExplicitTab}>
-        <TabsList>
+        <TabsList className="w-full max-w-full overflow-x-auto">
           <TabsTrigger value="visao">Visão geral</TabsTrigger>
           <TabsTrigger value="etapas">Etapas</TabsTrigger>
           <TabsTrigger value="tarefas">Tarefas</TabsTrigger>
@@ -247,118 +212,18 @@ export default async function PortalProjectDetailPage({
         </TabsContent>
 
         <TabsContent value="etapas" className="pt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Flag className="size-4" />
-                Etapas
-              </CardTitle>
-              <CardDescription>Fases do projeto.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {milestones.length === 0 ? (
-                <p className="py-6 text-center text-sm text-muted-foreground">
-                  Nenhuma etapa cadastrada ainda.
-                </p>
-              ) : (
-                milestones.map((milestone) => {
-                  const milestoneTasks =
-                    tasksByMilestone.get(milestone.id) ?? [];
-                  const milestoneDone = milestoneTasks.filter(
-                    (t) => t.status?.isFinal,
-                  ).length;
-                  return (
-                    <section
-                      key={milestone.id}
-                      className="rounded-xl p-3 ring-1 ring-foreground/10"
-                    >
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="text-sm font-semibold">
-                          {milestone.name}
-                        </h3>
-                        <MilestoneStatusChip status={milestone.status} />
-                        {milestone.dueDate && (
-                          <span className="text-xs text-muted-foreground">
-                            até {formatDate(milestone.dueDate)}
-                          </span>
-                        )}
-                        <span className="ml-auto text-xs text-muted-foreground tabular-nums">
-                          {milestoneDone} de {milestoneTasks.length} tarefas
-                        </span>
-                      </div>
-                      {milestone.description && (
-                        <p className="mt-1 text-sm whitespace-pre-wrap text-muted-foreground">
-                          {milestone.description}
-                        </p>
-                      )}
-                    </section>
-                  );
-                })
-              )}
-            </CardContent>
-          </Card>
+          <PortalProjectMilestonesSection
+            milestones={milestones}
+            tasksByMilestone={tasksByMilestone}
+          />
         </TabsContent>
 
         <TabsContent value="tarefas" className="pt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <ListChecks className="size-4" />
-                Tarefas
-              </CardTitle>
-              <CardDescription>
-                Tarefas visíveis para você, agrupadas por etapa.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {tasks.length === 0 ? (
-                <p className="py-6 text-center text-sm text-muted-foreground">
-                  Nenhuma tarefa visível para você ainda.
-                </p>
-              ) : (
-                <>
-                  {milestones.map((milestone) => {
-                    const milestoneTasks =
-                      tasksByMilestone.get(milestone.id) ?? [];
-                    if (milestoneTasks.length === 0) return null;
-                    return (
-                      <section key={milestone.id} className="space-y-2">
-                        <h3 className="text-sm font-semibold">
-                          {milestone.name}
-                        </h3>
-                        <ul className="space-y-1.5">
-                          {milestoneTasks.map((task) => (
-                            <TaskRow
-                              key={task.id}
-                              projectId={project.id}
-                              task={task}
-                            />
-                          ))}
-                        </ul>
-                      </section>
-                    );
-                  })}
-
-                  {looseTasks.length > 0 && (
-                    <section className="space-y-2">
-                      <h3 className="text-sm font-semibold text-muted-foreground">
-                        Sem etapa
-                      </h3>
-                      <ul className="space-y-1.5">
-                        {looseTasks.map((task) => (
-                          <TaskRow
-                            key={task.id}
-                            projectId={project.id}
-                            task={task}
-                          />
-                        ))}
-                      </ul>
-                    </section>
-                  )}
-                </>
-              )}
-            </CardContent>
-          </Card>
+          <PortalProjectTasksSection
+            projectId={project.id}
+            milestones={milestones}
+            tasks={tasks as PortalTask[]}
+          />
         </TabsContent>
 
         <TabsContent value="timeline" className="pt-4">

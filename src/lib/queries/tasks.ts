@@ -1,4 +1,4 @@
-import { and, asc, between, eq, inArray, isNull, lt, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, between, eq, ilike, inArray, isNull, lt, not, or, sql, type SQL } from "drizzle-orm";
 
 import {
   assertProjectAccess,
@@ -17,6 +17,7 @@ import {
   milestones,
   projects,
   taskChecklistItems,
+  taskDependencies,
   tasks,
   taskStatuses,
   users,
@@ -37,6 +38,7 @@ export type TaskListItem = {
   companyName: string;
   status: StatusInfo | null;
   ownerName: string | null;
+  blockedByCount: number;
 };
 
 /** Filtro de prazo dos cards de resumo: semana atual, mês atual ou vencidas. */
@@ -49,6 +51,8 @@ export type TaskListFilters = {
   hideCompleted?: boolean;
   /** Filtro de prazo — sempre restrito a tarefas abertas. */
   due?: TaskDueFilter;
+  /** Busca por título ou descrição da tarefa. */
+  search?: string;
 };
 
 /** Lista global de tarefas (escopo de projetos visíveis: empresa atribuída ou membro). */
@@ -92,6 +96,17 @@ export async function listTasks(
     conditions.push(isNull(tasks.completedAt), lt(tasks.dueDate, SQL_TODAY));
   }
 
+  const q = filters.search?.trim();
+  if (q) {
+    const pattern = `%${q}%`;
+    conditions.push(
+      or(
+        ilike(tasks.title, pattern),
+        ilike(tasks.description, pattern),
+      )!,
+    );
+  }
+
   const rows = await db
     .select({
       id: tasks.id,
@@ -108,6 +123,12 @@ export async function listTasks(
       statusColor: taskStatuses.color,
       statusIsFinal: taskStatuses.isFinal,
       ownerName: users.name,
+      blockedByCount: sql<number>`(
+        select count(*)::int
+        from ${taskDependencies}
+        inner join ${tasks} as dep_tasks on ${taskDependencies.dependsOnTaskId} = dep_tasks.id
+        where ${taskDependencies.taskId} = ${tasks.id} and dep_tasks.completed_at is null
+      )`,
     })
     .from(tasks)
     .innerJoin(projects, eq(tasks.projectId, projects.id))
@@ -137,6 +158,7 @@ export async function listTasks(
         }
       : null,
     ownerName: r.ownerName,
+    blockedByCount: r.blockedByCount,
   }));
 }
 
@@ -311,4 +333,73 @@ export async function listProjectMilestonesForTask(
     .from(milestones)
     .where(eq(milestones.projectId, projectId))
     .orderBy(asc(milestones.position), asc(milestones.name));
+}
+
+/** Tarefas das quais `taskId` depende. */
+export async function listTaskDependencies(taskId: string) {
+  return db
+    .select({
+      id: tasks.id,
+      title: tasks.title,
+      completedAt: tasks.completedAt,
+    })
+    .from(taskDependencies)
+    .innerJoin(tasks, eq(taskDependencies.dependsOnTaskId, tasks.id))
+    .where(eq(taskDependencies.taskId, taskId));
+}
+
+/** Tarefas que dependem de `taskId`. */
+export async function listTaskDependents(taskId: string) {
+  return db
+    .select({
+      id: tasks.id,
+      title: tasks.title,
+      completedAt: tasks.completedAt,
+    })
+    .from(taskDependencies)
+    .innerJoin(tasks, eq(taskDependencies.taskId, tasks.id))
+    .where(eq(taskDependencies.dependsOnTaskId, taskId));
+}
+
+/** Dependências não concluídas que bloqueiam `taskId`. */
+export async function getBlockingTasks(taskId: string) {
+  return db
+    .select({
+      id: tasks.id,
+      title: tasks.title,
+    })
+    .from(taskDependencies)
+    .innerJoin(tasks, eq(taskDependencies.dependsOnTaskId, tasks.id))
+    .where(
+      and(eq(taskDependencies.taskId, taskId), isNull(tasks.completedAt))!,
+    );
+}
+
+/** Tarefas do mesmo projeto disponíveis para serem dependências de `taskId`. */
+export async function listProjectTasksForDependencies(
+  projectId: string,
+  taskId: string,
+) {
+  const existing = await db
+    .select({ dependsOnTaskId: taskDependencies.dependsOnTaskId })
+    .from(taskDependencies)
+    .where(eq(taskDependencies.taskId, taskId));
+
+  const excludedIds = new Set(existing.map((d) => d.dependsOnTaskId));
+  excludedIds.add(taskId);
+
+  return db
+    .select({
+      id: tasks.id,
+      title: tasks.title,
+      completedAt: tasks.completedAt,
+    })
+    .from(tasks)
+    .where(
+      and(
+        eq(tasks.projectId, projectId),
+        excludedIds.size > 0 ? not(inArray(tasks.id, Array.from(excludedIds))) : undefined,
+      )!,
+    )
+    .orderBy(asc(tasks.title));
 }

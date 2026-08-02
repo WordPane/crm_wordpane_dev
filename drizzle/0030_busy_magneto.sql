@@ -1,0 +1,1 @@
+ALTER TABLE "comments" ADD COLUMN "task_mentions" jsonb;

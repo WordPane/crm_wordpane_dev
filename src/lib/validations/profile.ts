@@ -25,3 +25,22 @@ export const passwordChangeSchema = z
   });
 
 export type PasswordChangeValues = z.infer<typeof passwordChangeSchema>;
+
+const notificationChannelSchema = z.enum(["in_app", "email", "digest"]);
+
+export const notificationSettingsSchema = z.object({
+  channels: z
+    .object({
+      task: z.array(notificationChannelSchema).optional(),
+      comment: z.array(notificationChannelSchema).optional(),
+      project: z.array(notificationChannelSchema).optional(),
+      demand: z.array(notificationChannelSchema).optional(),
+      quote: z.array(notificationChannelSchema).optional(),
+      charge: z.array(notificationChannelSchema).optional(),
+      system: z.array(notificationChannelSchema).optional(),
+    })
+    .optional(),
+  digest: z.boolean().optional(),
+});
+
+export type NotificationSettingsValues = z.infer<typeof notificationSettingsSchema>;

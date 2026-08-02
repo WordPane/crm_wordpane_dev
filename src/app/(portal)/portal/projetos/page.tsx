@@ -23,6 +23,7 @@ export default async function PortalProjectsPage({
   searchParams: Promise<{
     q?: string | string[];
     status?: string | string[];
+    concluidas?: string | string[];
   }>;
 }) {
   const user = await requireUser();
@@ -30,11 +31,12 @@ export default async function PortalProjectsPage({
   const params = await searchParams;
   const search = first(params.q);
   const statusId = first(params.status);
+  const showDone = first(params.concluidas) === "sim";
 
   let projects, statuses;
   try {
     [projects, statuses] = await Promise.all([
-      listPortalProjects(user, { search, statusId }),
+      listPortalProjects(user, { search, statusId, hideCompleted: !showDone }),
       listPortalProjectStatuses(user),
     ]);
   } catch (error) {
@@ -55,7 +57,12 @@ export default async function PortalProjectsPage({
         </p>
       </div>
 
-      <ProjectFilters search={search} statusId={statusId} statuses={statuses} />
+      <ProjectFilters
+        search={search}
+        statusId={statusId}
+        showDone={showDone}
+        statuses={statuses}
+      />
 
       {projects.length === 0 ? (
         <Card>

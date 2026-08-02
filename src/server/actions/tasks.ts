@@ -1,7 +1,8 @@
 "use server";
 
-import { asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 
 import {
   assertProjectAccess,
@@ -12,13 +13,15 @@ import {
 import { logActivity } from "@/lib/activities";
 import { db } from "@/lib/db";
 import {
+  activities,
+  attachments,
+  demands,
   milestones,
   projects,
   taskChecklistItems,
+  taskDependencies,
   tasks,
   taskStatuses,
-  attachments,
-  demands,
 } from "@/lib/db/schema";
 import { notifyTaskAssigned } from "@/lib/notifications";
 import { getStorage } from "@/lib/storage";
@@ -110,6 +113,7 @@ export async function createTask(
       ownerId: data.ownerId || null,
       taskId: created.id,
       taskTitle: data.title,
+      projectId,
       projectName: project.name,
     });
 
@@ -214,6 +218,7 @@ export async function updateTask(
         ownerId: data.ownerId || null,
         taskId,
         taskTitle: data.title ?? scoped.task.title,
+        projectId: scoped.project.id,
         projectName: scoped.project.name,
       });
     }
@@ -243,6 +248,16 @@ export async function updateTaskStatus(
       .limit(1);
     if (!status) return { error: "Status não encontrado." };
     if (task.statusId === statusId) return { success: true };
+
+    if (status.isFinal) {
+      const { getBlockingTasks } = await import("@/lib/queries/tasks");
+      const blocking = await getBlockingTasks(taskId);
+      if (blocking.length > 0) {
+        return {
+          error: `Não é possível concluir esta tarefa. ${blocking.length} dependência(s) pendente(s): ${blocking.map((t) => t.title).join(", ")}`,
+        };
+      }
+    }
 
     const [oldStatus] = task.statusId
       ? await db
@@ -425,6 +440,249 @@ export async function deleteTask(taskId: string): Promise<ActionResult> {
     });
 
     revalidateTask(taskId, project.id);
+    return { success: true };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+const bulkUpdateSchema = z.object({
+  taskIds: z.array(z.string().uuid()).min(1),
+  statusId: z.string().uuid().optional(),
+  ownerId: z.string().uuid().optional().nullable(),
+  visibleToClient: z.boolean().optional(),
+});
+
+/**
+ * Atualiza várias tarefas de uma vez (status, responsável e/ou visibilidade).
+ * Só processa tarefas do escopo do usuário; aborta se alguma for inacessível.
+ */
+export async function bulkUpdateTasks(input: unknown): Promise<ActionResult> {
+  try {
+    const user = await requireUser();
+    requireTeam(user);
+    const data = bulkUpdateSchema.parse(input);
+
+    if (
+      data.statusId === undefined &&
+      data.ownerId === undefined &&
+      data.visibleToClient === undefined
+    ) {
+      return { error: "Nenhuma alteração informada." };
+    }
+
+    const rows = await db
+      .select({ task: tasks, project: projects })
+      .from(tasks)
+      .innerJoin(projects, eq(tasks.projectId, projects.id))
+      .where(inArray(tasks.id, data.taskIds));
+
+    if (rows.length !== data.taskIds.length) {
+      return { error: "Uma ou mais tarefas não foram encontradas." };
+    }
+
+    for (const { project } of rows) {
+      await assertProjectAccess(user, project);
+    }
+
+    const status = data.statusId
+      ? await db.select().from(taskStatuses).where(eq(taskStatuses.id, data.statusId)).then(([s]) => s)
+      : null;
+    if (data.statusId && !status) return { error: "Status não encontrado." };
+
+    await db.transaction(async (tx) => {
+      for (const { task, project } of rows) {
+        const set: Partial<typeof tasks.$inferInsert> = { updatedAt: new Date() };
+        if (data.statusId !== undefined) {
+          set.statusId = data.statusId;
+          set.completedAt = status?.isFinal ? new Date() : null;
+        }
+        if (data.ownerId !== undefined) set.ownerId = data.ownerId;
+        if (data.visibleToClient !== undefined) set.visibleToClient = data.visibleToClient;
+
+        await tx.update(tasks).set(set).where(eq(tasks.id, task.id));
+
+        if (data.statusId !== undefined && data.statusId !== task.statusId) {
+          const [oldStatus] = task.statusId
+            ? await tx
+                .select({ name: taskStatuses.name })
+                .from(taskStatuses)
+                .where(eq(taskStatuses.id, task.statusId))
+                .limit(1)
+            : [];
+
+          await tx.insert(activities).values({
+            actorId: user.id,
+            companyId: project.companyId,
+            projectId: project.id,
+            entityType: "task",
+            entityId: task.id,
+            action: "task.status_changed",
+            metadata: {
+              title: task.title,
+              from: oldStatus?.name ?? null,
+              to: status?.name ?? null,
+            },
+          });
+
+          if (status?.isFinal) {
+            await tx.insert(activities).values({
+              actorId: user.id,
+              companyId: project.companyId,
+              projectId: project.id,
+              entityType: "task",
+              entityId: task.id,
+              action: "task.completed",
+              metadata: { title: task.title },
+            });
+          }
+        }
+
+        if (
+          data.ownerId !== undefined &&
+          (data.ownerId || null) !== task.ownerId
+        ) {
+          await notifyTaskAssigned({
+            actorId: user.id,
+            actorName: user.name,
+            ownerId: data.ownerId || null,
+            taskId: task.id,
+            taskTitle: task.title,
+            projectId: project.id,
+            projectName: project.name,
+          });
+        }
+      }
+    });
+
+    revalidatePath("/admin/tarefas");
+    for (const { task, project } of rows) {
+      revalidatePath(`/admin/tarefas/${task.id}`);
+      revalidatePath(`/admin/projetos/${project.id}`);
+    }
+    return { success: true };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+/**
+ * Exclui várias tarefas de uma vez.
+ * Só processa tarefas do escopo do usuário; aborta se alguma for inacessível.
+ */
+export async function bulkDeleteTasks(input: unknown): Promise<ActionResult> {
+  try {
+    const user = await requireUser();
+    requireTeam(user);
+    const { taskIds } = z.object({ taskIds: z.array(z.string().uuid()).min(1) }).parse(input);
+
+    const rows = await db
+      .select({ task: tasks, project: projects })
+      .from(tasks)
+      .innerJoin(projects, eq(tasks.projectId, projects.id))
+      .where(inArray(tasks.id, taskIds));
+
+    if (rows.length !== taskIds.length) {
+      return { error: "Uma ou mais tarefas não foram encontradas." };
+    }
+
+    for (const { project } of rows) {
+      await assertProjectAccess(user, project);
+    }
+
+    const attachmentRows = await db
+      .select({ fileKey: attachments.fileKey, taskId: attachments.taskId })
+      .from(attachments)
+      .where(inArray(attachments.taskId, taskIds));
+
+    await db.transaction(async (tx) => {
+      await tx.update(demands).set({ taskId: null }).where(inArray(demands.taskId, taskIds));
+      await tx.delete(tasks).where(inArray(tasks.id, taskIds));
+    });
+
+    for (const row of attachmentRows) {
+      if (!/^https?:\/\//i.test(row.fileKey)) {
+        await getStorage().delete(row.fileKey);
+      }
+    }
+
+    for (const { task, project } of rows) {
+      await logActivity({
+        actorId: user.id,
+        companyId: project.companyId,
+        projectId: project.id,
+        entityType: "task",
+        entityId: task.id,
+        action: "task.deleted",
+        metadata: { title: task.title },
+      });
+    }
+
+    revalidatePath("/admin/tarefas");
+    for (const { task, project } of rows) {
+      revalidatePath(`/admin/tarefas/${task.id}`);
+      revalidatePath(`/admin/projetos/${project.id}`);
+    }
+    return { success: true };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+/**
+ * Adiciona uma dependência entre tarefas do mesmo projeto.
+ * `taskId` só poderá ser concluída após `dependsOnTaskId`.
+ */
+export async function addTaskDependency(
+  taskId: string,
+  dependsOnTaskId: string,
+): Promise<ActionResult> {
+  try {
+    const user = await requireUser();
+    requireTeam(user);
+    if (taskId === dependsOnTaskId) {
+      return { error: "Uma tarefa não pode depender dela mesma." };
+    }
+
+    const [taskRow, dependsRow] = await Promise.all([
+      getScopedTask(user, taskId),
+      getScopedTask(user, dependsOnTaskId),
+    ]);
+    if (!taskRow || !dependsRow) {
+      return { error: "Tarefa não encontrada." };
+    }
+    if (taskRow.project.id !== dependsRow.project.id) {
+      return { error: "As tarefas devem pertencer ao mesmo projeto." };
+    }
+
+    await db.insert(taskDependencies).values({ taskId, dependsOnTaskId });
+    revalidatePath(`/admin/tarefas/${taskId}`);
+    return { success: true };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+/** Remove uma dependência entre tarefas. */
+export async function removeTaskDependency(
+  taskId: string,
+  dependsOnTaskId: string,
+): Promise<ActionResult> {
+  try {
+    const user = await requireUser();
+    requireTeam(user);
+    const scoped = await getScopedTask(user, taskId);
+    if (!scoped) return { error: "Tarefa não encontrada." };
+
+    await db
+      .delete(taskDependencies)
+      .where(
+        and(
+          eq(taskDependencies.taskId, taskId),
+          eq(taskDependencies.dependsOnTaskId, dependsOnTaskId),
+        )!,
+      );
+    revalidatePath(`/admin/tarefas/${taskId}`);
     return { success: true };
   } catch (error) {
     return actionError(error);

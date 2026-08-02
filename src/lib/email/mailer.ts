@@ -33,6 +33,8 @@ export type SendEmailInput = {
   subject: string;
   title: string;
   intro: string;
+  /** Se true, `intro` já contém HTML seguro e não será escapado. */
+  introIsHtml?: boolean;
   rows?: EmailTemplateRow[];
   cta?: EmailTemplateCta;
   /** Links secundários em texto, abaixo do CTA (ex.: baixar boleto/XML). */
@@ -102,6 +104,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
         brand,
         title: input.title,
         intro: input.intro,
+        introIsHtml: input.introIsHtml,
         rows: input.rows,
         cta: input.cta,
         links: input.links,
@@ -114,6 +117,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
         brand,
         title: input.title,
         intro: input.intro,
+        introIsHtml: input.introIsHtml,
         rows: input.rows,
         cta: input.cta,
         links: input.links,

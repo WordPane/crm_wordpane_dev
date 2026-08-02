@@ -1,3 +1,5 @@
+"use client";
+
 import {
   Building2,
   Clock,
@@ -13,6 +15,7 @@ import {
   Wallet,
   type LucideIcon,
 } from "lucide-react";
+import Link from "next/link";
 
 import type { ActivityItem } from "@/lib/queries/activities";
 import { formatDateTime, timeAgo } from "@/lib/utils/format";
@@ -34,6 +37,30 @@ const ICONS: Record<string, LucideIcon> = {
 
 function str(value: unknown): string | null {
   return typeof value === "string" && value ? value : null;
+}
+
+/** Nome da tarefa que deve virar link, quando a atividade menciona uma tarefa. */
+function taskNameForLink(activity: ActivityItem): string | null {
+  const m = activity.metadata ?? {};
+  if (activity.action === "comment.added") return str(m.taskTitle);
+  if (activity.action === "upload.added") return str(m.target);
+  if (activity.entityType === "task") return str(m.title);
+  if (activity.action === "demand.converted") return str(m.taskTitle) ?? str(m.title);
+  return null;
+}
+
+/** Nome(s) da etapa que deve(m) virar link. */
+function milestoneNamesForLink(activity: ActivityItem): string[] {
+  const m = activity.metadata ?? {};
+  const names: string[] = [];
+  if (activity.entityType === "milestone" && str(m.title)) {
+    names.push(str(m.title)!);
+  }
+  if (activity.action === "task.milestone_changed") {
+    if (str(m.from) && str(m.from) !== "Sem etapa") names.push(str(m.from)!);
+    if (str(m.to) && str(m.to) !== "Sem etapa") names.push(str(m.to)!);
+  }
+  return names;
 }
 
 /** Texto legível em pt-BR a partir de action + metadata. */
@@ -128,6 +155,80 @@ function describe(activity: ActivityItem): string {
   }
 }
 
+function LinkSpan({
+  href,
+  children,
+}: {
+  href: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      className="font-medium text-foreground underline-offset-2 transition-colors hover:text-primary hover:underline"
+      onClick={(e) => e.stopPropagation()}
+    >
+      {children}
+    </Link>
+  );
+}
+
+/**
+ * Mesmo texto de `describe`, mas com nomes de tarefas e etapas transformados em Link.
+ */
+function describeWithLink(activity: ActivityItem): React.ReactNode {
+  const text = describe(activity);
+  const taskHref = activity.href;
+  const taskName = taskNameForLink(activity);
+  const milestoneHref = activity.milestoneHref;
+  const milestoneNames = milestoneNamesForLink(activity);
+
+  const replacements: { text: string; href: string }[] = [];
+  if (taskHref && taskName) replacements.push({ text: taskName, href: taskHref });
+  if (milestoneHref) {
+    for (const name of milestoneNames) {
+      replacements.push({ text: name, href: milestoneHref });
+    }
+  }
+
+  if (replacements.length === 0) {
+    return <span className="text-muted-foreground">{text}</span>;
+  }
+
+  // Ordena por posição no texto para substituir da esquerda para a direita
+  const positions = replacements
+    .map((r) => ({ ...r, index: text.indexOf(r.text) }))
+    .filter((r) => r.index !== -1)
+    .sort((a, b) => a.index - b.index);
+
+  if (positions.length === 0) {
+    return <span className="text-muted-foreground">{text}</span>;
+  }
+
+  const nodes: React.ReactNode[] = [];
+  let cursor = 0;
+  for (const pos of positions) {
+    if (pos.index > cursor) {
+      nodes.push(
+        <span key={`text-${cursor}`}>
+          {text.slice(cursor, pos.index)}
+        </span>,
+      );
+    }
+    nodes.push(
+      <LinkSpan key={`link-${pos.index}-${pos.text}`} href={pos.href}>
+        {pos.text}
+      </LinkSpan>,
+    );
+    cursor = pos.index + pos.text.length;
+  }
+  if (cursor < text.length) {
+    nodes.push(<span key={`text-end`}>{text.slice(cursor)}</span>);
+  }
+
+  return <span className="text-muted-foreground">{nodes}</span>;
+}
+
 /** Frase completa para eventos sem autor (sistema/webhook/link público). */
 function describeSystem(activity: ActivityItem): string {
   const m = activity.metadata ?? {};
@@ -183,9 +284,7 @@ export function ActivityTimeline({
               {activity.actor ? (
                 <>
                   <span className="font-medium">{activity.actor.name}</span>{" "}
-                  <span className="text-muted-foreground">
-                    {describe(activity)}
-                  </span>
+                  {describeWithLink(activity)}
                 </>
               ) : (
                 <span className="font-medium">

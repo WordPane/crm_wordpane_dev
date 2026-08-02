@@ -121,82 +121,83 @@ export function DemandList({
 
   return (
     <>
-      <div className="overflow-hidden rounded-xl bg-card ring-1 ring-foreground/10 [&_td:first-child]:pl-4 [&_td:last-child]:pr-4 [&_th:first-child]:pl-4 [&_th:last-child]:pr-4">
-        <Table>
-          <TableHeader>
-            <TableRow className="hover:bg-transparent">
-              <TableHead>Demanda</TableHead>
-              {showCompany && <TableHead>Empresa</TableHead>}
-              <TableHead>Categoria</TableHead>
-              <TableHead>Prioridade</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Autor</TableHead>
-              <TableHead>Data</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {demands.map((demand) => {
-              const expanded = expandedId === demand.id;
-              return [
-                <TableRow
-                  key={demand.id}
-                  className="cursor-pointer"
-                  onClick={() => setExpandedId(expanded ? null : demand.id)}
-                >
-                  <TableCell>
-                    <span className="inline-flex items-center gap-1.5 font-medium text-foreground">
-                      <ChevronDown
-                        className={cn(
-                          "size-3.5 text-muted-foreground transition-transform",
-                          !expanded && "-rotate-90",
-                        )}
-                      />
-                      {demand.title}
-                      {demand.attachments.length > 0 && (
-                        <span
-                          className="inline-flex items-center gap-0.5 text-xs font-normal text-muted-foreground"
-                          title={`${demand.attachments.length} ${
-                            demand.attachments.length === 1
-                              ? "anexo"
-                              : "anexos"
-                          }`}
-                        >
-                          <Paperclip className="size-3.5" />
-                          {demand.attachments.length}
-                        </span>
-                      )}
-                    </span>
-                  </TableCell>
-                  {showCompany && (
-                    <TableCell>
-                      <Link
-                        href={`/admin/clientes/${demand.companyId}`}
-                        className="text-muted-foreground transition-colors hover:text-foreground"
-                        onClick={(event) => event.stopPropagation()}
-                      >
-                        {demand.companyName}
-                      </Link>
-                    </TableCell>
-                  )}
-                  <TableCell>
-                    <DemandCategoryChip category={demand.category} />
-                  </TableCell>
-                  <TableCell>
-                    <PriorityChip priority={demand.priority} />
-                  </TableCell>
-                  <TableCell>
-                    <DemandStatusChip status={demand.status} />
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {demand.authorName ?? "—"}
-                  </TableCell>
-                  <TableCell
-                    className="text-muted-foreground"
-                    title={formatDate(demand.createdAt)}
+      <div className="overflow-hidden rounded-xl bg-card ring-1 ring-foreground/10">
+        <div className="overflow-x-auto">
+          <Table className="min-w-[44rem]">
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="whitespace-nowrap pl-4">Demanda</TableHead>
+                {showCompany && <TableHead className="whitespace-nowrap">Empresa</TableHead>}
+                <TableHead className="whitespace-nowrap">Categoria</TableHead>
+                <TableHead className="whitespace-nowrap">Prioridade</TableHead>
+                <TableHead className="whitespace-nowrap">Status</TableHead>
+                <TableHead className="whitespace-nowrap">Autor</TableHead>
+                <TableHead className="whitespace-nowrap pr-4">Data</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {demands.map((demand) => {
+                const expanded = expandedId === demand.id;
+                return [
+                  <TableRow
+                    key={demand.id}
+                    className="cursor-pointer"
+                    onClick={() => setExpandedId(expanded ? null : demand.id)}
                   >
-                    {timeAgo(demand.createdAt)}
-                  </TableCell>
-                </TableRow>,
+                    <TableCell className="whitespace-nowrap pl-4">
+                      <span className="inline-flex items-center gap-1.5 font-medium text-foreground">
+                        <ChevronDown
+                          className={cn(
+                            "size-3.5 text-muted-foreground transition-transform",
+                            !expanded && "-rotate-90",
+                          )}
+                        />
+                        {demand.title}
+                        {demand.attachments.length > 0 && (
+                          <span
+                            className="inline-flex items-center gap-0.5 text-xs font-normal text-muted-foreground"
+                            title={`${demand.attachments.length} ${
+                              demand.attachments.length === 1
+                                ? "anexo"
+                                : "anexos"
+                            }`}
+                          >
+                            <Paperclip className="size-3.5" />
+                            {demand.attachments.length}
+                          </span>
+                        )}
+                      </span>
+                    </TableCell>
+                    {showCompany && (
+                      <TableCell className="whitespace-nowrap">
+                        <Link
+                          href={`/admin/clientes/${demand.companyId}`}
+                          className="text-muted-foreground transition-colors hover:text-foreground"
+                          onClick={(event) => event.stopPropagation()}
+                        >
+                          {demand.companyName}
+                        </Link>
+                      </TableCell>
+                    )}
+                    <TableCell className="whitespace-nowrap">
+                      <DemandCategoryChip category={demand.category} />
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      <PriorityChip priority={demand.priority} />
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      <DemandStatusChip status={demand.status} />
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-muted-foreground">
+                      {demand.authorName ?? "—"}
+                    </TableCell>
+                    <TableCell
+                      className="whitespace-nowrap pr-4 text-muted-foreground"
+                      title={formatDate(demand.createdAt)}
+                    >
+                      {timeAgo(demand.createdAt)}
+                    </TableCell>
+                  </TableRow>,
                 expanded ? (
                   <TableRow
                     key={`${demand.id}-detail`}
@@ -325,7 +326,8 @@ export function DemandList({
               ];
             })}
           </TableBody>
-        </Table>
+          </Table>
+        </div>
       </div>
 
       {converting && (

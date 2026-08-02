@@ -1,3 +1,4 @@
+import { TZDate } from "@date-fns/tz";
 import { format, startOfMonth, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { and, asc, desc, eq, inArray, isNotNull, isNull, or, sql, type SQL } from "drizzle-orm";
@@ -27,7 +28,11 @@ import {
   taskStatuses,
   users,
 } from "@/lib/db/schema";
-import type { ActivityItem } from "@/lib/queries/activities";
+import {
+  activityHref,
+  activityMilestoneHref,
+  type ActivityItem,
+} from "@/lib/queries/activities";
 
 export type DashboardCounts = {
   projectsActive: number;
@@ -392,27 +397,30 @@ async function listUpcoming(
 async function listRevenueByMonth(
   scope: string[] | null,
 ): Promise<RevenueMonth[]> {
+  // Usa o fuso America/Sao_Paulo para alinhar com o card "Recebido no mês".
+  const paidAtBr = sql`${charges.paidAt} AT TIME ZONE 'America/Sao_Paulo'`;
   const conditions: SQL[] = [
     inArray(charges.status, ["received", "confirmed"]),
     isNotNull(charges.paidAt),
-    sql`${charges.paidAt} >= ${SQL_THIS_MONTH} - interval '5 months'`,
+    sql`${paidAtBr} >= ${SQL_THIS_MONTH} - interval '5 months'`,
   ];
   if (scope) conditions.push(inColumn(charges.companyId, scope));
 
   const rows = await db
     .select({
-      key: sql<string>`to_char(date_trunc('month', ${charges.paidAt}), 'YYYY-MM')`,
+      key: sql<string>`to_char(date_trunc('month', ${paidAtBr}), 'YYYY-MM')`,
       cents: sql<number>`coalesce(sum(${charges.valueCents}), 0)::int`,
     })
     .from(charges)
     .where(and(...conditions))
-    .groupBy(sql`date_trunc('month', ${charges.paidAt})`);
+    .groupBy(sql`date_trunc('month', ${paidAtBr})`);
 
   const byMonth = new Map(rows.map((r) => [r.key, r.cents]));
 
-  // Série completa dos 6 meses (zero onde não houve receita)
+  // Série completa dos 6 meses no fuso do negócio (zero onde não houve receita)
+  const nowBr = new TZDate(new Date(), "America/Sao_Paulo");
   return Array.from({ length: 6 }, (_, index) => {
-    const month = startOfMonth(subMonths(new Date(), 5 - index));
+    const month = startOfMonth(subMonths(nowBr, 5 - index));
     const key = format(month, "yyyy-MM");
     return {
       key,
@@ -443,6 +451,7 @@ async function listRecentActivities(
       action: activities.action,
       entityType: activities.entityType,
       entityId: activities.entityId,
+      projectId: activities.projectId,
       metadata: activities.metadata,
       createdAt: activities.createdAt,
       actorId: users.id,
@@ -455,17 +464,25 @@ async function listRecentActivities(
     .orderBy(desc(activities.createdAt))
     .limit(10);
 
-  return rows.map((r) => ({
-    id: r.id,
-    action: r.action,
-    entityType: r.entityType,
-    entityId: r.entityId,
-    metadata: (r.metadata as Record<string, unknown> | null) ?? null,
-    createdAt: r.createdAt,
-    actor: r.actorId
-      ? { id: r.actorId, name: r.actorName!, role: r.actorRole! }
-      : null,
-  }));
+  return rows.map((r) => {
+    const item: ActivityItem = {
+      id: r.id,
+      action: r.action,
+      entityType: r.entityType,
+      entityId: r.entityId,
+      projectId: r.projectId,
+      metadata: (r.metadata as Record<string, unknown> | null) ?? null,
+      createdAt: r.createdAt,
+      actor: r.actorId
+        ? { id: r.actorId, name: r.actorName!, role: r.actorRole! }
+        : null,
+    };
+    const href = activityHref(item);
+    if (href) item.href = href;
+    const milestoneHref = activityMilestoneHref(item);
+    if (milestoneHref) item.milestoneHref = milestoneHref;
+    return item;
+  });
 }
 
 /** Últimos 8 anexos do escopo, com autor e origem. */

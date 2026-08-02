@@ -319,12 +319,13 @@ function TemplateEditorDialog({
                 key={milestone.key}
                 className="space-y-3 rounded-xl p-3 ring-1 ring-border"
               >
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <span className="text-xs font-semibold text-muted-foreground">
                     {mi + 1}.
                   </span>
                   <Input
                     placeholder="Nome da etapa (ex.: Descoberta)"
+                    className="min-w-0 flex-1"
                     value={milestone.name}
                     onChange={(e) =>
                       updateMilestone(mi, { name: e.target.value })
@@ -333,7 +334,7 @@ function TemplateEditorDialog({
                   <Input
                     type="number"
                     min={0}
-                    className="w-24 shrink-0"
+                    className="w-20 shrink-0"
                     placeholder="Dias"
                     title="Prazo da etapa, em dias corridos após o início do projeto (vazio = sem prazo)"
                     aria-label="Prazo da etapa em dias"
@@ -342,40 +343,42 @@ function TemplateEditorDialog({
                       updateMilestone(mi, { dueInDays: e.target.value })
                     }
                   />
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label="Mover etapa para cima"
-                    disabled={mi === 0}
-                    onClick={() =>
-                      setMilestones((prev) => moveItem(prev, mi, -1))
-                    }
-                  >
-                    <ArrowUp className="size-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label="Mover etapa para baixo"
-                    disabled={mi === milestones.length - 1}
-                    onClick={() =>
-                      setMilestones((prev) => moveItem(prev, mi, 1))
-                    }
-                  >
-                    <ArrowDown className="size-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label="Remover etapa"
-                    className="text-muted-foreground hover:text-destructive"
-                    disabled={milestones.length === 1}
-                    onClick={() =>
-                      setMilestones((prev) => prev.filter((_, i) => i !== mi))
-                    }
-                  >
-                    <X className="size-4" />
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label="Mover etapa para cima"
+                      disabled={mi === 0}
+                      onClick={() =>
+                        setMilestones((prev) => moveItem(prev, mi, -1))
+                      }
+                    >
+                      <ArrowUp className="size-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label="Mover etapa para baixo"
+                      disabled={mi === milestones.length - 1}
+                      onClick={() =>
+                        setMilestones((prev) => moveItem(prev, mi, 1))
+                      }
+                    >
+                      <ArrowDown className="size-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label="Remover etapa"
+                      className="text-muted-foreground hover:text-destructive"
+                      disabled={milestones.length === 1}
+                      onClick={() =>
+                        setMilestones((prev) => prev.filter((_, i) => i !== mi))
+                      }
+                    >
+                      <X className="size-4" />
+                    </Button>
+                  </div>
                 </div>
 
                 <div className="space-y-2 pl-6">
@@ -384,9 +387,10 @@ function TemplateEditorDialog({
                       key={task.key}
                       className="space-y-2 rounded-lg p-2 ring-1 ring-border/60"
                     >
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <Input
                           placeholder="Título da tarefa"
+                          className="min-w-0 flex-1"
                           value={task.title}
                           onChange={(e) =>
                             updateMilestone(mi, {
@@ -413,7 +417,7 @@ function TemplateEditorDialog({
                           }
                         >
                           <SelectTrigger
-                            className="w-28"
+                            className="w-24 shrink-0"
                             aria-label="Prioridade"
                           >
                             <SelectValue>
@@ -445,49 +449,52 @@ function TemplateEditorDialog({
                           />
                           Cliente vê
                         </label>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          aria-label="Mover tarefa para cima"
-                          disabled={ti === 0}
-                          onClick={() =>
-                            updateMilestone(mi, {
-                              tasks: moveItem(milestone.tasks, ti, -1),
-                            })
-                          }
-                        >
-                          <ArrowUp className="size-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          aria-label="Mover tarefa para baixo"
-                          disabled={ti === milestone.tasks.length - 1}
-                          onClick={() =>
-                            updateMilestone(mi, {
-                              tasks: moveItem(milestone.tasks, ti, 1),
-                            })
-                          }
-                        >
-                          <ArrowDown className="size-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          aria-label="Remover tarefa"
-                          className="text-muted-foreground hover:text-destructive"
-                          onClick={() =>
-                            updateMilestone(mi, {
-                              tasks: milestone.tasks.filter((_, i) => i !== ti),
-                            })
-                          }
-                        >
-                          <X className="size-4" />
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            aria-label="Mover tarefa para cima"
+                            disabled={ti === 0}
+                            onClick={() =>
+                              updateMilestone(mi, {
+                                tasks: moveItem(milestone.tasks, ti, -1),
+                              })
+                            }
+                          >
+                            <ArrowUp className="size-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            aria-label="Mover tarefa para baixo"
+                            disabled={ti === milestone.tasks.length - 1}
+                            onClick={() =>
+                              updateMilestone(mi, {
+                                tasks: moveItem(milestone.tasks, ti, 1),
+                              })
+                            }
+                          >
+                            <ArrowDown className="size-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            aria-label="Remover tarefa"
+                            className="text-muted-foreground hover:text-destructive"
+                            onClick={() =>
+                              updateMilestone(mi, {
+                                tasks: milestone.tasks.filter((_, i) => i !== ti),
+                              })
+                            }
+                          >
+                            <X className="size-4" />
+                          </Button>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <Input
                           placeholder="Descrição da tarefa (opcional)"
+                          className="min-w-0 flex-1"
                           value={task.description}
                           onChange={(e) =>
                             updateMilestone(mi, {
@@ -502,7 +509,7 @@ function TemplateEditorDialog({
                         <Input
                           type="number"
                           min={0}
-                          className="w-24 shrink-0"
+                          className="w-20 shrink-0"
                           placeholder="Dias"
                           title="Prazo da tarefa, em dias corridos após o início do projeto (vazio = sem prazo)"
                           aria-label="Prazo da tarefa em dias"

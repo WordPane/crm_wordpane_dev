@@ -55,6 +55,8 @@ export type EmailTemplateInput = {
   brand: EmailTemplateBrand;
   title: string;
   intro: string;
+  /** Se true, `intro` já contém HTML seguro e não será escapado. */
+  introIsHtml?: boolean;
   rows?: EmailTemplateRow[];
   cta?: EmailTemplateCta;
   /** Links secundários em texto, abaixo do CTA (ex.: baixar boleto/XML). */
@@ -74,6 +76,25 @@ function escapeHtml(value: string): string {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+}
+
+/** Sanitiza HTML permitido no corpo do e-mail: negrito, itálico, quebras, links e listas. */
+function sanitizeEmailHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/<(?!\/?(b|strong|i|em|u|a|br|p|ul|ol|li|span)\b)[^>]*>/gi, "")
+    .replace(/<a\b([^>]*)>/gi, (match, attrs: string) => {
+      const hrefMatch = /href=["']([^"']+)["']/i.exec(attrs);
+      const href = hrefMatch ? safeUrl(hrefMatch[1]) : "#";
+      return `<a href="${href}" target="_blank" style="color:inherit;text-decoration:underline;">`;
+    });
+}
+
+function renderIntro(intro: string, isHtml?: boolean): string {
+  if (isHtml) {
+    return `<div style="margin:0 0 24px;font-family:${FONT};font-size:15px;line-height:1.6;color:rgba(255,255,255,0.72);">${sanitizeEmailHtml(intro)}</div>`;
+  }
+  return `<p style="margin:0 0 24px;font-family:${FONT};font-size:15px;line-height:1.6;color:rgba(255,255,255,0.72);">${escapeHtml(intro)}</p>`;
 }
 
 /** URLs só entram em href/src depois de sanitizadas (http/https, mailto ou /). */
@@ -196,7 +217,7 @@ function renderFooter(
 }
 
 export function renderEmailTemplate(input: EmailTemplateInput): string {
-  const { brand, title, intro, rows, cta, links, qrCode, footer, footerNote } =
+  const { brand, title, intro, introIsHtml, rows, cta, links, qrCode, footer, footerNote } =
     input;
 
   return `<!DOCTYPE html>
@@ -213,7 +234,7 @@ export function renderEmailTemplate(input: EmailTemplateInput): string {
   </style>
 </head>
 <body style="margin:0;padding:0;background-color:${brand.backgroundColor};">
-  <div style="display:none;max-height:0;overflow:hidden;">${escapeHtml(intro)}</div>
+  <div style="display:none;max-height:0;overflow:hidden;">${escapeHtml(intro.replace(/<[^>]+>/g, ""))}</div>
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:${brand.backgroundColor};">
     <tr>
       <td align="center" style="padding:40px 16px;">
@@ -228,7 +249,7 @@ export function renderEmailTemplate(input: EmailTemplateInput): string {
           <tr>
             <td style="background-color:${brand.cardColor};border:1px solid rgba(255,255,255,0.09);border-radius:16px;padding:32px;">
               <h1 style="margin:0 0 16px;font-family:${FONT};font-size:22px;font-weight:700;line-height:1.3;color:#ffffff;">${escapeHtml(title)}</h1>
-              <p style="margin:0 0 24px;font-family:${FONT};font-size:15px;line-height:1.6;color:rgba(255,255,255,0.72);">${escapeHtml(intro)}</p>
+              ${renderIntro(intro, introIsHtml)}
               ${rows && rows.length > 0 ? renderRows(rows) : ""}
               ${qrCode ? renderQrCode(qrCode) : ""}
               ${cta ? renderCta(cta, brand) : ""}
@@ -246,11 +267,28 @@ export function renderEmailTemplate(input: EmailTemplateInput): string {
 </html>`;
 }
 
+function stripHtmlToText(value: string): string {
+  return value
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n\n")
+    .replace(/<li>/gi, "• ")
+    .replace(/<\/li>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 /** Versão texto puro (campo `text` do nodemailer). */
 export function renderPlainTextFallback(
   input: Omit<EmailTemplateInput, "appUrl">,
 ): string {
-  const lines: string[] = [input.title, "", input.intro, ""];
+  const intro = input.introIsHtml ? stripHtmlToText(input.intro) : input.intro;
+  const lines: string[] = [input.title, "", intro, ""];
 
   if (input.rows && input.rows.length > 0) {
     for (const row of input.rows) lines.push(`${row.label}: ${row.value}`);

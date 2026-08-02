@@ -160,7 +160,7 @@ function StatusList({
             {statuses.map((s, index) => (
               <li
                 key={s.id}
-                className="flex items-center gap-3 rounded-xl bg-white/[0.02] p-3 ring-1 ring-foreground/10"
+                className="flex flex-wrap items-center gap-3 rounded-xl bg-white/[0.02] p-3 ring-1 ring-foreground/10"
               >
                 <div className="flex flex-col gap-0.5">
                   <Button

@@ -1,4 +1,4 @@
-import { and, asc, eq, ilike, inArray, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, eq, ilike, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
 
 import {
   assertProjectAccess,
@@ -13,6 +13,7 @@ import {
   projectMembers,
   projects,
   projectStatuses,
+  taskDependencies,
   taskStatuses,
   tasks,
   users,
@@ -48,6 +49,8 @@ export type ProjectListFilters = {
   search?: string;
   statusId?: string;
   companyId?: string;
+  /** Ocultar projetos com status final (concluídos/cancelados). */
+  hideCompleted?: boolean;
 };
 
 /** Lista projetos dentro do escopo do usuário, com progresso de tarefas. */
@@ -77,9 +80,24 @@ export async function listProjects(
     conditions.push(eq(projects.companyId, filters.companyId));
   if (filters.statusId)
     conditions.push(eq(projects.statusId, filters.statusId));
+  if (filters.hideCompleted) {
+    conditions.push(
+      or(isNull(projectStatuses.isFinal), eq(projectStatuses.isFinal, false))!,
+    );
+  }
 
   const q = filters.search?.trim();
-  if (q) conditions.push(ilike(projects.name, `%${q}%`));
+  if (q) {
+    const pattern = `%${q}%`;
+    conditions.push(
+      or(
+        ilike(projects.name, pattern),
+        ilike(projects.description, pattern),
+        ilike(companies.nomeFantasia, pattern),
+        ilike(companies.razaoSocial, pattern),
+      )!,
+    );
+  }
 
   const rows = await db
     .select({
@@ -177,6 +195,7 @@ export type ProjectTaskItem = {
   status: StatusInfo | null;
   ownerId: string | null;
   ownerName: string | null;
+  blockedByCount: number;
 };
 
 export type ProjectDetail = {
@@ -246,6 +265,12 @@ export async function getProject(
         statusIsFinal: taskStatuses.isFinal,
         ownerId: tasks.ownerId,
         ownerName: users.name,
+        blockedByCount: sql<number>`(
+          select count(*)::int
+          from ${taskDependencies}
+          inner join ${tasks} as dep_tasks on ${taskDependencies.dependsOnTaskId} = dep_tasks.id
+          where ${taskDependencies.taskId} = ${tasks.id} and dep_tasks.completed_at is null
+        )`,
       })
       .from(tasks)
       .leftJoin(taskStatuses, eq(tasks.statusId, taskStatuses.id))
@@ -302,6 +327,7 @@ export async function getProject(
         : null,
       ownerId: t.ownerId,
       ownerName: t.ownerName,
+      blockedByCount: t.blockedByCount,
     })),
   };
 }

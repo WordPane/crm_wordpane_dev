@@ -16,7 +16,10 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { ForbiddenError, requireUser } from "@/lib/access/permissions";
-import { listMentionableUsers } from "@/lib/queries/comments";
+import {
+  listMentionableTasks,
+  listMentionableUsers,
+} from "@/lib/queries/comments";
 import { getPortalTask } from "@/lib/queries/portal";
 import { formatDate, isOverdue } from "@/lib/utils/format";
 import { cn } from "@/lib/utils";
@@ -45,9 +48,12 @@ export default async function PortalTaskDetailPage({
   if (!detail) notFound();
 
   const { task, project, milestone, status, ownerName, checklist, comments } = detail;
-  const mentionableUsers = user.companyId
-    ? await listMentionableUsers(project.id, user.companyId)
-    : [];
+  const [mentionableUsers, mentionableTasks] = await Promise.all([
+    user.companyId
+      ? listMentionableUsers(project.id, user.companyId)
+      : Promise.resolve([]),
+    listMentionableTasks(project.id),
+  ]);
   const overdue = !task.completedAt && isOverdue(task.dueDate);
   const doneItems = checklist.filter((item) => item.done).length;
   const checklistPercent =
@@ -153,8 +159,10 @@ export default async function PortalTaskDetailPage({
             <CardContent>
               <PortalTaskComments
                 taskId={task.id}
+                projectId={project.id}
                 comments={comments}
                 mentionableUsers={mentionableUsers}
+                mentionableTasks={mentionableTasks}
               />
             </CardContent>
           </Card>

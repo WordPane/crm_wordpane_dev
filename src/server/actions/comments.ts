@@ -17,6 +17,11 @@ import {
 } from "@/lib/comments";
 import { db } from "@/lib/db";
 import { comments, projects, tasks } from "@/lib/db/schema";
+import {
+  extractMentionsFromHtml,
+  isEmptyHtml,
+  sanitizeCommentHtml,
+} from "@/lib/rich-text";
 import { clientUsersOfCompany, notifyUsers } from "@/lib/notifications";
 import { commentFormSchema } from "@/lib/validations/comment";
 import { actionError, type ActionResult } from "@/server/actions/utils";
@@ -58,14 +63,30 @@ export async function createComment(
       ? await getCommentAuthorId(parentId)
       : null;
 
+    const cleanBody = sanitizeCommentHtml(data.body);
+    if (isEmptyHtml(cleanBody)) {
+      return { error: "Escreva um comentário." };
+    }
+
+    const extracted = extractMentionsFromHtml(cleanBody);
+    const mentions = data.mentions?.length
+      ? data.mentions.filter((id) => extracted.mentions.includes(id))
+      : extracted.mentions;
+    const taskMentions = data.taskMentions?.length
+      ? data.taskMentions.filter((id) => extracted.taskMentions.includes(id))
+      : extracted.taskMentions;
+
+    const excerpt = cleanBody.replace(/<[^>]+>/g, "").slice(0, 140);
+
     const [created] = await db
       .insert(comments)
       .values({
         taskId,
         authorId: user.id,
         parentId,
-        mentions: data.mentions ?? null,
-        body: data.body,
+        mentions: mentions.length ? mentions : null,
+        taskMentions: taskMentions.length ? taskMentions : null,
+        body: cleanBody,
       })
       .returning({ id: comments.id });
 
@@ -77,8 +98,9 @@ export async function createComment(
       entityId: created.id,
       action: "comment.added",
       metadata: {
+        taskId,
         taskTitle: row.task.title,
-        excerpt: data.body.slice(0, 140),
+        excerpt,
       },
     });
 
@@ -90,7 +112,8 @@ export async function createComment(
         {
           type: "comment",
           title: `Novo comentário em "${row.task.title}"`,
-          body: data.body.slice(0, 140),
+          body: cleanBody,
+          bodyIsHtml: true,
           href: `/portal/projetos/${row.project.id}/tarefas/${taskId}`,
         },
       );
@@ -98,13 +121,14 @@ export async function createComment(
 
     // Menções com @ e resposta a comentário
     await notifyCommentMentions({
-      mentionIds: data.mentions,
+      mentionIds: mentions,
       authorId: user.id,
       authorName: user.name,
       taskId,
       taskTitle: row.task.title,
       projectId: row.project.id,
-      excerpt: data.body.slice(0, 140),
+      excerpt,
+      bodyHtml: cleanBody,
       parentAuthorId,
     });
 

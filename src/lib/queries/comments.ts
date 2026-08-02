@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, or } from "drizzle-orm";
 
 import {
   assertProjectAccess,
@@ -10,6 +10,7 @@ import {
   comments,
   projectMembers,
   projects,
+  taskStatuses,
   tasks,
   users,
   type User,
@@ -23,6 +24,8 @@ export type CommentItem = {
   parentId: string | null;
   /** Nomes dos usuários mencionados com @ (para destacar no texto). */
   mentionNames: string[];
+  /** Tarefas mencionadas com # (para renderizar links). */
+  taskMentions: { id: string; title: string }[];
   author: {
     id: string;
     name: string;
@@ -53,6 +56,7 @@ export async function listTaskComments(
       body: comments.body,
       parentId: comments.parentId,
       mentions: comments.mentions,
+      taskMentions: comments.taskMentions,
       createdAt: comments.createdAt,
       authorId: users.id,
       authorName: users.name,
@@ -77,6 +81,19 @@ export async function listTaskComments(
     for (const u of mentioned) mentionNames.set(u.id, u.name);
   }
 
+  // Títulos das tarefas mencionadas
+  const taskMentionIds = [
+    ...new Set(rows.flatMap((r) => r.taskMentions ?? [])),
+  ] as string[];
+  const taskMentionTitles = new Map<string, string>();
+  if (taskMentionIds.length > 0) {
+    const mentionedTasks = await db
+      .select({ id: tasks.id, title: tasks.title })
+      .from(tasks)
+      .where(inArray(tasks.id, taskMentionIds));
+    for (const t of mentionedTasks) taskMentionTitles.set(t.id, t.title);
+  }
+
   return rows.map((r) => ({
     id: r.id,
     body: r.body,
@@ -85,6 +102,9 @@ export async function listTaskComments(
     mentionNames: (r.mentions ?? [])
       .map((id) => mentionNames.get(id))
       .filter((name): name is string => Boolean(name)),
+    taskMentions: (r.taskMentions ?? [])
+      .map((id) => ({ id, title: taskMentionTitles.get(id) ?? "Tarefa" }))
+      .filter((t) => t.title),
     author: r.authorId
       ? {
           id: r.authorId,
@@ -139,4 +159,31 @@ export async function listMentionableUsers(
   return [...teamRows, ...clientRows].sort((a, b) =>
     a.name.localeCompare(b.name, "pt-BR"),
   );
+}
+
+export type MentionableTask = {
+  id: string;
+  title: string;
+};
+
+/**
+ * Tarefas do mesmo projeto que podem ser mencionadas com #.
+ * Oculta concluídas por padrão para manter a lista focada.
+ */
+export async function listMentionableTasks(
+  projectId: string,
+): Promise<MentionableTask[]> {
+  const rows = await db
+    .select({ id: tasks.id, title: tasks.title })
+    .from(tasks)
+    .leftJoin(taskStatuses, eq(tasks.statusId, taskStatuses.id))
+    .where(
+      and(
+        eq(tasks.projectId, projectId),
+        or(isNull(taskStatuses.isFinal), eq(taskStatuses.isFinal, false)),
+      ),
+    )
+    .orderBy(asc(tasks.title));
+
+  return rows;
 }

@@ -34,7 +34,8 @@ export function CalendarMonth({
 
   return (
     <div className="overflow-hidden rounded-xl ring-1 ring-foreground/10">
-      <div className="grid grid-cols-7 gap-px bg-border">
+      <div className="overflow-x-auto">
+        <div className="min-w-[44rem] grid grid-cols-7 gap-px bg-border">
         {WEEKDAY_SHORT.map((day) => (
           <div
             key={day}
@@ -116,6 +117,7 @@ export function CalendarMonth({
             </div>
           );
         })}
+        </div>
       </div>
     </div>
   );

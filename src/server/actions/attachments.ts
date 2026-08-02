@@ -170,7 +170,11 @@ export async function createAttachment(input: unknown): Promise<ActionResult> {
       entityType: "attachment",
       entityId: created.id,
       action: "upload.added",
-      metadata: { fileName: data.fileName, target: target.targetName },
+      metadata: {
+        fileName: data.fileName,
+        target: target.targetName,
+        taskId: data.taskId || undefined,
+      },
     });
 
     // Upload da equipe em projeto/tarefa visível → avisa os clientes

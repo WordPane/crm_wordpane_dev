@@ -6,6 +6,7 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import type { NotificationBellItem } from "@/components/layout/notification-bell";
+import { NotificationText } from "@/components/notifications/notification-text";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -130,14 +131,14 @@ export function NotificationsList({
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="flex flex-wrap items-center gap-2">
-                        <span
+                        <NotificationText
+                          text={item.title}
+                          href={item.href}
                           className={cn(
                             "block text-sm",
                             unread ? "font-semibold" : "font-medium",
                           )}
-                        >
-                          {item.title}
-                        </span>
+                        />
                         {priority && (
                           <span className="rounded-full bg-amber-400/10 px-2 py-0.5 text-[0.65rem] font-semibold tracking-wide text-amber-400 uppercase">
                             Prioridade
@@ -145,9 +146,11 @@ export function NotificationsList({
                         )}
                       </span>
                       {item.body && (
-                        <span className="mt-0.5 block text-sm text-muted-foreground">
-                          {item.body}
-                        </span>
+                        <NotificationText
+                          text={item.body}
+                          href={item.href}
+                          className="mt-0.5 block text-sm text-muted-foreground"
+                        />
                       )}
                       <span
                         className="mt-1 block text-xs text-muted-foreground/70"

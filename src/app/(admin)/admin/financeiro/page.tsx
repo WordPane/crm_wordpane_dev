@@ -6,7 +6,9 @@ import { ChargeStatusChip } from "@/components/chips";
 import { ChargeActionsMenu } from "@/components/finance/charge-actions-menu";
 import { ChargeFilters } from "@/components/finance/charge-filters";
 import { DownloadInvoicesButton } from "@/components/finance/download-invoices-button";
+import { ExportCsvButton } from "@/components/reports/export-csv-button";
 import { Button } from "@/components/ui/button";
+import { exportChargesCsv } from "@/server/actions/reports";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Table,
@@ -20,6 +22,7 @@ import { requireTeam, requireUser } from "@/lib/access/permissions";
 import type { Charge } from "@/lib/db/schema";
 import { listCompanies } from "@/lib/queries/companies";
 import { financeSummary, listCharges } from "@/lib/queries/finance";
+import { cn } from "@/lib/utils";
 import { formatCurrency, formatDate, isOverdue } from "@/lib/utils/format";
 import { parsePeriod } from "@/lib/utils/period";
 import {
@@ -76,6 +79,11 @@ export default async function FinancePage({
           </p>
         </div>
         <div className="flex gap-2">
+          <ExportCsvButton
+            filename="cobrancas.csv"
+            action={exportChargesCsv}
+            label="Exportar CSV"
+          />
           <Button
             variant="outline"
             render={<Link href="/admin/financeiro/servicos" />}
@@ -155,63 +163,66 @@ export default async function FinancePage({
         </Card>
       ) : (
         <Card>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Descrição</TableHead>
-                <TableHead>Empresa</TableHead>
-                <TableHead className="text-right">Valor</TableHead>
-                <TableHead>Vencimento</TableHead>
-                <TableHead>Pagamento</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {items.map((charge) => (
-                <TableRow key={charge.id}>
-                  <TableCell className="max-w-64">
-                    <span className="block truncate font-medium">
-                      {charge.description}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {charge.company.name}
-                  </TableCell>
-                  <TableCell className="text-right font-medium">
-                    {formatCurrency(charge.valueCents)}
-                  </TableCell>
-                  <TableCell
-                    className={
-                      charge.status === "pending" && isOverdue(charge.dueDate)
-                        ? "text-red-300"
-                        : "text-muted-foreground"
-                    }
-                  >
-                    {formatDate(charge.dueDate)}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {chargeBillingTypeLabels[charge.billingType]}
-                  </TableCell>
-                  <TableCell>
-                    <ChargeStatusChip status={charge.status} />
-                  </TableCell>
-                  <TableCell>
-                    <ChargeActionsMenu
-                      chargeId={charge.id}
-                      description={charge.description}
-                      valueCents={charge.valueCents}
-                      billingType={charge.billingType}
-                      dueDate={charge.dueDate}
-                      status={charge.status}
-                      invoiceUrl={charge.invoiceUrl}
-                      invoice={charge.invoice}
-                    />
-                  </TableCell>
+          <div className="overflow-x-auto">
+            <Table className="min-w-[44rem]">
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="whitespace-nowrap pl-4">Descrição</TableHead>
+                  <TableHead className="whitespace-nowrap">Empresa</TableHead>
+                  <TableHead className="whitespace-nowrap text-right">Valor</TableHead>
+                  <TableHead className="whitespace-nowrap">Vencimento</TableHead>
+                  <TableHead className="whitespace-nowrap">Pagamento</TableHead>
+                  <TableHead className="whitespace-nowrap">Status</TableHead>
+                  <TableHead className="whitespace-nowrap pr-4 text-right">Ações</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {items.map((charge) => (
+                  <TableRow key={charge.id}>
+                    <TableCell className="max-w-64 whitespace-nowrap pl-4">
+                      <span className="block truncate font-medium">
+                        {charge.description}
+                      </span>
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-muted-foreground">
+                      {charge.company.name}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-right font-medium">
+                      {formatCurrency(charge.valueCents)}
+                    </TableCell>
+                    <TableCell
+                      className={cn(
+                        "whitespace-nowrap",
+                        charge.status === "pending" && isOverdue(charge.dueDate)
+                          ? "text-red-300"
+                          : "text-muted-foreground",
+                      )}
+                    >
+                      {formatDate(charge.dueDate)}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-muted-foreground">
+                      {chargeBillingTypeLabels[charge.billingType]}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      <ChargeStatusChip status={charge.status} />
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap pr-4">
+                      <ChargeActionsMenu
+                        chargeId={charge.id}
+                        description={charge.description}
+                        valueCents={charge.valueCents}
+                        billingType={charge.billingType}
+                        dueDate={charge.dueDate}
+                        status={charge.status}
+                        invoiceUrl={charge.invoiceUrl}
+                        invoice={charge.invoice}
+                      />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </Card>
       )}
     </div>

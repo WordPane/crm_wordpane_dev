@@ -142,103 +142,105 @@ export function ServiceManager({
         </div>
 
         <div className="overflow-hidden rounded-xl bg-card ring-1 ring-foreground/10">
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead>Serviço</TableHead>
-                <TableHead className="text-right">Valor padrão</TableHead>
-                <TableHead>Cobrança</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {services.length === 0 ? (
+          <div className="overflow-x-auto">
+            <Table className="min-w-[44rem]">
+              <TableHeader>
                 <TableRow className="hover:bg-transparent">
-                  <TableCell
-                    colSpan={5}
-                    className="py-10 text-center text-sm text-muted-foreground"
-                  >
-                    Nenhum serviço cadastrado ainda.
-                  </TableCell>
+                  <TableHead className="whitespace-nowrap pl-4">Serviço</TableHead>
+                  <TableHead className="whitespace-nowrap text-right">Valor padrão</TableHead>
+                  <TableHead className="whitespace-nowrap">Cobrança</TableHead>
+                  <TableHead className="whitespace-nowrap">Status</TableHead>
+                  <TableHead className="whitespace-nowrap pr-4 text-right">Ações</TableHead>
                 </TableRow>
-              ) : (
-                services.map((service) => (
-                  <TableRow key={service.id}>
-                    <TableCell>
-                      <p className="font-medium">{service.name}</p>
-                      {service.description && (
-                        <p className="text-xs text-muted-foreground">
-                          {service.description}
-                        </p>
-                      )}
-                      {service.serviceCode && (
-                        <p className="text-xs text-muted-foreground">
-                          NFS-e: {service.serviceCode}
-                        </p>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right font-medium">
-                      {formatCurrency(service.defaultValueCents)}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {serviceBillingLabels[service.billing]}
-                      {service.billing === "recurring" &&
-                        ` · ${subscriptionCycleLabels[service.cycle]}`}
-                    </TableCell>
-                    <TableCell>
-                      <span
-                        className={cn(
-                          "chip",
-                          !service.active &&
-                            "border-border bg-muted text-muted-foreground",
-                        )}
-                      >
-                        {service.active ? "Ativo" : "Inativo"}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center justify-end gap-1">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={!service.active}
-                          onClick={() => setActivating(service)}
-                        >
-                          <Play />
-                          Ativar
-                        </Button>
-                        {canManage && (
-                          <>
-                            <Button
-                              variant="ghost"
-                              size="icon-sm"
-                              aria-label={`Editar ${service.name}`}
-                              onClick={() => setEditing(service)}
-                            >
-                              <Pencil className="size-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon-sm"
-                              aria-label={
-                                service.active
-                                  ? `Desativar ${service.name}`
-                                  : `Reativar ${service.name}`
-                              }
-                              onClick={() => handleToggle(service)}
-                            >
-                              <Power className="size-4" />
-                            </Button>
-                          </>
-                        )}
-                      </div>
+              </TableHeader>
+              <TableBody>
+                {services.length === 0 ? (
+                  <TableRow className="hover:bg-transparent">
+                    <TableCell
+                      colSpan={5}
+                      className="py-10 text-center text-sm text-muted-foreground"
+                    >
+                      Nenhum serviço cadastrado ainda.
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                ) : (
+                  services.map((service) => (
+                    <TableRow key={service.id}>
+                      <TableCell className="whitespace-nowrap pl-4">
+                        <p className="font-medium">{service.name}</p>
+                        {service.description && (
+                          <p className="text-xs text-muted-foreground">
+                            {service.description}
+                          </p>
+                        )}
+                        {service.serviceCode && (
+                          <p className="text-xs text-muted-foreground">
+                            NFS-e: {service.serviceCode}
+                          </p>
+                        )}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-right font-medium">
+                        {formatCurrency(service.defaultValueCents)}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-muted-foreground">
+                        {serviceBillingLabels[service.billing]}
+                        {service.billing === "recurring" &&
+                          ` · ${subscriptionCycleLabels[service.cycle]}`}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        <span
+                          className={cn(
+                            "chip",
+                            !service.active &&
+                              "border-border bg-muted text-muted-foreground",
+                          )}
+                        >
+                          {service.active ? "Ativo" : "Inativo"}
+                        </span>
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap pr-4">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={!service.active}
+                            onClick={() => setActivating(service)}
+                          >
+                            <Play />
+                            Ativar
+                          </Button>
+                          {canManage && (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                aria-label={`Editar ${service.name}`}
+                                onClick={() => setEditing(service)}
+                              >
+                                <Pencil className="size-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon-sm"
+                                aria-label={
+                                  service.active
+                                    ? `Desativar ${service.name}`
+                                    : `Reativar ${service.name}`
+                                }
+                                onClick={() => handleToggle(service)}
+                              >
+                                <Power className="size-4" />
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </div>
       </div>
 
@@ -246,61 +248,63 @@ export function ServiceManager({
       <div className="space-y-3">
         <h2 className="text-lg font-bold">Serviços ativos por cliente</h2>
         <div className="overflow-hidden rounded-xl bg-card ring-1 ring-foreground/10">
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead>Cliente</TableHead>
-                <TableHead>Serviço</TableHead>
-                <TableHead className="text-right">Valor</TableHead>
-                <TableHead>Pagamento</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {activeServices.length === 0 ? (
+          <div className="overflow-x-auto">
+            <Table className="min-w-[44rem]">
+              <TableHeader>
                 <TableRow className="hover:bg-transparent">
-                  <TableCell
-                    colSpan={5}
-                    className="py-10 text-center text-sm text-muted-foreground"
-                  >
-                    Nenhum serviço recorrente ativo no momento.
-                  </TableCell>
+                  <TableHead className="whitespace-nowrap pl-4">Cliente</TableHead>
+                  <TableHead className="whitespace-nowrap">Serviço</TableHead>
+                  <TableHead className="whitespace-nowrap text-right">Valor</TableHead>
+                  <TableHead className="whitespace-nowrap">Pagamento</TableHead>
+                  <TableHead className="whitespace-nowrap pr-4 text-right">Ações</TableHead>
                 </TableRow>
-              ) : (
-                activeServices.map((cs) => (
-                  <TableRow key={cs.id}>
-                    <TableCell className="font-medium">{cs.company.name}</TableCell>
-                    <TableCell>
-                      {cs.service.name}
-                      <span className="text-xs text-muted-foreground">
-                        {" "}
-                        · {subscriptionCycleLabels[cs.service.cycle]}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right font-medium">
-                      {formatCurrency(cs.valueCents)}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {chargeBillingTypeLabels[cs.billingType]}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex justify-end">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-muted-foreground hover:text-destructive"
-                          onClick={() => setDeactivating(cs)}
-                        >
-                          <XCircle />
-                          Cancelar
-                        </Button>
-                      </div>
+              </TableHeader>
+              <TableBody>
+                {activeServices.length === 0 ? (
+                  <TableRow className="hover:bg-transparent">
+                    <TableCell
+                      colSpan={5}
+                      className="py-10 text-center text-sm text-muted-foreground"
+                    >
+                      Nenhum serviço recorrente ativo no momento.
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                ) : (
+                  activeServices.map((cs) => (
+                    <TableRow key={cs.id}>
+                      <TableCell className="whitespace-nowrap pl-4 font-medium">{cs.company.name}</TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        {cs.service.name}
+                        <span className="text-xs text-muted-foreground">
+                          {" "}
+                          · {subscriptionCycleLabels[cs.service.cycle]}
+                        </span>
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-right font-medium">
+                        {formatCurrency(cs.valueCents)}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-muted-foreground">
+                        {chargeBillingTypeLabels[cs.billingType]}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap pr-4">
+                        <div className="flex justify-end">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-muted-foreground hover:text-destructive"
+                            onClick={() => setDeactivating(cs)}
+                          >
+                            <XCircle />
+                            Cancelar
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </div>
       </div>
 

@@ -234,32 +234,34 @@ export default async function QuoteDetailPage({
         <CardHeader>
           <CardTitle>Itens do orçamento</CardTitle>
         </CardHeader>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Descrição</TableHead>
-              <TableHead className="text-right">Qtd.</TableHead>
-              <TableHead className="text-right">Valor unit.</TableHead>
-              <TableHead className="text-right">Total</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {items.map((item) => (
-              <TableRow key={item.id}>
-                <TableCell>{item.description}</TableCell>
-                <TableCell className="text-right">
-                  {formatQuantity(item.quantity)}
-                </TableCell>
-                <TableCell className="text-right">
-                  {formatCurrency(item.unitPriceCents)}
-                </TableCell>
-                <TableCell className="text-right font-medium">
-                  {formatCurrency(item.totalCents)}
-                </TableCell>
+        <div className="overflow-x-auto">
+          <Table className="min-w-[40rem]">
+            <TableHeader>
+              <TableRow>
+                <TableHead className="whitespace-nowrap pl-4">Descrição</TableHead>
+                <TableHead className="whitespace-nowrap text-right">Qtd.</TableHead>
+                <TableHead className="whitespace-nowrap text-right">Valor unit.</TableHead>
+                <TableHead className="whitespace-nowrap pr-4 text-right">Total</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {items.map((item) => (
+                <TableRow key={item.id}>
+                  <TableCell className="whitespace-nowrap pl-4">{item.description}</TableCell>
+                  <TableCell className="whitespace-nowrap text-right">
+                    {formatQuantity(item.quantity)}
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap text-right">
+                    {formatCurrency(item.unitPriceCents)}
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap pr-4 text-right font-medium">
+                    {formatCurrency(item.totalCents)}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
         <CardContent className="space-y-1 border-t border-border pt-4 text-sm">
           <div className="flex justify-between text-muted-foreground">
             <span>Subtotal</span>

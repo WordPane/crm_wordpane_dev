@@ -1,8 +1,10 @@
 import { redirect } from "next/navigation";
 
+import { MobileMenuButton } from "@/components/layout/mobile-menu-button";
 import { PortalSidebar } from "@/components/layout/portal-sidebar";
 import { NotificationBell } from "@/components/layout/notification-bell";
 import { NotificationPopups } from "@/components/layout/notification-popups";
+import { SidebarProvider } from "@/components/layout/sidebar-context";
 import { UserMenu } from "@/components/layout/user-menu";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -60,51 +62,56 @@ export default async function PortalLayout({
     ]);
 
   return (
-    <div className="min-h-screen">
-      <PortalSidebar
-        companyName={company.name}
-        canManageUsers={profile?.isCompanyAdmin ?? false}
-        brand={brand}
-      />
-      <NotificationPopups
-        enabled={profile?.notifyPopup ?? false}
-        initialIds={recentUnread.map((n) => n.id)}
-      />
+    <SidebarProvider>
+      <div className="min-h-screen">
+        <PortalSidebar
+          companyName={company.name}
+          canManageUsers={profile?.isCompanyAdmin ?? false}
+          brand={brand}
+        />
+        <NotificationPopups
+          enabled={profile?.notifyPopup ?? false}
+          initialIds={recentUnread.map((n) => n.id)}
+        />
 
-      <div className="flex min-h-screen flex-col pl-60">
-        {user.impersonatedBy && (
-          <div className="flex items-center justify-center gap-3 bg-amber-400 px-4 py-2 text-sm font-medium text-amber-950">
-            Você está acessando como {user.name} (impersonação do super admin).
-            <form action={stopImpersonation}>
-              <button
-                type="submit"
-                className="font-semibold underline underline-offset-2"
-              >
-                Voltar ao meu acesso
-              </button>
-            </form>
-          </div>
-        )}
+        <div className="flex min-h-screen flex-col lg:pl-60">
+          {user.impersonatedBy && (
+            <div className="flex flex-col items-center justify-center gap-2 bg-amber-400 px-4 py-2 text-center text-sm font-medium text-amber-950 sm:flex-row sm:gap-3">
+              Você está acessando como {user.name} (impersonação do super admin).
+              <form action={stopImpersonation}>
+                <button
+                  type="submit"
+                  className="font-semibold underline underline-offset-2"
+                >
+                  Voltar ao meu acesso
+                </button>
+              </form>
+            </div>
+          )}
 
-        <header className="glass sticky top-0 z-30 flex h-16 items-center justify-end gap-3 border-b border-border px-6">
-          <NotificationBell
-            key={unreadNotifications}
-            initialUnread={unreadNotifications}
-            items={notifications}
-            viewAllHref="/portal/notificacoes"
-          />
-          <UserMenu
-            name={user.name}
-            email={user.email}
-            image={profile?.avatarUrl ? `/api/avatar/${user.id}` : null}
-            profileHref="/portal/perfil"
-          />
-        </header>
+          <header className="glass sticky top-0 z-30 flex h-16 items-center justify-between gap-3 border-b border-border px-4 lg:justify-end lg:px-6">
+            <MobileMenuButton />
+            <div className="flex items-center gap-3">
+              <NotificationBell
+                key={unreadNotifications}
+                initialUnread={unreadNotifications}
+                items={notifications}
+                viewAllHref="/portal/notificacoes"
+              />
+              <UserMenu
+                name={user.name}
+                email={user.email}
+                image={profile?.avatarUrl ? `/api/avatar/${user.id}` : null}
+                profileHref="/portal/perfil"
+              />
+            </div>
+          </header>
 
-        <main className="flex-1 p-6">
-          <div className="mx-auto w-full max-w-6xl">{children}</div>
-        </main>
+          <main className="flex-1 p-4 lg:p-6">
+            <div className="mx-auto w-full max-w-6xl">{children}</div>
+          </main>
+        </div>
       </div>
-    </div>
+    </SidebarProvider>
   );
 }

@@ -1,6 +1,7 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, Geist_Mono } from "next/font/google";
 
+import { ServiceWorkerRegister } from "@/components/pwa/service-worker-register";
 import { Toaster } from "@/components/ui/sonner";
 import { DEFAULT_BRAND, brandAssetUrl } from "@/lib/brand/config";
 import { getBranding } from "@/lib/brand/settings";
@@ -27,6 +28,12 @@ export async function generateMetadata(): Promise<Metadata> {
       template: `%s | ${brand.appName}`,
     },
     description: `Gestão de clientes, projetos e demandas — ${brand.appName}`,
+    applicationName: brand.appName,
+    appleWebApp: {
+      capable: true,
+      title: brand.appName,
+      statusBarStyle: "black-translucent",
+    },
     icons: customFavicon
       ? { icon: [{ url: brandAssetUrl(brand, "favicon") }] }
       : {
@@ -36,6 +43,16 @@ export async function generateMetadata(): Promise<Metadata> {
           ],
           apple: "/brand/apple-touch-icon.png",
         },
+  };
+}
+
+export async function generateViewport(): Promise<Viewport> {
+  const brand = await getBranding();
+  return {
+    themeColor: brand.primaryColor,
+    width: "device-width",
+    initialScale: 1,
+    viewportFit: "cover",
   };
 }
 
@@ -55,6 +72,7 @@ export default async function RootLayout({
       <body className="min-h-full flex flex-col">
         {brandCss && <style dangerouslySetInnerHTML={{ __html: brandCss }} />}
         {children}
+        <ServiceWorkerRegister />
         <Toaster />
       </body>
     </html>

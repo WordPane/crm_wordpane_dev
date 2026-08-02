@@ -98,61 +98,63 @@ export default async function QuotesPage({
         </Card>
       ) : (
         <Card>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nº</TableHead>
-                <TableHead>Título</TableHead>
-                <TableHead>Empresa</TableHead>
-                <TableHead className="text-right">Valor</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Validade</TableHead>
-                <TableHead>Criado em</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {items.map((quote) => (
-                <TableRow key={quote.id}>
-                  <TableCell className="font-mono text-xs">
-                    <Link
-                      href={`/admin/orcamentos/${quote.id}`}
-                      className="font-medium text-primary hover:underline"
-                    >
-                      {formatQuoteNumber(quote.number)}
-                    </Link>
-                    {quote.version > 1 && (
-                      <span className="ml-1 text-muted-foreground">
-                        v{quote.version}
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Link
-                      href={`/admin/orcamentos/${quote.id}`}
-                      className="font-medium hover:underline"
-                    >
-                      {quote.title}
-                    </Link>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {quote.company.name}
-                  </TableCell>
-                  <TableCell className="text-right font-medium">
-                    {formatCurrency(quote.totalCents)}
-                  </TableCell>
-                  <TableCell>
-                    <QuoteStatusChip status={quote.status} />
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {formatDate(quote.validUntil)}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {formatDate(quote.createdAt)}
-                  </TableCell>
+          <div className="overflow-x-auto">
+            <Table className="min-w-[52rem]">
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="whitespace-nowrap pl-4">Nº</TableHead>
+                  <TableHead className="whitespace-nowrap">Título</TableHead>
+                  <TableHead className="whitespace-nowrap">Empresa</TableHead>
+                  <TableHead className="whitespace-nowrap text-right">Valor</TableHead>
+                  <TableHead className="whitespace-nowrap">Status</TableHead>
+                  <TableHead className="whitespace-nowrap">Validade</TableHead>
+                  <TableHead className="whitespace-nowrap pr-4">Criado em</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {items.map((quote) => (
+                  <TableRow key={quote.id}>
+                    <TableCell className="whitespace-nowrap pl-4 font-mono text-xs">
+                      <Link
+                        href={`/admin/orcamentos/${quote.id}`}
+                        className="font-medium text-primary hover:underline"
+                      >
+                        {formatQuoteNumber(quote.number)}
+                      </Link>
+                      {quote.version > 1 && (
+                        <span className="ml-1 text-muted-foreground">
+                          v{quote.version}
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      <Link
+                        href={`/admin/orcamentos/${quote.id}`}
+                        className="font-medium hover:underline"
+                      >
+                        {quote.title}
+                      </Link>
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-muted-foreground">
+                      {quote.company.name}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-right font-medium">
+                      {formatCurrency(quote.totalCents)}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      <QuoteStatusChip status={quote.status} />
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-muted-foreground">
+                      {formatDate(quote.validUntil)}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap pr-4 text-muted-foreground">
+                      {formatDate(quote.createdAt)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </Card>
       )}
     </div>

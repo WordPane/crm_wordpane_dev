@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
+import { NotificationSettingsForm } from "@/components/profile/notification-settings-form";
 import { PasswordForm } from "@/components/profile/password-form";
 import { AvatarUpload } from "@/components/profile/avatar-upload";
 import { PopupPreferenceForm } from "@/components/profile/popup-preference-form";
@@ -31,6 +32,7 @@ export default async function AdminProfilePage() {
       email: users.email,
       avatarUrl: users.avatarUrl,
       notifyPopup: users.notifyPopup,
+      notificationSettings: users.notificationSettings,
     })
     .from(users)
     .where(eq(users.id, sessionUser.id))
@@ -98,8 +100,11 @@ export default async function AdminProfilePage() {
             Como você quer ser avisado das novidades.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-6">
           <PopupPreferenceForm defaultEnabled={profile.notifyPopup} />
+          <NotificationSettingsForm
+            defaultSettings={profile.notificationSettings}
+          />
         </CardContent>
       </Card>
     </div>

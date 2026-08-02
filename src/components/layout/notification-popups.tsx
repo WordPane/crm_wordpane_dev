@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 
+import { NotificationText } from "@/components/notifications/notification-text";
 import { isPriorityNotification } from "@/lib/notification-display";
 
 type RecentItem = {
@@ -54,11 +55,14 @@ export function NotificationPopups({
               ? { label: "Ver", onClick: () => router.push(href) }
               : undefined,
           };
+          const titleNode = (
+            <NotificationText text={item.title} href={href} />
+          );
           // Demandas de clientes são prioridade: popup em destaque (âmbar)
           if (isPriorityNotification(item.type)) {
-            toast.warning(item.title, options);
+            toast.warning(titleNode, options);
           } else {
-            toast(item.title, options);
+            toast(titleNode, options);
           }
         }
       } catch {

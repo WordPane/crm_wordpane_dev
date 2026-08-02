@@ -7,6 +7,9 @@ import { sql } from "drizzle-orm";
 /** "Hoje" em America/Sao_Paulo. */
 export const SQL_TODAY = sql`(now() AT TIME ZONE 'America/Sao_Paulo')::date`;
 
+/** "Amanhã" em America/Sao_Paulo. */
+export const SQL_TOMORROW = sql`(now() AT TIME ZONE 'America/Sao_Paulo')::date + interval '1 day'`;
+
 /** "Este mês" em America/Sao_Paulo. */
 export const SQL_THIS_MONTH = sql`date_trunc('month', now() AT TIME ZONE 'America/Sao_Paulo')`;
 

@@ -122,7 +122,7 @@ export default async function CompanyDetailPage({
 
       {/* ─── Tabs ─── */}
       <Tabs defaultValue={activeTab}>
-        <TabsList>
+        <TabsList className="w-full max-w-full overflow-x-auto">
           <TabsTrigger value="dados">Dados</TabsTrigger>
           <TabsTrigger value="usuarios">Usuários</TabsTrigger>
           <TabsTrigger value="projetos">Projetos</TabsTrigger>

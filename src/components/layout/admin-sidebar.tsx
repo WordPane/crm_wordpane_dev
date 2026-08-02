@@ -16,6 +16,7 @@ import {
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { useSidebar } from "@/components/layout/sidebar-context";
 import type { UserRole } from "@/lib/auth/types";
 import { brandAssetUrl, type BrandConfig } from "@/lib/brand/config";
 import { cn } from "@/lib/utils";
@@ -45,46 +46,65 @@ export function AdminSidebar({
   brand: BrandConfig;
 }) {
   const pathname = usePathname();
+  const { open, setOpen } = useSidebar();
   const items =
     role === "super_admin" ? [...NAV_ITEMS, ...SUPER_ONLY_ITEMS] : NAV_ITEMS;
 
   return (
-    <aside className="glass fixed inset-y-0 left-0 z-40 flex w-60 flex-col border-r border-sidebar-border">
-      <div className="flex h-16 items-center border-b border-sidebar-border px-5">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={brandAssetUrl(brand, "logo")}
-          alt={brand.appName}
-          className="h-7 w-auto"
+    <>
+      {/* Overlay para fechar ao clicar fora em telas pequenas */}
+      {open && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          onClick={() => setOpen(false)}
+          aria-hidden="true"
         />
-      </div>
+      )}
 
-      <nav className="flex-1 space-y-1 overflow-y-auto p-3">
-        {items.map(({ href, label, icon: Icon }) => {
-          const active = pathname.startsWith(href);
-          return (
-            <Link
-              key={href}
-              href={href}
-              className={cn(
-                "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
-                active
-                  ? "bg-primary/10 text-primary"
-                  : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground",
-              )}
-            >
-              <Icon className="size-4" />
-              {label}
-            </Link>
-          );
-        })}
-      </nav>
+      <aside
+        className={cn(
+          "glass fixed inset-y-0 left-0 z-50 flex w-60 flex-col border-r border-sidebar-border transition-transform duration-200",
+          "-translate-x-full lg:translate-x-0",
+          open && "translate-x-0",
+        )}
+      >
+        <div className="flex h-16 items-center border-b border-sidebar-border px-5">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={brandAssetUrl(brand, "logo")}
+            alt={brand.appName}
+            className="h-7 w-auto"
+          />
+        </div>
 
-      <div className="border-t border-sidebar-border p-4">
-        <p className="text-[0.65rem] tracking-widest text-muted-foreground/50 uppercase">
-          {brand.appName} · Admin
-        </p>
-      </div>
-    </aside>
+        <nav className="flex-1 space-y-1 overflow-y-auto p-3">
+          {items.map(({ href, label, icon: Icon }) => {
+            const active = pathname.startsWith(href);
+            return (
+              <Link
+                key={href}
+                href={href}
+                onClick={() => setOpen(false)}
+                className={cn(
+                  "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
+                  active
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground",
+                )}
+              >
+                <Icon className="size-4" />
+                {label}
+              </Link>
+            );
+          })}
+        </nav>
+
+        <div className="border-t border-sidebar-border p-4">
+          <p className="text-[0.65rem] tracking-widest text-muted-foreground/50 uppercase">
+            {brand.appName} · Admin
+          </p>
+        </div>
+      </aside>
+    </>
   );
 }

@@ -9,6 +9,8 @@ import {
   notifications,
   users,
   type Charge,
+  type NotificationCategory,
+  type NotificationSettings,
 } from "@/lib/db/schema";
 import { sendEmail, type SendEmailQrCode } from "@/lib/email/mailer";
 import { getEmailSettings } from "@/lib/email/settings";
@@ -23,6 +25,8 @@ export type NotificationInput = {
   type: string;
   title: string;
   body?: string | null;
+  /** Se true, `body` contém HTML seguro permitido no e-mail (negrito, itálico, links, listas). */
+  bodyIsHtml?: boolean;
   href?: string | null;
   /** Linhas label/valor exibidas no corpo do e-mail (opcional). */
   rows?: EmailTemplateRow[];
@@ -37,6 +41,28 @@ export type NotificationInput = {
   qrCode?: SendEmailQrCode;
 };
 
+function notificationCategory(type: string): NotificationCategory {
+  if (type.startsWith("task.")) return "task";
+  if (type === "comment" || type.startsWith("comment.")) return "comment";
+  if (type.startsWith("project.")) return "project";
+  if (type.startsWith("demand.")) return "demand";
+  if (type.startsWith("quote.")) return "quote";
+  if (type.startsWith("charge.")) return "charge";
+  return "system";
+}
+
+function channelsForUser(
+  settings: NotificationSettings | null,
+  category: NotificationCategory,
+): { in_app: boolean; email: boolean; digest: boolean } {
+  const configured = settings?.channels?.[category] ?? ["in_app", "email"];
+  return {
+    in_app: configured.includes("in_app"),
+    email: configured.includes("email"),
+    digest: configured.includes("digest") || settings?.digest === true,
+  };
+}
+
 /** Insere notificações em lote (deduplica destinatários, ignora lista vazia). */
 export async function notifyUsers(
   userIds: string[],
@@ -44,17 +70,36 @@ export async function notifyUsers(
 ): Promise<void> {
   const ids = [...new Set(userIds)].filter(Boolean);
   if (ids.length === 0) return;
-  await db.insert(notifications).values(
-    ids.map((userId) => ({
-      userId,
-      type: n.type,
-      title: n.title,
-      body: n.body ?? null,
-      href: n.href ?? null,
-    })),
-  );
-  // E-mail é best-effort: o insert acima é a fonte de verdade e nunca falha por causa de SMTP
-  await emailNotificationRecipients(ids, n);
+
+  const category = notificationCategory(n.type);
+  const userRows = await db
+    .select({ id: users.id, settings: users.notificationSettings })
+    .from(users)
+    .where(and(inArray(users.id, ids), eq(users.status, "active")));
+
+  const inAppIds: string[] = [];
+  const emailIds: string[] = [];
+
+  for (const user of userRows) {
+    const channels = channelsForUser(user.settings, category);
+    if (channels.in_app) inAppIds.push(user.id);
+    if (channels.email && !channels.digest) emailIds.push(user.id);
+  }
+
+  if (inAppIds.length > 0) {
+    await db.insert(notifications).values(
+      inAppIds.map((userId) => ({
+        userId,
+        type: n.type,
+        title: n.title,
+        body: n.body ?? null,
+        href: n.href ?? null,
+      })),
+    );
+  }
+
+  // E-mail é best-effort: nunca falha a notificação principal por causa de SMTP
+  await emailNotificationRecipients(emailIds, n);
 }
 
 /**
@@ -112,6 +157,7 @@ async function emailNotificationRecipients(
           subject: n.title,
           title: n.title,
           intro: n.body ?? n.title,
+          introIsHtml: n.bodyIsHtml,
           rows: n.rows,
           cta,
           links,
@@ -230,6 +276,64 @@ export async function clientUsersOfCompany(
   return rows.map((r) => r.id);
 }
 
+function taskLink(taskId: string, title: string): string {
+  return `<a href="/admin/tarefas/${taskId}" target="_blank">${title}</a>`;
+}
+
+function projectLink(projectName: string, projectId: string): string {
+  return `<a href="/admin/projetos/${projectId}" target="_blank">${projectName}</a>`;
+}
+
+/**
+ * Avisa o responsável sobre tarefa com prazo próximo (amanhã).
+ */
+export async function notifyTaskDueSoon(input: {
+  userId: string;
+  taskId: string;
+  taskTitle: string;
+  projectId: string;
+  projectName: string;
+  dueDate: string;
+}): Promise<void> {
+  await notifyUsers([input.userId], {
+    type: "task.due_soon",
+    title: `Prazo próximo: "${input.taskTitle}"`,
+    body: `A tarefa ${taskLink(input.taskId, input.taskTitle)} vence amanhã (${input.dueDate}) no projeto ${projectLink(input.projectName, input.projectId)}.`,
+    bodyIsHtml: true,
+    href: `/admin/tarefas/${input.taskId}`,
+    rows: [
+      { label: "Projeto", value: input.projectName },
+      { label: "Tarefa", value: input.taskTitle },
+      { label: "Prazo", value: input.dueDate },
+    ],
+  });
+}
+
+/**
+ * Avisa o responsável sobre tarefa vencida.
+ */
+export async function notifyTaskOverdue(input: {
+  userId: string;
+  taskId: string;
+  taskTitle: string;
+  projectId: string;
+  projectName: string;
+  dueDate: string;
+}): Promise<void> {
+  await notifyUsers([input.userId], {
+    type: "task.overdue",
+    title: `Tarefa vencida: "${input.taskTitle}"`,
+    body: `A tarefa ${taskLink(input.taskId, input.taskTitle)} venceu em ${input.dueDate} no projeto ${projectLink(input.projectName, input.projectId)}.`,
+    bodyIsHtml: true,
+    href: `/admin/tarefas/${input.taskId}`,
+    rows: [
+      { label: "Projeto", value: input.projectName },
+      { label: "Tarefa", value: input.taskTitle },
+      { label: "Vencimento", value: input.dueDate },
+    ],
+  });
+}
+
 /**
  * Avisa o novo responsável por uma tarefa (notificação interna + e-mail).
  * Não dispara quando não há responsável ou quando o autor atribui a si mesmo.
@@ -240,13 +344,15 @@ export async function notifyTaskAssigned(input: {
   ownerId: string | null;
   taskId: string;
   taskTitle: string;
+  projectId: string;
   projectName: string;
 }): Promise<void> {
   if (!input.ownerId || input.ownerId === input.actorId) return;
   await notifyUsers([input.ownerId], {
     type: "task.assigned",
-    title: `Tarefa atribuída a você: ${input.taskTitle}`,
-    body: `${input.actorName} atribuiu a tarefa "${input.taskTitle}" para você no projeto ${input.projectName}.`,
+    title: `Tarefa atribuída a você: "${input.taskTitle}"`,
+    body: `${input.actorName} atribuiu a tarefa ${taskLink(input.taskId, input.taskTitle)} para você no projeto ${projectLink(input.projectName, input.projectId)}.`,
+    bodyIsHtml: true,
     href: `/admin/tarefas/${input.taskId}`,
     rows: [
       { label: "Projeto", value: input.projectName },

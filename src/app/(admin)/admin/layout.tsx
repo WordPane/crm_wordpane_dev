@@ -2,9 +2,11 @@ import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 
 import { AdminSidebar } from "@/components/layout/admin-sidebar";
+import { MobileMenuButton } from "@/components/layout/mobile-menu-button";
 import { NotificationBell } from "@/components/layout/notification-bell";
 import { NotificationPopups } from "@/components/layout/notification-popups";
 import { SearchPalette } from "@/components/layout/search-palette";
+import { SidebarProvider } from "@/components/layout/sidebar-context";
 import { UserMenu } from "@/components/layout/user-menu";
 import { requireTeam, requireUser } from "@/lib/access/permissions";
 import { getBranding } from "@/lib/brand/settings";
@@ -46,32 +48,37 @@ export default async function AdminLayout({
     ]);
 
   return (
-    <div className="min-h-screen">
-      <AdminSidebar role={user.role} brand={brand} />
-      <NotificationPopups
-        enabled={prefs?.notifyPopup ?? false}
-        initialIds={recentUnread.map((n) => n.id)}
-      />
+    <SidebarProvider>
+      <div className="min-h-screen">
+        <AdminSidebar role={user.role} brand={brand} />
+        <NotificationPopups
+          enabled={prefs?.notifyPopup ?? false}
+          initialIds={recentUnread.map((n) => n.id)}
+        />
 
-      <div className="flex min-h-screen flex-col pl-60">
-        <header className="glass sticky top-0 z-30 flex h-16 items-center justify-end gap-3 border-b border-border px-6">
-          <SearchPalette />
-          <NotificationBell
-            key={unreadNotifications}
-            initialUnread={unreadNotifications}
-            items={notifications}
-            viewAllHref="/admin/notificacoes"
-          />
-          <UserMenu
-            name={user.name}
-            email={user.email}
-            image={prefs?.avatarUrl ? `/api/avatar/${user.id}` : null}
-            profileHref="/admin/perfil"
-          />
-        </header>
+        <div className="flex min-h-screen flex-col lg:pl-60">
+          <header className="glass sticky top-0 z-30 flex h-16 items-center justify-between gap-3 border-b border-border px-4 lg:justify-end lg:px-6">
+            <MobileMenuButton />
+            <div className="flex items-center gap-3">
+              <SearchPalette />
+              <NotificationBell
+                key={unreadNotifications}
+                initialUnread={unreadNotifications}
+                items={notifications}
+                viewAllHref="/admin/notificacoes"
+              />
+              <UserMenu
+                name={user.name}
+                email={user.email}
+                image={prefs?.avatarUrl ? `/api/avatar/${user.id}` : null}
+                profileHref="/admin/perfil"
+              />
+            </div>
+          </header>
 
-        <main className="flex-1 p-6">{children}</main>
+          <main className="flex-1 p-4 lg:p-6">{children}</main>
+        </div>
       </div>
-    </div>
+    </SidebarProvider>
   );
 }

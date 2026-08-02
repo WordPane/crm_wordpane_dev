@@ -82,61 +82,63 @@ export default async function CompaniesPage({
           </CardContent>
         </Card>
       ) : (
-        <div className="overflow-hidden rounded-xl bg-card ring-1 ring-foreground/10 [&_td:first-child]:pl-4 [&_td:last-child]:pr-4 [&_th:first-child]:pl-4 [&_th:last-child]:pr-4">
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead>Empresa</TableHead>
-                <TableHead>CNPJ/CPF</TableHead>
-                <TableHead>Cidade/UF</TableHead>
-                <TableHead>E-mail</TableHead>
-                <TableHead>WhatsApp</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="w-12" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {items.map((c) => (
-                <TableRow key={c.id}>
-                  <TableCell>
-                    <Link
-                      href={`/admin/clientes/${c.id}`}
-                      className="block font-medium text-foreground transition-colors hover:text-primary"
-                    >
-                      {c.nomeFantasia || c.razaoSocial}
-                      {c.nomeFantasia && (
-                        <span className="block text-xs font-normal text-muted-foreground">
-                          {c.razaoSocial}
-                        </span>
-                      )}
-                    </Link>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {c.cnpj ?? "—"}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {[c.cidade, c.estado].filter(Boolean).join("/") || "—"}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {c.email ?? "—"}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {c.whatsapp ?? "—"}
-                  </TableCell>
-                  <TableCell>
-                    <CompanyStatusChip status={c.status} />
-                  </TableCell>
-                  <TableCell>
-                    <CompanyRowActions
-                      companyId={c.id}
-                      companyName={c.nomeFantasia || c.razaoSocial}
-                      canDelete={user.role === "super_admin"}
-                    />
-                  </TableCell>
+        <div className="overflow-hidden rounded-xl bg-card ring-1 ring-foreground/10">
+          <div className="overflow-x-auto">
+            <Table className="min-w-[52rem]">
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="whitespace-nowrap pl-4">Empresa</TableHead>
+                  <TableHead className="whitespace-nowrap">CNPJ/CPF</TableHead>
+                  <TableHead className="whitespace-nowrap">Cidade/UF</TableHead>
+                  <TableHead className="whitespace-nowrap">E-mail</TableHead>
+                  <TableHead className="whitespace-nowrap">WhatsApp</TableHead>
+                  <TableHead className="whitespace-nowrap">Status</TableHead>
+                  <TableHead className="w-12 whitespace-nowrap pr-4" />
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {items.map((c) => (
+                  <TableRow key={c.id}>
+                    <TableCell className="whitespace-nowrap pl-4">
+                      <Link
+                        href={`/admin/clientes/${c.id}`}
+                        className="block font-medium text-foreground transition-colors hover:text-primary"
+                      >
+                        {c.nomeFantasia || c.razaoSocial}
+                        {c.nomeFantasia && (
+                          <span className="block text-xs font-normal text-muted-foreground">
+                            {c.razaoSocial}
+                          </span>
+                        )}
+                      </Link>
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-muted-foreground">
+                      {c.cnpj ?? "—"}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-muted-foreground">
+                      {[c.cidade, c.estado].filter(Boolean).join("/") || "—"}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-muted-foreground">
+                      {c.email ?? "—"}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-muted-foreground">
+                      {c.whatsapp ?? "—"}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      <CompanyStatusChip status={c.status} />
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap pr-4">
+                      <CompanyRowActions
+                        companyId={c.id}
+                        companyName={c.nomeFantasia || c.razaoSocial}
+                        canDelete={user.role === "super_admin"}
+                      />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </div>
       )}
     </div>
