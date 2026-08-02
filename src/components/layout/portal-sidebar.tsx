@@ -67,6 +67,7 @@ export function PortalSidebar({
           "-translate-x-full lg:translate-x-0",
           open && "translate-x-0",
         )}
+        style={{ paddingTop: "env(safe-area-inset-top)" }}
       >
         <div className="flex h-16 items-center border-b border-sidebar-border px-5">
           {/* eslint-disable-next-line @next/next/no-img-element */}
