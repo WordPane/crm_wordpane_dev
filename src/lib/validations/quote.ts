@@ -81,6 +81,7 @@ export const quoteFormSchema = z.object({
   discount: z.string(), // "1.234,56" (R$) ou "10,5" (%) — "" = sem desconto
   discountType: z.enum(quoteDiscountTypes),
   notes: z.string(),
+  scope: z.string(),
   items: z
     .array(
       z.object({
@@ -103,6 +104,7 @@ export const emptyQuoteValues: QuoteFormValues = {
   discount: "",
   discountType: "amount",
   notes: "",
+  scope: "",
   items: [{ description: "", quantity: "1", unitPrice: "", serviceId: "" }],
 };
 
@@ -117,6 +119,7 @@ export const quotePayloadSchema = z.object({
     .optional()
     .or(z.literal("")),
   notes: z.string().trim().max(2000, "Observações muito longas.").optional(),
+  scope: z.string().trim().max(5000, "Escopo muito longo.").optional(),
   discountCents: z.number().int().min(0, "Desconto inválido."),
   discountType: z.enum(quoteDiscountTypes),
   /** Percentual × 100 (10,5% = 1050). Obrigatório quando tipo = percent. */

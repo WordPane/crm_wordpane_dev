@@ -74,6 +74,7 @@ export default async function EditQuotePage({
           : "",
     discountType: quote.discountType,
     notes: quote.notes ?? "",
+    scope: quote.scope ?? "",
     items: items.map((item) => ({
       description: item.description,
       quantity: item.quantity.replace(".", ","),

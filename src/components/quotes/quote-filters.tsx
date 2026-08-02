@@ -1,7 +1,9 @@
 "use client";
 
+import { X } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -82,6 +84,18 @@ export function QuoteFilters({
           ))}
         </SelectContent>
       </Select>
+
+      {(status || companyId) && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => router.replace(pathname, { scroll: false })}
+        >
+          <X className="size-4" />
+          Limpar filtros
+        </Button>
+      )}
     </div>
   );
 }

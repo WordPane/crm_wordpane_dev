@@ -766,6 +766,8 @@ export const quotes = pgTable(
       .references(() => companies.id, { onDelete: "cascade" }),
     title: varchar("title", { length: 220 }).notNull(),
     notes: text("notes"), // condições, prazos, observações exibidas no orçamento
+    /** Escopo do que será desenvolvido/entregue — exibido antes do valor. */
+    scope: text("scope"),
     status: quoteStatusEnum("status").notNull().default("draft"),
     validUntil: date("valid_until"),
     discountCents: integer("discount_cents").notNull().default(0),

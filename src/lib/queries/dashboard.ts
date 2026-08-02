@@ -468,7 +468,7 @@ async function listRecentActivities(
     .orderBy(desc(activities.createdAt))
     .limit(10);
 
-  return rows.map((r) => {
+  const items = rows.map((r) => {
     const item: ActivityItem = {
       id: r.id,
       action: r.action,
@@ -487,6 +487,40 @@ async function listRecentActivities(
     if (milestoneHref) item.milestoneHref = milestoneHref;
     return item;
   });
+
+  // Fallback para comentários antigos cujo metadata não tinha taskId:
+  // busca a tarefa vinculada ao comentário e monta o link.
+  const commentIdsWithoutHref = items
+    .filter(
+      (item) =>
+        item.action === "comment.added" &&
+        !item.href &&
+        item.entityType === "comment" &&
+        item.entityId,
+    )
+    .map((item) => item.entityId!);
+
+  if (commentIdsWithoutHref.length > 0) {
+    const commentTasks = await db
+      .select({ id: comments.id, taskId: comments.taskId })
+      .from(comments)
+      .where(inArray(comments.id, commentIdsWithoutHref));
+    const taskIdByComment = new Map(commentTasks.map((c) => [c.id, c.taskId]));
+
+    for (const item of items) {
+      if (
+        item.action === "comment.added" &&
+        !item.href &&
+        item.entityType === "comment" &&
+        item.entityId
+      ) {
+        const taskId = taskIdByComment.get(item.entityId);
+        if (taskId) item.href = `/admin/tarefas/${taskId}`;
+      }
+    }
+  }
+
+  return items;
 }
 
 /** Últimos 8 anexos do escopo, com autor e origem. */

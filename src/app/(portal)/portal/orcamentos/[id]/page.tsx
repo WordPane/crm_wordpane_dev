@@ -172,6 +172,19 @@ export default async function PortalQuoteDetailPage({
         </Card>
       )}
 
+      {quote.status !== "requested" && quote.scope && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Escopo / O que será desenvolvido</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="whitespace-pre-wrap text-sm text-muted-foreground">
+              {quote.scope}
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
       {quote.status !== "requested" && (
         <Card>
           <CardHeader>

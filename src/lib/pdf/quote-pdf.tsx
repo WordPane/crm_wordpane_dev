@@ -248,6 +248,15 @@ function QuotePdfDocument({
             <Text style={styles.value}>{quote.title}</Text>
           </View>
 
+          {quote.scope && (
+            <View style={styles.section} wrap={false}>
+              <Text style={brandStyles.sectionTitle}>Escopo / O que será desenvolvido</Text>
+              <View style={styles.notes}>
+                <Text>{quote.scope}</Text>
+              </View>
+            </View>
+          )}
+
           <View style={styles.section}>
             <View style={styles.tableHeader} fixed>
               <Text style={styles.colDesc}>DESCRIÇÃO</Text>

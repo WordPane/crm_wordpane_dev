@@ -31,7 +31,7 @@ import {
   type QuoteFormValues,
   type QuotePayload,
 } from "@/lib/validations/quote";
-import { createQuote, updateQuote } from "@/server/actions/quotes";
+import { createQuote, sendQuote, updateQuote } from "@/server/actions/quotes";
 
 type SelectOption = { id: string; name: string };
 /** Serviço do catálogo para o seletor de itens (preenche descrição e valor). */
@@ -91,6 +91,7 @@ const MANUAL = "__manual__";
 export function QuoteForm(props: QuoteFormProps) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  const [intent, setIntent] = useState<"save" | "send">("save");
   const [pending, startTransition] = useTransition();
 
   const form = useForm<QuoteFormValues>({
@@ -183,6 +184,7 @@ export function QuoteForm(props: QuoteFormProps) {
       title: values.title,
       validUntil: values.validUntil,
       notes: values.notes,
+      scope: values.scope,
       discountCents,
       discountType: values.discountType,
       discountPercentBps,
@@ -200,15 +202,30 @@ export function QuoteForm(props: QuoteFormProps) {
         return;
       }
 
-      if (props.mode === "create") {
-        toast.success("Orçamento criado como rascunho.");
-        router.push(
-          result.id ? `/admin/orcamentos/${result.id}` : "/admin/orcamentos",
-        );
+      const quoteId = props.mode === "edit" ? props.quoteId : result.id;
+
+      if (intent === "send" && quoteId) {
+        const sendResult = await sendQuote(quoteId);
+        if ("error" in sendResult) {
+          setError(sendResult.error);
+          toast.success(
+            props.mode === "edit"
+              ? "Orçamento salvo, mas não foi possível enviá-lo."
+              : "Orçamento criado, mas não foi possível enviá-lo.",
+          );
+          router.push(`/admin/orcamentos/${quoteId}`);
+          return;
+        }
+        toast.success("Orçamento salvo e enviado ao cliente.");
       } else {
-        toast.success("Orçamento atualizado.");
-        router.push(`/admin/orcamentos/${props.quoteId}`);
+        toast.success(
+          props.mode === "edit"
+            ? "Orçamento atualizado como rascunho."
+            : "Orçamento criado como rascunho.",
+        );
       }
+
+      router.push(`/admin/orcamentos/${quoteId}`);
     });
   }
 
@@ -467,9 +484,17 @@ export function QuoteForm(props: QuoteFormProps) {
         </div>
       </div>
 
+      <Field label="Escopo / O que será desenvolvido" error={errors.scope?.message}>
+        <Textarea
+          placeholder="Descreva o que será entregue, funcionalidades, etapas..."
+          rows={5}
+          {...form.register("scope")}
+        />
+      </Field>
+
       <Field label="Observações" error={errors.notes?.message}>
         <Textarea
-          placeholder="Condições de pagamento, prazos, escopo..."
+          placeholder="Condições de pagamento, prazos, observações gerais..."
           rows={4}
           {...form.register("notes")}
         />
@@ -481,18 +506,34 @@ export function QuoteForm(props: QuoteFormProps) {
         </p>
       )}
 
-      <div className="flex items-center justify-end gap-2">
+      <div className="flex flex-col-reverse items-center justify-end gap-2 sm:flex-row">
         <Button
           type="button"
           variant="outline"
           disabled={pending}
           onClick={() => router.back()}
+          className="w-full sm:w-auto"
         >
           Cancelar
         </Button>
-        <Button type="submit" disabled={pending || totalCents < 0}>
-          {pending && <Loader2 className="animate-spin" />}
-          {props.mode === "edit" ? "Salvar alterações" : "Criar orçamento"}
+        <Button
+          type="submit"
+          variant="outline"
+          disabled={pending || totalCents < 0}
+          className="w-full sm:w-auto"
+          onClick={() => setIntent("save")}
+        >
+          {pending && intent === "save" && <Loader2 className="animate-spin" />}
+          Salvar rascunho
+        </Button>
+        <Button
+          type="submit"
+          disabled={pending || totalCents < 0}
+          className="w-full sm:w-auto"
+          onClick={() => setIntent("send")}
+        >
+          {pending && intent === "send" && <Loader2 className="animate-spin" />}
+          Salvar e enviar ao cliente
         </Button>
       </div>
     </form>

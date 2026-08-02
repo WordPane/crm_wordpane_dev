@@ -230,6 +230,19 @@ export default async function QuoteDetailPage({
         </Card>
       )}
 
+      {quote.scope && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Escopo / O que será desenvolvido</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="whitespace-pre-wrap text-sm text-muted-foreground">
+              {quote.scope}
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle>Itens do orçamento</CardTitle>

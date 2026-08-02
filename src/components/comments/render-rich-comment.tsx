@@ -5,10 +5,42 @@ import { Fragment, type ReactNode } from "react";
 
 import { sanitizeCommentHtml } from "@/lib/rich-text";
 
+const URL_REGEX = /(https?:\/\/\S+)/;
+
+function linkifyText(text: string, key: string): ReactNode {
+  const parts = text.split(URL_REGEX);
+  if (parts.length <= 1) return text;
+
+  return (
+    <Fragment key={key}>
+      {parts.map((part, i) => {
+        if (URL_REGEX.test(part)) {
+          return (
+            <a
+              key={`${key}-url-${i}`}
+              href={part}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium text-primary underline-offset-2 hover:underline"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {part}
+            </a>
+          );
+        }
+        return <Fragment key={`${key}-txt-${i}`}>{part}</Fragment>;
+      })}
+    </Fragment>
+  );
+}
+
+type RenderContext = { inAnchor: boolean };
+
 /**
  * Transforma um HTML de comentário em React nodes.
  * - Menções a usuários (`@nome`) ganham badge.
  * - Menções a tarefas (`#título`) viram Link.
+ * - URLs soltas no texto viram link automaticamente.
  * - Demais tags são renderizadas como elementos React.
  */
 export function renderRichComment(
@@ -23,16 +55,26 @@ export function renderRichComment(
   const parser = new DOMParser();
   const doc = parser.parseFromString(clean, "text/html");
 
-  function renderNode(node: Node, key: string): ReactNode {
+  function renderNode(
+    node: Node,
+    key: string,
+    ctx: RenderContext = { inAnchor: false },
+  ): ReactNode {
     if (node.nodeType === Node.TEXT_NODE) {
-      return <Fragment key={key}>{node.textContent}</Fragment>;
+      const text = node.textContent ?? "";
+      if (ctx.inAnchor || !text.trim()) {
+        return <Fragment key={key}>{text}</Fragment>;
+      }
+      return linkifyText(text, key);
     }
     if (node.nodeType !== Node.ELEMENT_NODE) return null;
 
     const el = node as Element;
     const tag = el.tagName.toLowerCase();
+    const childCtx: RenderContext =
+      tag === "a" ? { inAnchor: true } : ctx;
     const children = Array.from(el.childNodes).map((child, i) =>
-      renderNode(child, `${key}-${i}`),
+      renderNode(child, `${key}-${i}`, childCtx),
     );
 
     if (tag === "span" && el.getAttribute("data-type") === "mention") {
@@ -53,6 +95,7 @@ export function renderRichComment(
             key={key}
             href={taskHref(taskId)}
             className="mention mention-task inline-flex items-center gap-1 rounded-md px-1 py-0.5 font-medium text-primary underline-offset-2 transition-colors hover:text-primary/80 hover:underline"
+            onClick={(e) => e.stopPropagation()}
           >
             #{task.title}
           </Link>
@@ -77,6 +120,7 @@ export function renderRichComment(
           target={el.getAttribute("target") ?? "_blank"}
           rel={el.getAttribute("rel") ?? "noopener noreferrer"}
           className="font-medium text-primary underline-offset-2 hover:underline"
+          onClick={(e) => e.stopPropagation()}
         >
           {children}
         </a>
@@ -110,8 +154,18 @@ export function renderRichComment(
       return <em key={key}>{children}</em>;
     }
     if (tag === "u") return <u key={key}>{children}</u>;
-    if (tag === "ul") return <ul key={key} className="mb-2 list-disc pl-5">{children}</ul>;
-    if (tag === "ol") return <ol key={key} className="mb-2 list-decimal pl-5">{children}</ol>;
+    if (tag === "ul")
+      return (
+        <ul key={key} className="mb-2 list-disc pl-5">
+          {children}
+        </ul>
+      );
+    if (tag === "ol")
+      return (
+        <ol key={key} className="mb-2 list-decimal pl-5">
+          {children}
+        </ol>
+      );
     if (tag === "li") return <li key={key}>{children}</li>;
 
     return <span key={key}>{children}</span>;
