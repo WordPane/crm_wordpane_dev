@@ -89,7 +89,10 @@ export default async function PortalLayout({
             </div>
           )}
 
-          <header className="glass sticky top-0 z-30 flex h-16 items-center justify-between gap-3 border-b border-border px-4 lg:justify-end lg:px-6">
+          <header
+            className="glass sticky top-0 z-30 flex min-h-16 items-center justify-between gap-3 border-b border-border px-4 lg:justify-end lg:px-6"
+            style={{ paddingTop: "env(safe-area-inset-top)" }}
+          >
             <MobileMenuButton />
             <div className="flex items-center gap-3">
               <NotificationBell
