@@ -19,12 +19,18 @@ export function invalidateSetupCache(): void {
 export async function hasSuperAdmin(): Promise<boolean> {
   if (cache && cache.expiresAt > Date.now()) return cache.value;
 
-  const [row] = await db
-    .select({ value: count() })
-    .from(users)
-    .where(eq(users.role, "super_admin"));
+  try {
+    const [row] = await db
+      .select({ value: count() })
+      .from(users)
+      .where(eq(users.role, "super_admin"));
 
-  const value = (row?.value ?? 0) > 0;
-  cache = { value, expiresAt: Date.now() + CACHE_TTL_MS };
-  return value;
+    const value = (row?.value ?? 0) > 0;
+    cache = { value, expiresAt: Date.now() + CACHE_TTL_MS };
+    return value;
+  } catch {
+    // Durante builds sem banco disponível (ex: Dokploy) assumimos que a
+    // instância já foi configurada, evitando quebrar a prerenderização.
+    return true;
+  }
 }
