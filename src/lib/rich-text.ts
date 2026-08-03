@@ -1,12 +1,12 @@
-import DOMPurify from "isomorphic-dompurify";
+import sanitizeHtml from "sanitize-html";
 
 /**
  * Sanitiza HTML de comentários ricos.
  * Permite apenas formatação básica, links, imagens e menções.
  */
 export function sanitizeCommentHtml(html: string): string {
-  return DOMPurify.sanitize(html, {
-    ALLOWED_TAGS: [
+  return sanitizeHtml(html, {
+    allowedTags: [
       "p",
       "br",
       "strong",
@@ -21,20 +21,12 @@ export function sanitizeCommentHtml(html: string): string {
       "li",
       "span",
     ],
-    ALLOWED_ATTR: [
-      "href",
-      "target",
-      "rel",
-      "src",
-      "alt",
-      "class",
-      "data-id",
-      "data-label",
-      "data-kind",
-      "data-type",
-    ],
-    ALLOW_DATA_ATTR: false,
-    FORBID_ATTR: ["style", "onclick", "onerror", "onload"],
+    allowedAttributes: {
+      a: ["href", "target", "rel"],
+      img: ["src", "alt"],
+      span: ["class", "data-id", "data-label", "data-kind", "data-type"],
+    },
+    disallowedTagsMode: "discard",
   });
 }
 
