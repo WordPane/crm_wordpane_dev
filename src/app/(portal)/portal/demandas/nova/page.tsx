@@ -2,7 +2,10 @@ import type { Metadata } from "next";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
-import { PortalDemandForm } from "@/components/portal/portal-demand-form";
+import {
+  PortalDemandForm,
+  type PortalPlanHint,
+} from "@/components/portal/portal-demand-form";
 import {
   Card,
   CardContent,
@@ -12,6 +15,7 @@ import {
 } from "@/components/ui/card";
 import { requireUser } from "@/lib/access/permissions";
 import { getBranding } from "@/lib/brand/settings";
+
 import {
   computeProjectPlanBalance,
   getPlanIdCoveringProject,
@@ -29,36 +33,49 @@ export default async function PortalNewDemandPage() {
   // Saldo do plano de manutenção por projeto (projetos sem plano ficam fora).
   // Projetos cobertos pela MESMA instância compartilham o pool — cache por
   // instância no escopo do request para não recalcular o mesmo saldo.
-  const balanceByInstance = new Map<string, Promise<ProjectPlanBalance | null>>();
-  const balances = await Promise.all(
-    projects.map(async (p) => {
-      const instanceId = await getPlanIdCoveringProject(p.id);
-      if (!instanceId) return null;
-      let balance = balanceByInstance.get(instanceId);
-      if (!balance) {
-        balance = computeProjectPlanBalance(p.id);
-        balanceByInstance.set(instanceId, balance);
-      }
-      return balance;
-    }),
-  );
-  const plans = Object.fromEntries(
-    projects.flatMap((p, i) => {
-      const b = balances[i];
-      if (!b) return [];
-      return [
-        [
-          p.id,
-          {
-            planName: b.plan.name,
-            adjustmentsLeft: b.available.adjustment,
-            pagesLeft: b.available.page,
-            pendingPayment: b.status === "pending_payment",
-          },
-        ],
-      ];
-    }),
-  );
+  let plans: Record<string, PortalPlanHint> = {};
+  try {
+    const balanceByInstance = new Map<
+      string,
+      Promise<ProjectPlanBalance | null>
+    >();
+    const balances = await Promise.all(
+      projects.map(async (p) => {
+        const instanceId = await getPlanIdCoveringProject(p.id);
+        if (!instanceId) return null;
+        let balance = balanceByInstance.get(instanceId);
+        if (!balance) {
+          balance = computeProjectPlanBalance(p.id);
+          balanceByInstance.set(instanceId, balance);
+        }
+        return balance;
+      }),
+    );
+    plans = Object.fromEntries(
+      projects.flatMap((p, i) => {
+        const b = balances[i];
+        if (!b) return [];
+        return [
+          [
+            p.id,
+            {
+              planName: b.plan.name,
+              adjustmentsLeft: b.available.adjustment,
+              pagesLeft: b.available.page,
+              pendingPayment: b.status === "pending_payment",
+            },
+          ],
+        ];
+      }),
+    );
+  } catch (error) {
+    // Se o cálculo do saldo falhar, ainda renderiza o formulário sem os
+    // avisos de plano. A validação de cota acontece no envio (allocateQuota).
+    console.error(
+      "Erro ao calcular saldo dos planos na página Nova demanda:",
+      error,
+    );
+  }
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">

@@ -1,8 +1,8 @@
-import { addMonths, format, parseISO } from "date-fns";
+import { addMonths, format, isValid, parseISO } from "date-fns";
 import { and, asc, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 
 import { requireTeam, ForbiddenError, type SessionUser } from "@/lib/access/permissions";
-import { db } from "@/lib/db";
+import { db, type DB } from "@/lib/db";
 import {
   maintenancePackages,
   maintenancePlans,
@@ -85,8 +85,15 @@ export type ProjectPlanBalance = {
 
 type PlanRow = { projectPlan: ProjectPlan; plan: MaintenancePlan };
 
+/** Limite de segurança para evitar loop infinito em dados corrompidos. */
+const MAX_ROLLOVER_MONTHS = 120;
+
 function nextPeriodStart(periodStart: string): string {
-  return format(addMonths(parseISO(periodStart), 1), "yyyy-MM-dd");
+  const date = parseISO(periodStart);
+  if (!isValid(date)) {
+    throw new Error(`currentPeriodStart inválido: "${periodStart}"`);
+  }
+  return format(addMonths(date, 1), "yyyy-MM-dd");
 }
 
 /**
@@ -100,6 +107,7 @@ function nextPeriodStart(periodStart: string): string {
 async function applyRollover(
   row: PlanRow,
   today: string = businessToday(),
+  tx: DB = db,
 ): Promise<string> {
   let start = row.projectPlan.currentPeriodStart;
   if (nextPeriodStart(start) > today) return start;
@@ -108,7 +116,7 @@ async function applyRollover(
     // Já pendente: o ciclo corrente é o primeiro não pago — nada a avançar.
     if (row.projectPlan.status !== "active") return start;
     start = nextPeriodStart(start);
-    await db
+    await tx
       .update(projectPlans)
       .set({
         currentPeriodStart: start,
@@ -120,10 +128,17 @@ async function applyRollover(
     return start;
   }
 
+  let iterations = 0;
   while (nextPeriodStart(start) <= today) {
     start = nextPeriodStart(start);
+    iterations += 1;
+    if (iterations > MAX_ROLLOVER_MONTHS) {
+      throw new Error(
+        `Rollover excedeu ${MAX_ROLLOVER_MONTHS} meses para o plano ${row.projectPlan.id}.`,
+      );
+    }
   }
-  await db
+  await tx
     .update(projectPlans)
     .set({ currentPeriodStart: start, updatedAt: new Date() })
     .where(eq(projectPlans.id, row.projectPlan.id));
@@ -133,8 +148,11 @@ async function applyRollover(
 /** Instância de plano vigente (active/pending_payment) que cobre o projeto,
  *  ou null. Canceladas não contam — o projeto volta a não ter controle.
  *  Rollover aplicado apenas em instâncias ativas. */
-async function loadPlanForProject(projectId: string): Promise<PlanRow | null> {
-  const [row] = await db
+async function loadPlanForProject(
+  projectId: string,
+  tx: DB = db,
+): Promise<PlanRow | null> {
+  const [row] = await tx
     .select({ projectPlan: projectPlans, plan: maintenancePlans })
     .from(projectPlanProjects)
     .innerJoin(
@@ -151,7 +169,7 @@ async function loadPlanForProject(projectId: string): Promise<PlanRow | null> {
     .limit(1);
   if (!row) return null;
   if (row.projectPlan.status === "active") {
-    const start = await applyRollover(row);
+    const start = await applyRollover(row, businessToday(), tx);
     row.projectPlan.currentPeriodStart = start;
   }
   return row;
@@ -210,23 +228,24 @@ export async function getPlanIdCoveringProject(
 async function buildBalance(
   row: PlanRow,
   opts: { rollover: boolean; projectId: string | null },
+  tx: DB = db,
 ): Promise<ProjectPlanBalance> {
   const periodStart = opts.rollover
-    ? await applyRollover(row)
+    ? await applyRollover(row, businessToday(), tx)
     : row.projectPlan.currentPeriodStart;
   const periodEnd = nextPeriodStart(periodStart);
   const planId = row.projectPlan.id;
 
   const [coverage, cycleCounts, packageCounts, perProjectCounts, packageRows] =
     await Promise.all([
-      db
+      tx
         .select({ id: projects.id, name: projects.name })
         .from(projectPlanProjects)
         .innerJoin(projects, eq(projectPlanProjects.projectId, projects.id))
         .where(eq(projectPlanProjects.projectPlanId, planId))
         .orderBy(asc(projects.name)),
       // Consumo mensal: sem pacote, dentro do ciclo corrente
-      db
+      tx
         .select({
           kind: projectPlanUsages.kind,
           count: sql<number>`count(*)::int`,
@@ -243,7 +262,7 @@ async function buildBalance(
         )
         .groupBy(projectPlanUsages.kind),
       // Consumo por pacote (créditos persistem entre ciclos até esgotar)
-      db
+      tx
         .select({
           kind: projectPlanUsages.kind,
           packageId: projectPlanUsages.packageId,
@@ -259,7 +278,7 @@ async function buildBalance(
         )
         .groupBy(projectPlanUsages.kind, projectPlanUsages.packageId),
       // Consumo do ciclo por projeto (qualquer origem: mensal ou pacote)
-      db
+      tx
         .select({
           projectId: projectPlanUsages.projectId,
           projectName: projects.name,
@@ -278,7 +297,7 @@ async function buildBalance(
           ),
         )
         .groupBy(projectPlanUsages.projectId, projects.name, projectPlanUsages.kind),
-      db
+      tx
         .select()
         .from(projectPlanPackages)
         .where(eq(projectPlanPackages.projectPlanId, planId))
@@ -379,10 +398,11 @@ async function buildBalance(
  *  Inclui instâncias `pending_payment` (UI mostra "aguardando pagamento"). */
 export async function computeProjectPlanBalance(
   projectId: string,
+  tx: DB = db,
 ): Promise<ProjectPlanBalance | null> {
-  const row = await loadPlanForProject(projectId);
+  const row = await loadPlanForProject(projectId, tx);
   if (!row) return null;
-  return buildBalance(row, { rollover: false, projectId });
+  return buildBalance(row, { rollover: false, projectId }, tx);
 }
 
 /** Saldo do plano do projeto para a equipe (admin). */
@@ -449,12 +469,12 @@ export type AllocateResult = "ok" | "quota_exceeded" | "payment_pending";
  * Deve rodar DENTRO da transação de criação da demanda.
  */
 export async function allocateQuota(
-  tx: Pick<typeof db, "insert">,
+  tx: DB,
   projectId: string,
   kind: UsageKind,
   demandId: string,
 ): Promise<AllocateResult> {
-  const balance = await computeProjectPlanBalance(projectId);
+  const balance = await computeProjectPlanBalance(projectId, tx);
   if (!balance) return "ok"; // sem plano → sem controle
   if (balance.status !== "active") return "payment_pending";
 
