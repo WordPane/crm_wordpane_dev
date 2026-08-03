@@ -16,11 +16,15 @@ RUN npm ci
 FROM base AS builder
 WORKDIR /app
 
-COPY --from=deps /app/node_modules ./node_modules
-COPY . .
-
+# Variáveis necessárias durante o build (prerenderização de páginas que
+# acessam o banco). Não ficam na imagem final.
+ARG DATABASE_URL
+ENV DATABASE_URL=$DATABASE_URL
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
+
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
 
 RUN npm run build
 
