@@ -19,6 +19,8 @@ import {
 } from "@/lib/queries/notifications";
 import { hasSuperAdmin } from "@/lib/setup";
 
+export const dynamic = "force-dynamic";
+
 export default async function AdminLayout({
   children,
 }: {

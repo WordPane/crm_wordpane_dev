@@ -19,6 +19,8 @@ import { getPortalCompany, getPortalProfile } from "@/lib/queries/portal";
 import { logout } from "@/server/actions/auth";
 import { stopImpersonation } from "@/server/actions/impersonate";
 
+export const dynamic = "force-dynamic";
+
 export default async function PortalLayout({
   children,
 }: {
