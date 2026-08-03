@@ -11,7 +11,7 @@ import "./types";
 export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: "jwt", maxAge: 60 * 60 * 24 * 7 }, // 7 dias
   pages: { signIn: "/login" },
-  trustHost: process.env.AUTH_TRUST_HOST === "true",
+  ...(process.env.AUTH_TRUST_HOST === "true" ? { trustHost: true } : {}),
   providers: [
     Credentials({
       name: "credentials",
