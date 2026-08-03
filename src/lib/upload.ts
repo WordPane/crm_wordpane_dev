@@ -52,6 +52,7 @@ export async function uploadFile(file: File): Promise<UploadedFileMeta> {
     };
   }
 
+  // "local" e "s3" usam multipart através da API
   const formData = new FormData();
   formData.append("file", file);
   const response = await fetch("/api/upload", {

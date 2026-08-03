@@ -8,6 +8,7 @@ import {
   getStorage,
   MAX_UPLOAD_SIZE,
   usingBlobStorage,
+  usingS3Storage,
 } from "@/lib/storage";
 
 const BLOB_MISSING_ERROR =
@@ -15,14 +16,21 @@ const BLOB_MISSING_ERROR =
 
 /**
  * GET /api/upload — informa o driver ativo para o cliente escolher o fluxo:
- * "blob" (upload direto do navegador) ou "local" (multipart nesta rota).
+ * "blob" (upload direto do navegador), "s3" (multipart para S3/MinIO)
+ * ou "local" (multipart para disco em ./.storage).
  */
 export async function GET() {
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: "Não autenticado." }, { status: 401 });
   }
-  return NextResponse.json({ driver: usingBlobStorage() ? "blob" : "local" });
+
+  let driver: string;
+  if (usingBlobStorage()) driver = "blob";
+  else if (usingS3Storage()) driver = "s3";
+  else driver = "local";
+
+  return NextResponse.json({ driver });
 }
 
 /**
@@ -86,10 +94,13 @@ async function handleClientToken(request: Request) {
   }
 }
 
-/** Dev local: recebe o arquivo via multipart e grava no driver ativo. */
+/**
+ * Recebe o arquivo via multipart e grava no driver ativo.
+ * Usado por "local" (dev) e "s3" (Dokploy/MinIO).
+ */
 async function handleMultipart(request: Request) {
-  // Produção sem Blob: falha explícita em vez de erro de filesystem read-only.
-  if (process.env.VERCEL && !usingBlobStorage()) {
+  // Vercel sem Blob: falha explícita em vez de erro de filesystem read-only.
+  if (process.env.VERCEL && !usingBlobStorage() && !usingS3Storage()) {
     return NextResponse.json({ error: BLOB_MISSING_ERROR }, { status: 500 });
   }
 

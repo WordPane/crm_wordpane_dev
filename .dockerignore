@@ -1,0 +1,13 @@
+.git
+.github
+node_modules
+npm-debug.log
+.next
+.storage
+.env.local
+.env
+.DS_Store
+*.md
+docs
+docker-compose*.yml
+Dockerfile*
