@@ -27,17 +27,22 @@ export async function getBranding(): Promise<BrandConfig> {
   if (cache && cache.expiresAt > Date.now()) return cache.value;
 
   let value = DEFAULT_BRAND;
-  const [row] = await db
-    .select()
-    .from(appSettings)
-    .where(eq(appSettings.key, BRAND_SETTINGS_KEY))
-    .limit(1);
-  if (row) {
-    try {
-      value = { ...DEFAULT_BRAND, ...(row.value as Partial<BrandConfig>) };
-    } catch {
-      value = DEFAULT_BRAND;
+  try {
+    const [row] = await db
+      .select()
+      .from(appSettings)
+      .where(eq(appSettings.key, BRAND_SETTINGS_KEY))
+      .limit(1);
+    if (row) {
+      try {
+        value = { ...DEFAULT_BRAND, ...(row.value as Partial<BrandConfig>) };
+      } catch {
+        value = DEFAULT_BRAND;
+      }
     }
+  } catch {
+    // Durante builds sem banco disponível (ex: Dokploy) usamos o branding padrão.
+    value = DEFAULT_BRAND;
   }
 
   cache = { value, expiresAt: Date.now() + CACHE_TTL_MS };
