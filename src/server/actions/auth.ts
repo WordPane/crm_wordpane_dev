@@ -21,7 +21,7 @@ import {
   type ActionResult,
 } from "@/server/actions/utils";
 
-export type LoginState = { error?: string } | undefined;
+export type LoginState = { error?: string; success?: boolean } | undefined;
 
 export async function authenticate(
   _prevState: LoginState,
@@ -39,7 +39,7 @@ export async function authenticate(
     }
     throw error;
   }
-  redirect("/");
+  return { success: true };
 }
 
 export async function logout(): Promise<void> {

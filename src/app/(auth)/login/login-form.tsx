@@ -2,7 +2,8 @@
 
 import { Loader2 } from "lucide-react";
 import Link from "next/link";
-import { useActionState } from "react";
+import { useRouter } from "next/navigation";
+import { useActionState, useEffect } from "react";
 import { useFormStatus } from "react-dom";
 
 import { Button } from "@/components/ui/button";
@@ -25,6 +26,15 @@ export function LoginForm() {
     authenticate,
     undefined,
   );
+  const router = useRouter();
+
+  useEffect(() => {
+    if (state?.success) {
+      // Força recarregamento completo para garantir que o cookie de sessão
+      // seja enviado na primeira requisição após o login.
+      window.location.href = "/";
+    }
+  }, [state]);
 
   return (
     <form action={formAction} className="space-y-4">
