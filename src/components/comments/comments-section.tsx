@@ -12,7 +12,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import type { CommentItem, MentionableUser } from "@/lib/queries/comments";
-import { formatDateTime, initials, timeAgo } from "@/lib/utils/format";
+import { formatDateTime, initials } from "@/lib/utils/format";
 
 export type CommentActionResult =
   | { success: true; id?: string }
@@ -114,7 +114,7 @@ export function CommentsSection({
               className="text-xs text-muted-foreground"
               title={formatDateTime(comment.createdAt)}
             >
-              {timeAgo(comment.createdAt)}
+              {formatDateTime(comment.createdAt)}
             </span>
             <div className="ml-auto flex items-center">
               <Button
@@ -193,7 +193,7 @@ export function CommentsSection({
             <li key={root.id} className="space-y-4">
               <ul>{[renderComment(root)]}</ul>
               {repliesOf(root.id).length > 0 && (
-                <ul className="ml-9 space-y-4 border-l border-border pl-5">
+                <ul className="space-y-4">
                   {repliesOf(root.id).map((reply) =>
                     renderComment(reply, byId.get(root.id)),
                   )}

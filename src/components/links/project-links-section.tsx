@@ -44,7 +44,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import type { ProjectLink } from "@/lib/db/schema";
-import { formatDate, timeAgo } from "@/lib/utils/format";
+import { formatDateTime } from "@/lib/utils/format";
 import {
   projectLinkFormSchema,
   type ProjectLinkFormValues,
@@ -131,11 +131,8 @@ export function ProjectLinksSection({
                       {link.notes}
                     </p>
                   )}
-                  <p
-                    className="text-xs text-muted-foreground"
-                    title={formatDate(link.createdAt)}
-                  >
-                    Adicionado {timeAgo(link.createdAt)}
+                  <p className="text-xs text-muted-foreground">
+                    Adicionado em {formatDateTime(link.createdAt)}
                   </p>
                 </div>
 

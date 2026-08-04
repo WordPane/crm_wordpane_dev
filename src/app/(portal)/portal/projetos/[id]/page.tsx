@@ -34,7 +34,7 @@ import {
 } from "@/lib/queries/maintenance";
 import { getPortalProject } from "@/lib/queries/portal";
 import type { StatusInfo } from "@/lib/queries/projects";
-import { formatDate, initials, timeAgo } from "@/lib/utils/format";
+import { formatDate, formatDateTime, initials } from "@/lib/utils/format";
 import { projectTypeLabels } from "@/lib/validations/project";
 import {
   createPortalAttachment,
@@ -343,7 +343,7 @@ export default async function PortalProjectDetailPage({
                         </p>
                       )}
                       <p className="mt-1 text-xs text-muted-foreground">
-                        Adicionado {timeAgo(link.createdAt)}
+                        Adicionado em {formatDateTime(link.createdAt)}
                       </p>
                     </li>
                   ))}

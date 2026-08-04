@@ -169,11 +169,13 @@
     box-shadow: var(--glow-primary);
   }
 
-  /* Menções de usuário/cliente e tarefa em comentários */
+  /* Menções de usuário/cliente e tarefa em comentários e editor */
   .mention-user,
-  .mention-task {
-    color: var(--green);
-    font-weight: 700;
+  .mention-task,
+  .ProseMirror .mention-user,
+  .ProseMirror .mention-task {
+    color: var(--green) !important;
+    font-weight: 700 !important;
   }
 
   /* Glow radial de fundo (login, heroes) */

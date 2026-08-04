@@ -41,7 +41,7 @@ import {
   listTaskDependents,
 } from "@/lib/queries/tasks";
 import { listTeamSelectOptions } from "@/lib/queries/team";
-import { formatDate, isOverdue, timeAgo } from "@/lib/utils/format";
+import { formatDate, formatDateTime, isOverdue } from "@/lib/utils/format";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Detalhes da tarefa" };
@@ -345,7 +345,7 @@ export default async function TaskDetailPage({
 
             <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Clock className="size-3.5" />
-              Criada por {creator?.name ?? "—"} {timeAgo(task.createdAt)}
+              Criada por {creator?.name ?? "—"} em {formatDateTime(task.createdAt)}
             </p>
           </CardContent>
         </Card>

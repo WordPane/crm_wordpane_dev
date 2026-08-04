@@ -21,7 +21,7 @@ import { Button } from "@/components/ui/button";
 import type { UserRole } from "@/lib/auth/types";
 import type { AttachmentItem } from "@/lib/queries/attachments";
 import { uploadFile } from "@/lib/upload";
-import { formatFileSize, timeAgo } from "@/lib/utils/format";
+import { formatDateTime, formatFileSize } from "@/lib/utils/format";
 import {
   createAttachment,
   deleteAttachment,
@@ -122,11 +122,7 @@ function AttachmentCard({
 
         <div className="space-y-0.5 text-xs text-muted-foreground">
           <p className="truncate">{attachment.uploader?.name ?? "—"}</p>
-          <p>
-            <span title={attachment.createdAt.toISOString()}>
-              {timeAgo(attachment.createdAt)}
-            </span>
-          </p>
+          <p>{formatDateTime(attachment.createdAt)}</p>
           {attachment.taskTitle && attachment.taskId && (
             <p className="truncate">
               <Link

@@ -18,7 +18,7 @@ import {
 import Link from "next/link";
 
 import type { ActivityItem } from "@/lib/queries/activities";
-import { formatDateTime, timeAgo } from "@/lib/utils/format";
+import { formatDateTime } from "@/lib/utils/format";
 
 const ICONS: Record<string, LucideIcon> = {
   project: FolderKanban,
@@ -292,11 +292,8 @@ export function ActivityTimeline({
                 </span>
               )}
             </p>
-            <p
-              className="mt-0.5 text-xs text-muted-foreground"
-              title={formatDateTime(activity.createdAt)}
-            >
-              {timeAgo(activity.createdAt)}
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {formatDateTime(activity.createdAt)}
             </p>
           </li>
         );
