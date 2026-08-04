@@ -169,6 +169,12 @@
     box-shadow: var(--glow-primary);
   }
 
+  /* Menção de usuário/cliente em comentários */
+  .mention-user {
+    color: var(--green);
+    font-weight: 700;
+  }
+
   /* Glow radial de fundo (login, heroes) */
   .hero-glow {
     background: radial-gradient(

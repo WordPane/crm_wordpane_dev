@@ -115,7 +115,7 @@ export function renderRichComment(
       return (
         <span
           key={key}
-          className="mention mention-user rounded-md bg-primary/10 px-1 py-0.5 font-medium text-primary"
+          className="mention mention-user rounded-md bg-green/10 px-1 py-0.5 font-bold"
         >
           @{label}
         </span>
