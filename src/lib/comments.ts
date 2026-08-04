@@ -86,10 +86,10 @@ export async function notifyCommentMentions(input: {
   const contextTitle = input.taskTitle ?? "Projeto";
   const taskHref = input.taskId
     ? `/portal/projetos/${input.projectId}/tarefas/${input.taskId}`
-    : `/portal/projetos/${input.projectId}`;
+    : `/portal/projetos/${input.projectId}?tab=conversa`;
   const adminHref = input.taskId
     ? `/admin/tarefas/${input.taskId}`
-    : `/admin/projetos/${input.projectId}`;
+    : `/admin/projetos/${input.projectId}?tab=conversa`;
 
   if (clientIds.length > 0) {
     await notifyUsers(clientIds, {
