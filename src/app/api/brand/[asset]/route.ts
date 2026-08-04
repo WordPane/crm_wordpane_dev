@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getBranding } from "@/lib/brand/settings";
 import { getStorage } from "@/lib/storage";
+import { getPublicBaseUrl } from "@/lib/url";
 
 const MIME_BY_EXT: Record<string, string> = {
   png: "image/png",
@@ -69,14 +70,14 @@ export async function GET(
 
   const value = asset === "logo" ? brand.logoUrl : brand.faviconUrl;
 
-  // URL absoluta (blob) ou path estático (marca padrão em /public)
-  if (/^https?:\/\//i.test(value)) {
-    return NextResponse.redirect(value);
-  }
-  if (value.startsWith("/")) {
-    // Redirecionamento relativo: o navegador resolve no domínio atual,
-    // evitando depender do host detectado pelo Next.js standalone.
-    return NextResponse.redirect(value);
+  // URL absoluta (blob) ou path estático (marca padrão em /public).
+  // Paths relativos são convertidos para URL absoluta com base no domínio
+  // público, porque o Next.js standalone atrás do Traefik pode detectar
+  // o host interno (0.0.0.0:3000) em vez de devcrm.wordpane.dev.
+  if (/^https?:\/\//i.test(value) || value.startsWith("/")) {
+    return NextResponse.redirect(
+      new URL(value, getPublicBaseUrl(request)).toString(),
+    );
   }
 
   const buffer = await getStorage().get(value);
