@@ -346,6 +346,7 @@ export default async function TaskDetailPage({
                 taskId={task.id}
                 currentUserId={user.id}
                 currentUserRole={user.role}
+                layout="list"
               />
             </CardContent>
           </Card>

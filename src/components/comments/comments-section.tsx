@@ -153,6 +153,8 @@ export function CommentsSection({
             comment.mentionNames,
             comment.taskMentions,
             taskHref,
+            mentionableUsers,
+            mentionableTasks,
           )}
 
           {replyTo?.id === comment.id && (

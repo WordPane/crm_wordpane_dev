@@ -44,6 +44,8 @@ type AttachmentListProps = {
   deleteAction?: typeof deleteAttachment;
   /** Base do link da tarefa de origem (padrão: /admin/tarefas). */
   taskHrefBase?: string;
+  /** Visualização em grade (padrão) ou lista. */
+  layout?: "grid" | "list";
 };
 
 function fileIcon(mimeType: string | null) {
@@ -63,6 +65,17 @@ function fileIcon(mimeType: string | null) {
   return File;
 }
 
+function canDeleteAttachment(
+  readOnly: boolean,
+  attachment: AttachmentListItem,
+  currentUserId: string,
+  currentUserRole: UserRole,
+) {
+  if (readOnly) return false;
+  if (attachment.uploader?.id === currentUserId) return true;
+  return currentUserRole === "admin" || currentUserRole === "super_admin";
+}
+
 function AttachmentCard({
   attachment,
   readOnly,
@@ -79,10 +92,12 @@ function AttachmentCard({
   onDelete: () => void;
 }) {
   const Icon = fileIcon(attachment.mimeType);
-  const canDelete =
-    !readOnly &&
-    (attachment.uploader?.id === currentUserId ||
-      currentUserRole === "super_admin");
+  const canDelete = canDeleteAttachment(
+    readOnly,
+    attachment,
+    currentUserId,
+    currentUserRole,
+  );
 
   return (
     <div className="group relative flex flex-col gap-3 rounded-xl bg-white/[0.02] p-4 ring-1 ring-foreground/10 transition-colors hover:bg-white/[0.04]">
@@ -140,6 +155,73 @@ function AttachmentCard({
   );
 }
 
+function AttachmentRow({
+  attachment,
+  readOnly,
+  currentUserId,
+  currentUserRole,
+  taskHrefBase,
+  onDelete,
+}: {
+  attachment: AttachmentListItem;
+  readOnly: boolean;
+  currentUserId: string;
+  currentUserRole: UserRole;
+  taskHrefBase: string;
+  onDelete: () => void;
+}) {
+  const Icon = fileIcon(attachment.mimeType);
+  const canDelete = canDeleteAttachment(
+    readOnly,
+    attachment,
+    currentUserId,
+    currentUserRole,
+  );
+
+  return (
+    <li className="flex items-center gap-3 rounded-xl bg-white/[0.02] p-3 ring-1 ring-foreground/10">
+      <Icon className="size-5 shrink-0 text-muted-foreground" />
+      <div className="min-w-0 flex-1">
+        <a
+          href={`/api/files/${attachment.id}`}
+          className="block truncate text-sm font-medium text-foreground transition-colors hover:text-primary"
+        >
+          {attachment.fileName}
+        </a>
+        <p className="text-xs text-muted-foreground">
+          {formatFileSize(attachment.fileSize)}
+          {" · "}
+          {attachment.uploader?.name ?? "—"}
+          {" · "}
+          {formatDateTime(attachment.createdAt)}
+          {attachment.taskTitle && attachment.taskId && (
+            <>
+              {" · "}
+              <Link
+                href={`${taskHrefBase}/${attachment.taskId}`}
+                className="transition-colors hover:text-foreground"
+              >
+                {attachment.taskTitle}
+              </Link>
+            </>
+          )}
+        </p>
+      </div>
+      {canDelete && (
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          aria-label={`Excluir ${attachment.fileName}`}
+          className="text-muted-foreground hover:text-destructive"
+          onClick={() => onDelete()}
+        >
+          <Trash2 />
+        </Button>
+      )}
+    </li>
+  );
+}
+
 /** Lista de anexos com upload (uploadFile + createAttachment) e exclusão. */
 export function AttachmentList({
   attachments,
@@ -152,6 +234,7 @@ export function AttachmentList({
   createAction = createAttachment,
   deleteAction = deleteAttachment,
   taskHrefBase = "/admin/tarefas",
+  layout = "grid",
 }: AttachmentListProps) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -228,7 +311,7 @@ export function AttachmentList({
             Nenhum arquivo anexado.
           </p>
         </div>
-      ) : (
+      ) : layout === "grid" ? (
         <div className="max-h-[420px] overflow-y-auto pr-1">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {attachments.map((attachment) => (
@@ -244,6 +327,20 @@ export function AttachmentList({
             ))}
           </div>
         </div>
+      ) : (
+        <ul className="max-h-[420px] space-y-2 overflow-y-auto pr-1">
+          {attachments.map((attachment) => (
+            <AttachmentRow
+              key={attachment.id}
+              attachment={attachment}
+              readOnly={readOnly}
+              currentUserId={currentUserId}
+              currentUserRole={currentUserRole}
+              taskHrefBase={taskHrefBase}
+              onDelete={() => setDeleting(attachment)}
+            />
+          ))}
+        </ul>
       )}
 
       <ConfirmDialog
