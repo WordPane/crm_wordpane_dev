@@ -187,6 +187,7 @@ function createMentionSuggestion(
   kind: "user" | "task",
   getItems: (query: string) => SuggestionItem[],
   onStateChange: (state: SuggestionState | null) => void,
+  onRangeChange: (range: { from: number; to: number } | null) => void,
 ) {
   return {
     char: kind === "user" ? "@" : "#",
@@ -194,16 +195,19 @@ function createMentionSuggestion(
     items: ({ query }: { query: string }) => getItems(query),
     render: () => {
       return {
-        onStart: (props: { query: string }) => {
+        onStart: (props: { query: string; range: { from: number; to: number } }) => {
+          onRangeChange(props.range);
           onStateChange({ items: getItems(props.query), query: props.query, kind });
         },
-        onUpdate: (props: { query: string }) => {
+        onUpdate: (props: { query: string; range: { from: number; to: number } }) => {
+          onRangeChange(props.range);
           onStateChange({ items: getItems(props.query), query: props.query, kind });
         },
         onKeyDown: (props: { event: KeyboardEvent }) => {
           return props.event.key === "Escape";
         },
         onExit: () => {
+          onRangeChange(null);
           onStateChange(null);
         },
       };
@@ -234,6 +238,7 @@ export function RichCommentEditor({
 }) {
   const [suggestion, setSuggestion] = useState<SuggestionState | null>(null);
   const editorRef = useRef<Editor | null>(null);
+  const mentionRangeRef = useRef<{ from: number; to: number } | null>(null);
 
   const userItems = useCallback(
     (query: string) =>
@@ -270,11 +275,15 @@ export function RichCommentEditor({
       Placeholder.configure({ placeholder }),
       Mention.extend({ name: "userMention" }).configure({
         HTMLAttributes: { class: "mention mention-user" },
-        suggestion: createMentionSuggestion("user", userItems, handleSuggestionChange),
+        suggestion: createMentionSuggestion("user", userItems, handleSuggestionChange, (range) => {
+          mentionRangeRef.current = range;
+        }),
       }),
       Mention.extend({ name: "taskMention" }).configure({
         HTMLAttributes: { class: "mention mention-task" },
-        suggestion: createMentionSuggestion("task", taskItems, handleSuggestionChange),
+        suggestion: createMentionSuggestion("task", taskItems, handleSuggestionChange, (range) => {
+          mentionRangeRef.current = range;
+        }),
       }),
     ],
     content: "",
@@ -325,14 +334,16 @@ export function RichCommentEditor({
   function selectMention(item: SuggestionItem) {
     const kind = suggestion?.kind ?? "user";
     const nodeType = kind === "user" ? "userMention" : "taskMention";
+    const range = mentionRangeRef.current ?? editor.state.selection;
     editor
       .chain()
       .focus()
-      .insertContentAt(editor.state.selection, {
+      .insertContentAt(range, {
         type: nodeType,
         attrs: { id: item.id, label: item.label, kind },
       })
       .run();
+    mentionRangeRef.current = null;
     setSuggestion(null);
   }
 
