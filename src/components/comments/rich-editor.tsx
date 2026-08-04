@@ -338,10 +338,13 @@ export function RichCommentEditor({
     editor
       .chain()
       .focus()
-      .insertContentAt(range, {
-        type: nodeType,
-        attrs: { id: item.id, label: item.label, kind },
-      })
+      .insertContentAt(range, [
+        {
+          type: nodeType,
+          attrs: { id: item.id, label: item.label, kind },
+        },
+        { type: "text", text: " " },
+      ])
       .run();
     mentionRangeRef.current = null;
     setSuggestion(null);

@@ -96,7 +96,10 @@ export function renderRichComment(
         const task = taskMentions.find((t) => t.id === taskId);
         if (!taskId || !task) {
           return (
-            <span key={key} className="mention mention-task">
+            <span
+              key={key}
+              className="mention mention-task rounded-md bg-green/10 px-1 py-0.5 font-bold"
+            >
               #{label}
             </span>
           );
@@ -105,7 +108,7 @@ export function renderRichComment(
           <Link
             key={key}
             href={taskHref(taskId)}
-            className="mention mention-task inline-flex items-center gap-1 rounded-md px-1 py-0.5 font-medium text-primary underline-offset-2 transition-colors hover:text-primary/80 hover:underline"
+            className="mention mention-task inline-flex items-center gap-1 rounded-md bg-green/10 px-1 py-0.5 font-bold underline-offset-2 transition-colors hover:underline"
             onClick={(e) => e.stopPropagation()}
           >
             #{task.title}
