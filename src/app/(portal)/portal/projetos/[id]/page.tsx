@@ -7,6 +7,7 @@ import { ActivityTimeline } from "@/components/activities/activity-timeline";
 import { AttachmentList } from "@/components/attachments/attachment-list";
 import { PriorityChip, StatusColorChip } from "@/components/chips";
 import { PortalPlanCard } from "@/components/portal/portal-plan-card";
+import { PortalProjectComments } from "@/components/portal/portal-project-comments";
 import { PortalProjectMilestonesSection } from "@/components/portal/portal-project-milestones-section";
 import { PortalProjectTasksSection } from "@/components/portal/portal-project-tasks-section";
 import { ProjectTabsPersist } from "@/components/projects/project-tabs-persist";
@@ -22,6 +23,11 @@ import { Progress } from "@/components/ui/progress";
 import { TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ForbiddenError, requireUser } from "@/lib/access/permissions";
 import type { Task } from "@/lib/db/schema";
+import {
+  listMentionableTasks,
+  listMentionableUsers,
+  listProjectComments,
+} from "@/lib/queries/comments";
 import {
   computeProjectPlanBalance,
   listActiveMaintenancePackages,
@@ -44,6 +50,7 @@ const TABS = [
   "timeline",
   "arquivos",
   "links",
+  "conversa",
 ] as const;
 type TabValue = (typeof TABS)[number];
 
@@ -80,10 +87,14 @@ export default async function PortalProjectDetailPage({
 
   // Saldo do plano de manutenção (se houver) — o acesso ao projeto já foi
   // validado acima por getPortalProject
-  const [planBalance, maintenancePackages] = await Promise.all([
-    computeProjectPlanBalance(project.id),
-    listActiveMaintenancePackages(),
-  ]);
+  const [planBalance, maintenancePackages, projectComments, mentionableUsers, mentionableTasks] =
+    await Promise.all([
+      computeProjectPlanBalance(project.id),
+      listActiveMaintenancePackages(),
+      listProjectComments(user, project.id),
+      listMentionableUsers(project.id, project.companyId),
+      listMentionableTasks(project.id),
+    ]);
 
   const totalTasks = tasks.length;
   const doneTasks = tasks.filter((t) => t.status?.isFinal).length;
@@ -144,6 +155,7 @@ export default async function PortalProjectDetailPage({
           <TabsTrigger value="timeline">Timeline</TabsTrigger>
           <TabsTrigger value="arquivos">Arquivos</TabsTrigger>
           <TabsTrigger value="links">Links</TabsTrigger>
+          <TabsTrigger value="conversa">Conversa</TabsTrigger>
         </TabsList>
 
         <TabsContent value="visao" className="space-y-6 pt-4">
@@ -337,6 +349,25 @@ export default async function PortalProjectDetailPage({
                   ))}
                 </ul>
               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="conversa" className="pt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Conversa do projeto</CardTitle>
+              <CardDescription>
+                Troque mensagens com a equipe e mencione tarefas quando necessário.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <PortalProjectComments
+                projectId={project.id}
+                comments={projectComments}
+                mentionableUsers={mentionableUsers}
+                mentionableTasks={mentionableTasks}
+              />
             </CardContent>
           </Card>
         </TabsContent>

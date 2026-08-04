@@ -98,7 +98,7 @@ export function ProjectLinksSection({
             </p>
           </div>
         ) : (
-          <ul className="space-y-2">
+          <ul className="max-h-[calc(100vh-300px)] space-y-2 overflow-y-auto pr-1">
             {links.map((link) => (
               <li
                 key={link.id}

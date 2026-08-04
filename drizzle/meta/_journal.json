@@ -260,6 +260,13 @@
       "when": 1785681953520,
       "tag": "0036_handy_kingpin",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1785811675873,
+      "tag": "0037_curvy_lenny_balinger",
+      "breakpoints": true
     }
   ]
 }

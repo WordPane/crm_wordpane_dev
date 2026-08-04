@@ -505,9 +505,12 @@ export const comments = pgTable(
   "comments",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    taskId: uuid("task_id")
-      .notNull()
-      .references(() => tasks.id, { onDelete: "cascade" }),
+    taskId: uuid("task_id").references(() => tasks.id, {
+      onDelete: "cascade",
+    }),
+    projectId: uuid("project_id").references(() => projects.id, {
+      onDelete: "cascade",
+    }),
     authorId: uuid("author_id")
       .notNull()
       .references(() => users.id),
@@ -522,7 +525,10 @@ export const comments = pgTable(
       .defaultNow(),
     editedAt: timestamp("edited_at", { withTimezone: true }),
   },
-  (t) => [index("comments_task_idx").on(t.taskId)],
+  (t) => [
+    index("comments_task_idx").on(t.taskId),
+    index("comments_project_idx").on(t.projectId),
+  ],
 );
 
 // ─────────────────────────── Arquivos ───────────────────────────

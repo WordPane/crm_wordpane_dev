@@ -26,16 +26,16 @@ import { clientUsersOfCompany, notifyUsers } from "@/lib/notifications";
 import { commentFormSchema } from "@/lib/validations/comment";
 import { actionError, type ActionResult } from "@/server/actions/utils";
 
-/** Comentário + tarefa + projeto, com acesso garantido (empresa atribuída ou membro do projeto). */
+/** Comentário + projeto (e tarefa, quando houver), com acesso garantido. */
 async function getScopedComment(user: SessionUser, commentId: string) {
   const [row] = await db
     .select({ comment: comments, task: tasks, project: projects })
     .from(comments)
-    .innerJoin(tasks, eq(comments.taskId, tasks.id))
-    .innerJoin(projects, eq(tasks.projectId, projects.id))
+    .leftJoin(tasks, eq(comments.taskId, tasks.id))
+    .leftJoin(projects, eq(comments.projectId, projects.id))
     .where(eq(comments.id, commentId))
     .limit(1);
-  if (!row) return null;
+  if (!row?.project) return null;
   await assertProjectAccess(user, row.project);
   return row;
 }
@@ -140,6 +140,102 @@ export async function createComment(
   }
 }
 
+/** Comentário em nível de projeto (visão geral / aba Conversa). */
+export async function createProjectComment(
+  projectId: string,
+  input: unknown,
+): Promise<ActionResult> {
+  try {
+    const user = await requireUser();
+    requireTeam(user);
+    const data = commentFormSchema.parse(input);
+
+    const [project] = await db
+      .select()
+      .from(projects)
+      .where(eq(projects.id, projectId))
+      .limit(1);
+    if (!project) return { error: "Projeto não encontrado." };
+    await assertProjectAccess(user, project);
+
+    const parentId = await resolveCommentParent(projectId, data.parentId, "project");
+    const parentAuthorId = parentId
+      ? await getCommentAuthorId(parentId)
+      : null;
+
+    const cleanBody = sanitizeCommentHtml(data.body);
+    if (isEmptyHtml(cleanBody)) {
+      return { error: "Escreva um comentário." };
+    }
+
+    const extracted = extractMentionsFromHtml(cleanBody);
+    const mentions = data.mentions?.length
+      ? data.mentions.filter((id) => extracted.mentions.includes(id))
+      : extracted.mentions;
+    const taskMentions = data.taskMentions?.length
+      ? data.taskMentions.filter((id) => extracted.taskMentions.includes(id))
+      : extracted.taskMentions;
+
+    const excerpt = cleanBody.replace(/<[^>]+>/g, "").slice(0, 140);
+
+    const [created] = await db
+      .insert(comments)
+      .values({
+        projectId,
+        authorId: user.id,
+        parentId,
+        mentions: mentions.length ? mentions : null,
+        taskMentions: taskMentions.length ? taskMentions : null,
+        body: cleanBody,
+      })
+      .returning({ id: comments.id });
+
+    await logActivity({
+      actorId: user.id,
+      companyId: project.companyId,
+      projectId: project.id,
+      entityType: "comment",
+      entityId: created.id,
+      action: "comment.added",
+      metadata: {
+        projectId,
+        projectName: project.name,
+        excerpt,
+      },
+    });
+
+    // Avisa todos os clientes da empresa sobre o novo comentário no projeto
+    const recipients = await clientUsersOfCompany(project.companyId);
+    await notifyUsers(
+      recipients.filter((id) => id !== user.id),
+      {
+        type: "comment",
+        title: `Novo comentário em "${project.name}"`,
+        body: cleanBody,
+        bodyIsHtml: true,
+        href: `/portal/projetos/${project.id}`,
+      },
+    );
+
+    // Menções com @ e resposta a comentário
+    await notifyCommentMentions({
+      mentionIds: mentions,
+      authorId: user.id,
+      authorName: user.name,
+      projectId: project.id,
+      excerpt,
+      bodyHtml: cleanBody,
+      parentAuthorId,
+    });
+
+    revalidatePath(`/admin/projetos/${projectId}`);
+    revalidatePath(`/portal/projetos/${projectId}`);
+    return { success: true, id: created.id };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
 /** Só o autor ou super_admin pode excluir. */
 export async function deleteComment(commentId: string): Promise<ActionResult> {
   try {
@@ -154,8 +250,12 @@ export async function deleteComment(commentId: string): Promise<ActionResult> {
 
     await db.delete(comments).where(eq(comments.id, commentId));
 
-    revalidatePath(`/admin/tarefas/${scoped.task.id}`);
+    if (!scoped.project) return { success: true };
+    if (scoped.task?.id) {
+      revalidatePath(`/admin/tarefas/${scoped.task.id}`);
+    }
     revalidatePath(`/admin/projetos/${scoped.project.id}`);
+    revalidatePath(`/portal/projetos/${scoped.project.id}`);
     return { success: true };
   } catch (error) {
     return actionError(error);

@@ -24,11 +24,12 @@ type MentionableTask = {
 };
 
 type CommentsSectionProps = {
-  taskId: string;
+  taskId?: string;
+  projectId?: string;
   comments: CommentItem[];
   mentionableUsers: MentionableUser[];
   mentionableTasks: MentionableTask[];
-  submitAction: (taskId: string, input: unknown) => Promise<CommentActionResult>;
+  submitAction: (scopeId: string, input: unknown) => Promise<CommentActionResult>;
   /** Exclusão habilitada quando ambos são informados. */
   deleteAction?: (commentId: string) => Promise<CommentActionResult>;
   canDelete?: (comment: CommentItem) => boolean;
@@ -39,6 +40,7 @@ type CommentsSectionProps = {
 
 export function CommentsSection({
   taskId,
+  projectId,
   comments,
   mentionableUsers,
   mentionableTasks,
@@ -47,6 +49,7 @@ export function CommentsSection({
   canDelete,
   taskHref,
 }: CommentsSectionProps) {
+  const scopeId = (taskId ?? projectId)!;
   const router = useRouter();
   const [replyTo, setReplyTo] = useState<CommentItem | null>(null);
   const [deleting, setDeleting] = useState<CommentItem | null>(null);
@@ -62,7 +65,7 @@ export function CommentsSection({
     parentId?: string,
   ) {
     startTransition(async () => {
-      const result = await submitAction(taskId, {
+      const result = await submitAction(scopeId, {
         body: input.html,
         mentions: input.mentions,
         taskMentions: input.taskMentions,

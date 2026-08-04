@@ -174,6 +174,103 @@ export async function createPortalComment(
   }
 }
 
+/** Comentário do cliente em nível de projeto (aba Conversa). */
+export async function createPortalProjectComment(
+  projectId: string,
+  input: unknown,
+): Promise<ActionResult> {
+  try {
+    const user = await requireUser();
+    const companyId = await requireClient(user);
+
+    const [project] = await db
+      .select()
+      .from(projects)
+      .where(and(eq(projects.id, projectId), eq(projects.companyId, companyId)))
+      .limit(1);
+    if (!project) return { error: "Projeto não encontrado." };
+
+    const data = portalCommentSchema.parse(input);
+
+    const parentId = await resolveCommentParent(
+      projectId,
+      data.parentId,
+      "project",
+    );
+    const parentAuthorId = parentId
+      ? await getCommentAuthorId(parentId)
+      : null;
+
+    const cleanBody = sanitizeCommentHtml(data.body);
+    if (isEmptyHtml(cleanBody)) {
+      return { error: "Escreva um comentário." };
+    }
+
+    const extracted = extractMentionsFromHtml(cleanBody);
+    const mentions = data.mentions?.length
+      ? data.mentions.filter((id) => extracted.mentions.includes(id))
+      : extracted.mentions;
+    const taskMentions = data.taskMentions?.length
+      ? data.taskMentions.filter((id) => extracted.taskMentions.includes(id))
+      : extracted.taskMentions;
+
+    const excerpt = cleanBody.replace(/<[^>]+>/g, "").slice(0, 140);
+
+    const [created] = await db
+      .insert(comments)
+      .values({
+        projectId,
+        authorId: user.id,
+        parentId,
+        mentions: mentions.length ? mentions : null,
+        taskMentions: taskMentions.length ? taskMentions : null,
+        body: cleanBody,
+      })
+      .returning({ id: comments.id });
+
+    await logActivity({
+      actorId: user.id,
+      companyId,
+      projectId: project.id,
+      entityType: "comment",
+      entityId: created.id,
+      action: "comment.added",
+      metadata: {
+        projectId,
+        projectName: project.name,
+        excerpt,
+      },
+    });
+
+    // Comentário do cliente → avisa a equipe da empresa
+    const commentRecipients = await teamUsersOfCompany(companyId);
+    await notifyUsers(
+      commentRecipients.filter((id) => id !== user.id),
+      {
+        type: "comment",
+        title: `${user.name} comentou em "${project.name}"`,
+        body: excerpt,
+        href: `/admin/projetos/${projectId}`,
+      },
+    );
+
+    // Menções com @ e resposta a comentário
+    await notifyCommentMentions({
+      mentionIds: mentions,
+      authorId: user.id,
+      authorName: user.name,
+      projectId: project.id,
+      excerpt,
+      parentAuthorId,
+    });
+
+    revalidatePortalProject(project.id);
+    return { success: true, id: created.id };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
 // ─────────────────────────── Anexos ───────────────────────────
 
 type PortalAttachmentTarget = {

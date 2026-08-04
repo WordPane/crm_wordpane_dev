@@ -5,24 +5,31 @@ import { comments, users } from "@/lib/db/schema";
 import { notifyUsers } from "@/lib/notifications";
 
 /**
- * Resolve o comentário pai de uma resposta: valida que é da mesma tarefa e
- * achata a thread para 1 nível (resposta a resposta pendura na raiz).
+ * Resolve o comentário pai de uma resposta: valida que é da mesma tarefa ou
+ * projeto e achata a thread para 1 nível (resposta a resposta pendura na raiz).
  */
 export async function resolveCommentParent(
-  taskId: string,
+  scopeId: string,
   parentId: string | undefined | null,
+  scope: "task" | "project" = "task",
 ): Promise<string | null> {
   if (!parentId) return null;
   const [parent] = await db
     .select({
       id: comments.id,
       taskId: comments.taskId,
+      projectId: comments.projectId,
       parentId: comments.parentId,
     })
     .from(comments)
     .where(eq(comments.id, parentId))
     .limit(1);
-  if (!parent || parent.taskId !== taskId) return null;
+  if (!parent) return null;
+  const matchesScope =
+    scope === "task"
+      ? parent.taskId === scopeId
+      : parent.projectId === scopeId;
+  if (!matchesScope) return null;
   return parent.parentId ?? parent.id;
 }
 
@@ -42,14 +49,15 @@ export async function getCommentAuthorId(
 /**
  * Notifica os mencionados com @ (href por role: cliente → portal, equipe →
  * admin) e o autor do comentário respondido ("nova resposta").
+ * Pode ser usado para comentários de tarefa ou de projeto.
  */
 export async function notifyCommentMentions(input: {
   mentionIds: string[] | undefined;
   authorId: string;
   authorName: string;
-  taskId: string;
-  taskTitle: string;
   projectId: string;
+  taskId?: string;
+  taskTitle?: string;
   excerpt: string;
   /** HTML sanitizado do comentário para o corpo do e-mail. */
   bodyHtml?: string;
@@ -75,22 +83,30 @@ export async function notifyCommentMentions(input: {
   const body = input.bodyHtml?.trim() || input.excerpt;
   const bodyIsHtml = Boolean(input.bodyHtml?.trim());
 
+  const contextTitle = input.taskTitle ?? "Projeto";
+  const taskHref = input.taskId
+    ? `/portal/projetos/${input.projectId}/tarefas/${input.taskId}`
+    : `/portal/projetos/${input.projectId}`;
+  const adminHref = input.taskId
+    ? `/admin/tarefas/${input.taskId}`
+    : `/admin/projetos/${input.projectId}`;
+
   if (clientIds.length > 0) {
     await notifyUsers(clientIds, {
       type: "comment.mention",
-      title: `${input.authorName} mencionou você em "${input.taskTitle}"`,
+      title: `${input.authorName} mencionou você em "${contextTitle}"`,
       body,
       bodyIsHtml,
-      href: `/portal/projetos/${input.projectId}/tarefas/${input.taskId}`,
+      href: taskHref,
     });
   }
   if (teamIds.length > 0) {
     await notifyUsers(teamIds, {
       type: "comment.mention",
-      title: `${input.authorName} mencionou você em "${input.taskTitle}"`,
+      title: `${input.authorName} mencionou você em "${contextTitle}"`,
       body,
       bodyIsHtml,
-      href: `/admin/tarefas/${input.taskId}`,
+      href: adminHref,
     });
   }
 
@@ -107,12 +123,10 @@ export async function notifyCommentMentions(input: {
       .limit(1);
     if (parentAuthor) {
       const href =
-        parentAuthor.role === "client"
-          ? `/portal/projetos/${input.projectId}/tarefas/${input.taskId}`
-          : `/admin/tarefas/${input.taskId}`;
+        parentAuthor.role === "client" ? taskHref : adminHref;
       await notifyUsers([input.parentAuthorId], {
         type: "comment.reply",
-        title: `${input.authorName} respondeu seu comentário em "${input.taskTitle}"`,
+        title: `${input.authorName} respondeu seu comentário em "${contextTitle}"`,
         body,
         bodyIsHtml,
         href,

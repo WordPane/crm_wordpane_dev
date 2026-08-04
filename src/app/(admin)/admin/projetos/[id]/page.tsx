@@ -8,6 +8,7 @@ import { AttachmentList } from "@/components/attachments/attachment-list";
 import { PriorityChip } from "@/components/chips";
 import { ProjectLinksSection } from "@/components/links/project-links-section";
 import { MilestonesSection } from "@/components/projects/milestones-section";
+import { ProjectComments } from "@/components/projects/project-comments";
 import { ProjectDeleteButton } from "@/components/projects/project-delete-button";
 import { ProjectForm } from "@/components/projects/project-form";
 import { ProjectMembersSection } from "@/components/projects/project-members-section";
@@ -35,6 +36,11 @@ import {
   listProjectTaskAttachments,
 } from "@/lib/queries/attachments";
 import { listCompanies } from "@/lib/queries/companies";
+import {
+  listMentionableTasks,
+  listMentionableUsers,
+  listProjectComments,
+} from "@/lib/queries/comments";
 import { listProjectLinks } from "@/lib/queries/links";
 import {
   getProjectPlanBalance,
@@ -56,6 +62,7 @@ const TABS = [
   "timeline",
   "arquivos",
   "links",
+  "conversa",
 ] as const;
 type TabValue = (typeof TABS)[number];
 
@@ -102,6 +109,9 @@ export default async function ProjectDetailPage({
     templates,
     planBalance,
     maintenancePlans,
+    projectComments,
+    mentionableUsers,
+    mentionableTasks,
   ] = await Promise.all([
     listActiveProjectStatuses(user),
     listActiveTaskStatuses(user),
@@ -114,6 +124,9 @@ export default async function ProjectDetailPage({
     listProjectTemplateOptions(user),
     getProjectPlanBalance(user, project.id),
     listActiveMaintenancePlans(user),
+    listProjectComments(user, project.id),
+    listMentionableUsers(project.id, project.companyId),
+    listMentionableTasks(project.id),
   ]);
 
   const totalTasks = tasks.length;
@@ -167,6 +180,7 @@ export default async function ProjectDetailPage({
           <TabsTrigger value="timeline">Timeline</TabsTrigger>
           <TabsTrigger value="arquivos">Arquivos</TabsTrigger>
           <TabsTrigger value="links">Links</TabsTrigger>
+          <TabsTrigger value="conversa">Conversa</TabsTrigger>
         </TabsList>
 
         <TabsContent value="visao" className="space-y-6 pt-4">
@@ -347,6 +361,27 @@ export default async function ProjectDetailPage({
 
         <TabsContent value="links" className="pt-4">
           <ProjectLinksSection projectId={project.id} links={projectLinks} />
+        </TabsContent>
+
+        <TabsContent value="conversa" className="pt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Conversa do projeto</CardTitle>
+              <CardDescription>
+                Troque mensagens, links e menções com a equipe e clientes.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ProjectComments
+                projectId={project.id}
+                comments={projectComments}
+                currentUserId={user.id}
+                currentUserRole={user.role}
+                mentionableUsers={mentionableUsers}
+                mentionableTasks={mentionableTasks}
+              />
+            </CardContent>
+          </Card>
         </TabsContent>
       </ProjectTabsPersist>
     </div>

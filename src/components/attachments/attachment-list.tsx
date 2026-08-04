@@ -63,6 +63,87 @@ function fileIcon(mimeType: string | null) {
   return File;
 }
 
+function AttachmentCard({
+  attachment,
+  readOnly,
+  currentUserId,
+  currentUserRole,
+  taskHrefBase,
+  onDelete,
+}: {
+  attachment: AttachmentListItem;
+  readOnly: boolean;
+  currentUserId: string;
+  currentUserRole: UserRole;
+  taskHrefBase: string;
+  onDelete: () => void;
+}) {
+  const Icon = fileIcon(attachment.mimeType);
+  const canDelete =
+    !readOnly &&
+    (attachment.uploader?.id === currentUserId ||
+      currentUserRole === "super_admin");
+
+  return (
+    <div className="group relative flex flex-col gap-3 rounded-xl bg-white/[0.02] p-4 ring-1 ring-foreground/10 transition-colors hover:bg-white/[0.04]">
+      {canDelete && (
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          aria-label={`Excluir ${attachment.fileName}`}
+          className="absolute top-2 right-2 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
+          onClick={(e) => {
+            e.preventDefault();
+            onDelete();
+          }}
+        >
+          <Trash2 />
+        </Button>
+      )}
+
+      <a
+        href={`/api/files/${attachment.id}`}
+        className="flex flex-1 flex-col gap-3"
+        title={attachment.fileName}
+      >
+        <div className="flex items-start gap-3">
+          <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+            <Icon className="size-5 text-primary" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium text-foreground">
+              {attachment.fileName}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {formatFileSize(attachment.fileSize)}
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-0.5 text-xs text-muted-foreground">
+          <p className="truncate">{attachment.uploader?.name ?? "—"}</p>
+          <p>
+            <span title={attachment.createdAt.toISOString()}>
+              {timeAgo(attachment.createdAt)}
+            </span>
+          </p>
+          {attachment.taskTitle && attachment.taskId && (
+            <p className="truncate">
+              <Link
+                href={`${taskHrefBase}/${attachment.taskId}`}
+                onClick={(e) => e.stopPropagation()}
+                className="transition-colors hover:text-foreground"
+              >
+                {attachment.taskTitle}
+              </Link>
+            </p>
+          )}
+        </div>
+      </a>
+    </div>
+  );
+}
+
 /** Lista de anexos com upload (uploadFile + createAttachment) e exclusão. */
 export function AttachmentList({
   attachments,
@@ -152,62 +233,21 @@ export function AttachmentList({
           </p>
         </div>
       ) : (
-        <ul className="space-y-2">
-          {attachments.map((attachment) => {
-            const Icon = fileIcon(attachment.mimeType);
-            const canDelete =
-              !readOnly &&
-              (attachment.uploader?.id === currentUserId ||
-                currentUserRole === "super_admin");
-            return (
-              <li
+        <div className="max-h-[420px] overflow-y-auto pr-1">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {attachments.map((attachment) => (
+              <AttachmentCard
                 key={attachment.id}
-                className="flex items-center gap-3 rounded-xl bg-white/[0.02] p-3 ring-1 ring-foreground/10"
-              >
-                <Icon className="size-5 shrink-0 text-muted-foreground" />
-                <div className="min-w-0 flex-1">
-                  <a
-                    href={`/api/files/${attachment.id}`}
-                    className="block truncate text-sm font-medium text-foreground transition-colors hover:text-primary"
-                  >
-                    {attachment.fileName}
-                  </a>
-                  <p className="text-xs text-muted-foreground">
-                    {formatFileSize(attachment.fileSize)}
-                    {" · "}
-                    {attachment.uploader?.name ?? "—"}
-                    {" · "}
-                    <span title={attachment.createdAt.toISOString()}>
-                      {timeAgo(attachment.createdAt)}
-                    </span>
-                    {attachment.taskTitle && attachment.taskId && (
-                      <>
-                        {" · "}
-                        <Link
-                          href={`${taskHrefBase}/${attachment.taskId}`}
-                          className="transition-colors hover:text-foreground"
-                        >
-                          {attachment.taskTitle}
-                        </Link>
-                      </>
-                    )}
-                  </p>
-                </div>
-                {canDelete && (
-                  <Button
-                    variant="ghost"
-                    size="icon-xs"
-                    aria-label={`Excluir ${attachment.fileName}`}
-                    className="text-muted-foreground hover:text-destructive"
-                    onClick={() => setDeleting(attachment)}
-                  >
-                    <Trash2 />
-                  </Button>
-                )}
-              </li>
-            );
-          })}
-        </ul>
+                attachment={attachment}
+                readOnly={readOnly}
+                currentUserId={currentUserId}
+                currentUserRole={currentUserRole}
+                taskHrefBase={taskHrefBase}
+                onDelete={() => setDeleting(attachment)}
+              />
+            ))}
+          </div>
+        </div>
       )}
 
       <ConfirmDialog

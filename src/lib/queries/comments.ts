@@ -116,6 +116,87 @@ export async function listTaskComments(
   }));
 }
 
+/** Comentários do projeto em ordem cronológica — lança ForbiddenError fora do escopo. */
+export async function listProjectComments(
+  user: SessionUser,
+  projectId: string,
+): Promise<CommentItem[]> {
+  requireTeam(user);
+
+  const [project] = await db
+    .select({ id: projects.id, companyId: projects.companyId })
+    .from(projects)
+    .where(eq(projects.id, projectId))
+    .limit(1);
+  if (!project) return [];
+  await assertProjectAccess(user, project);
+
+  const rows = await db
+    .select({
+      id: comments.id,
+      body: comments.body,
+      parentId: comments.parentId,
+      mentions: comments.mentions,
+      taskMentions: comments.taskMentions,
+      createdAt: comments.createdAt,
+      authorId: users.id,
+      authorName: users.name,
+      authorRole: users.role,
+      authorAvatarUrl: users.avatarUrl,
+    })
+    .from(comments)
+    .leftJoin(users, eq(comments.authorId, users.id))
+    .where(eq(comments.projectId, projectId))
+    .orderBy(asc(comments.createdAt));
+
+  // Nomes dos mencionados (para destacar no texto)
+  const mentionIds = [
+    ...new Set(rows.flatMap((r) => r.mentions ?? [])),
+  ] as string[];
+  const mentionNames = new Map<string, string>();
+  if (mentionIds.length > 0) {
+    const mentioned = await db
+      .select({ id: users.id, name: users.name })
+      .from(users)
+      .where(inArray(users.id, mentionIds));
+    for (const u of mentioned) mentionNames.set(u.id, u.name);
+  }
+
+  // Títulos das tarefas mencionadas
+  const taskMentionIds = [
+    ...new Set(rows.flatMap((r) => r.taskMentions ?? [])),
+  ] as string[];
+  const taskMentionTitles = new Map<string, string>();
+  if (taskMentionIds.length > 0) {
+    const mentionedTasks = await db
+      .select({ id: tasks.id, title: tasks.title })
+      .from(tasks)
+      .where(inArray(tasks.id, taskMentionIds));
+    for (const t of mentionedTasks) taskMentionTitles.set(t.id, t.title);
+  }
+
+  return rows.map((r) => ({
+    id: r.id,
+    body: r.body,
+    createdAt: r.createdAt,
+    parentId: r.parentId,
+    mentionNames: (r.mentions ?? [])
+      .map((id) => mentionNames.get(id))
+      .filter((name): name is string => Boolean(name)),
+    taskMentions: (r.taskMentions ?? [])
+      .map((id) => ({ id, title: taskMentionTitles.get(id) ?? "Tarefa" }))
+      .filter((t) => t.title),
+    author: r.authorId
+      ? {
+          id: r.authorId,
+          name: r.authorName!,
+          role: r.authorRole!,
+          avatarUrl: r.authorAvatarUrl,
+        }
+      : null,
+  }));
+}
+
 export type MentionableUser = {
   id: string;
   name: string;
