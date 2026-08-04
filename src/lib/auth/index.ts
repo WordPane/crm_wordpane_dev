@@ -8,10 +8,59 @@ import { users } from "@/lib/db/schema";
 
 import "./types";
 
+// Normaliza AUTH_URL/NEXTAUTH_URL para a origem, ignorando caminhos como
+// /api/auth que possam ter sido salvos na Vercel/Dokploy.
+function normalizeAuthUrlEnv(key: "AUTH_URL" | "NEXTAUTH_URL") {
+  const raw = process.env[key];
+  if (!raw) return;
+  try {
+    process.env[key] = new URL(raw).origin;
+  } catch {
+    // mantém valor original se não for uma URL válida
+  }
+}
+normalizeAuthUrlEnv("AUTH_URL");
+normalizeAuthUrlEnv("NEXTAUTH_URL");
+
+const cookieDomain = process.env.AUTH_COOKIE_DOMAIN;
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: "jwt", maxAge: 60 * 60 * 24 * 7 }, // 7 dias
   pages: { signIn: "/login" },
+  basePath: "/api/auth",
   trustHost: true,
+  cookies: {
+    sessionToken: {
+      name: "authjs.session-token",
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: true,
+        ...(cookieDomain ? { domain: cookieDomain } : {}),
+      },
+    },
+    csrfToken: {
+      name: "authjs.csrf-token",
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: true,
+        ...(cookieDomain ? { domain: cookieDomain } : {}),
+      },
+    },
+    callbackUrl: {
+      name: "authjs.callback-url",
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: true,
+        ...(cookieDomain ? { domain: cookieDomain } : {}),
+      },
+    },
+  },
   providers: [
     Credentials({
       name: "credentials",

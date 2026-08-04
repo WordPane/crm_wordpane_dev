@@ -1,5 +1,8 @@
-import type { CalendarEvent, CalendarEventType } from "@/lib/queries/calendar";
-import { CHARGE_EVENT_COLOR } from "@/lib/queries/calendar";
+import {
+  CHARGE_EVENT_COLOR,
+  type CalendarEvent,
+  type CalendarEventType,
+} from "@/lib/queries/calendar.types";
 import { cn } from "@/lib/utils";
 
 /** Cabeçalho de colunas começando na segunda-feira (pt-BR). */

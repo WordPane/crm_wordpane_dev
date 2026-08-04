@@ -3,7 +3,7 @@ import Link from "next/link";
 
 import { EventTypeChip } from "@/components/calendar/event-shared";
 import { PriorityChip, StatusColorChip } from "@/components/chips";
-import type { CalendarEvent } from "@/lib/queries/calendar";
+import type { CalendarEvent } from "@/lib/queries/calendar.types";
 import { cn } from "@/lib/utils";
 
 /** Agenda de um único dia — lista de cards completos dos vencimentos. */

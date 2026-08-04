@@ -70,8 +70,13 @@ export async function GET(
   const value = asset === "logo" ? brand.logoUrl : brand.faviconUrl;
 
   // URL absoluta (blob) ou path estático (marca padrão em /public)
-  if (/^https?:\/\//i.test(value) || value.startsWith("/")) {
-    return NextResponse.redirect(new URL(value, request.url));
+  if (/^https?:\/\//i.test(value)) {
+    return NextResponse.redirect(value);
+  }
+  if (value.startsWith("/")) {
+    // Redirecionamento relativo: o navegador resolve no domínio atual,
+    // evitando depender do host detectado pelo Next.js standalone.
+    return NextResponse.redirect(value);
   }
 
   const buffer = await getStorage().get(value);

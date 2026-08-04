@@ -16,7 +16,7 @@ import {
   eventColor,
   groupEventsByDate,
 } from "@/components/calendar/event-shared";
-import type { CalendarEvent } from "@/lib/queries/calendar";
+import type { CalendarEvent } from "@/lib/queries/calendar.types";
 import { cn } from "@/lib/utils";
 
 const MAX_CHIPS_PER_DAY = 3;

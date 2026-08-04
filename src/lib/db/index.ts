@@ -1,15 +1,11 @@
-import { neonConfig, Pool } from "@neondatabase/serverless";
-import { drizzle, type NeonDatabase } from "drizzle-orm/neon-serverless";
+import "server-only";
+
+import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
 
 import * as schema from "./schema";
 
-export type DB = NeonDatabase<typeof schema>;
-
-// Consultas avulsas via HTTP (sem websocket): conexões ws ociosas são
-// encerradas pelo Neon e falhavam intermitentemente em servidores
-// long-lived — a escrita comitava mas o driver reportava erro.
-// Transações (db.transaction) continuam via websocket normalmente.
-neonConfig.poolQueryViaFetch = true;
+export type DB = NodePgDatabase<typeof schema>;
 
 let _db: DB | null = null;
 

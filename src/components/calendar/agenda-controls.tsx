@@ -23,7 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { CalendarEventType } from "@/lib/queries/calendar";
+import type { CalendarEventType } from "@/lib/queries/calendar.types";
 import { cn } from "@/lib/utils";
 
 export type CalendarView = "dia" | "semana" | "mes" | "ano";

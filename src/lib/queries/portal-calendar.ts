@@ -31,7 +31,7 @@ import {
   CHARGE_EVENT_COLOR,
   type CalendarEvent,
   type CalendarSummary,
-} from "@/lib/queries/calendar";
+} from "@/lib/queries/calendar.types";
 import { chargeStatusLabels } from "@/lib/validations/finance";
 import { milestoneStatusLabels } from "@/lib/validations/project";
 import { businessToday, formatCurrency } from "@/lib/utils/format";

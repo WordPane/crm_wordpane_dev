@@ -10,7 +10,7 @@ import {
   eventTypeLabels,
   groupEventsByDate,
 } from "@/components/calendar/event-shared";
-import type { CalendarEvent } from "@/lib/queries/calendar";
+import type { CalendarEvent } from "@/lib/queries/calendar.types";
 import { cn } from "@/lib/utils";
 
 /** Semana em 7 colunas (seg–dom) com mini-cards de eventos empilhados. */

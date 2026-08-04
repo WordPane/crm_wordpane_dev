@@ -13,7 +13,7 @@ import {
   dayViewHref,
   monthViewHref,
 } from "@/components/calendar/event-shared";
-import type { CalendarEvent } from "@/lib/queries/calendar";
+import type { CalendarEvent } from "@/lib/queries/calendar.types";
 import { cn } from "@/lib/utils";
 
 const WEEKDAY_LETTERS = ["S", "T", "Q", "Q", "S", "S", "D"];
