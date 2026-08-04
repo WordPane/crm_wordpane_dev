@@ -52,6 +52,17 @@ export function renderRichComment(
   const clean = sanitizeCommentHtml(html);
   if (!clean) return null;
 
+  // Durante o SSR o DOMParser não existe; renderizamos o HTML sanitizado
+  // diretamente e deixamos as transformações ricas para o cliente.
+  if (typeof DOMParser === "undefined") {
+    return (
+      <div
+        className="text-sm leading-relaxed text-muted-foreground"
+        dangerouslySetInnerHTML={{ __html: clean }}
+      />
+    );
+  }
+
   const parser = new DOMParser();
   const doc = parser.parseFromString(clean, "text/html");
 
