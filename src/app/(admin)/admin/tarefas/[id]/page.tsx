@@ -69,8 +69,7 @@ export default async function TaskDetailPage({
   }
   if (!detail) notFound();
 
-  const { task, project, company, status, creator, checklist } =
-    detail;
+  const { task, project, company, status, creator, checklist } = detail;
 
   const [
     statuses,
@@ -271,6 +270,68 @@ export default async function TaskDetailPage({
               <ActivityTimeline activities={taskActivities} />
             </CardContent>
           </Card>
+        </div>
+
+        {/* ─── Coluna lateral ─── */}
+        <div className="space-y-6">
+          <Card className="self-start">
+            <CardHeader>
+              <CardTitle>Detalhes</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <TaskSidebarControls
+                taskId={task.id}
+                ownerId={task.ownerId}
+                statusId={task.statusId}
+                milestoneId={task.milestoneId}
+                milestones={projectMilestones}
+                visibleToClient={task.visibleToClient}
+                statuses={statuses}
+                teamUsers={teamUsers}
+              />
+
+              <Separator />
+
+              <dl className="space-y-2.5 text-sm">
+                <div className="flex justify-between gap-2">
+                  <dt className="text-muted-foreground">Prazo</dt>
+                  <dd className={cn(overdue && "font-medium text-red-300")}>
+                    {formatDate(task.dueDate)}
+                  </dd>
+                </div>
+                <div className="flex justify-between gap-2">
+                  <dt className="text-muted-foreground">Empresa</dt>
+                  <dd>
+                    <Link
+                      href={`/admin/clientes/${company.id}`}
+                      className="transition-colors hover:text-primary"
+                    >
+                      {company.name}
+                    </Link>
+                  </dd>
+                </div>
+                <div className="flex justify-between gap-2">
+                  <dt className="text-muted-foreground">Origem</dt>
+                  <dd>
+                    {task.origin === "demanda_cliente"
+                      ? "Demanda do cliente"
+                      : "Interna"}
+                  </dd>
+                </div>
+                <div className="flex justify-between gap-2">
+                  <dt className="text-muted-foreground">Concluída em</dt>
+                  <dd>{formatDate(task.completedAt)}</dd>
+                </div>
+              </dl>
+
+              <Separator />
+
+              <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Clock className="size-3.5" />
+                Criada por {creator?.name ?? "—"} em {formatDateTime(task.createdAt)}
+              </p>
+            </CardContent>
+          </Card>
 
           <Card>
             <CardHeader>
@@ -289,66 +350,6 @@ export default async function TaskDetailPage({
             </CardContent>
           </Card>
         </div>
-
-        {/* ─── Coluna lateral ─── */}
-        <Card className="self-start">
-          <CardHeader>
-            <CardTitle>Detalhes</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <TaskSidebarControls
-              taskId={task.id}
-              ownerId={task.ownerId}
-              statusId={task.statusId}
-              milestoneId={task.milestoneId}
-              milestones={projectMilestones}
-              visibleToClient={task.visibleToClient}
-              statuses={statuses}
-              teamUsers={teamUsers}
-            />
-
-            <Separator />
-
-            <dl className="space-y-2.5 text-sm">
-              <div className="flex justify-between gap-2">
-                <dt className="text-muted-foreground">Prazo</dt>
-                <dd className={cn(overdue && "font-medium text-red-300")}>
-                  {formatDate(task.dueDate)}
-                </dd>
-              </div>
-              <div className="flex justify-between gap-2">
-                <dt className="text-muted-foreground">Empresa</dt>
-                <dd>
-                  <Link
-                    href={`/admin/clientes/${company.id}`}
-                    className="transition-colors hover:text-primary"
-                  >
-                    {company.name}
-                  </Link>
-                </dd>
-              </div>
-              <div className="flex justify-between gap-2">
-                <dt className="text-muted-foreground">Origem</dt>
-                <dd>
-                  {task.origin === "demanda_cliente"
-                    ? "Demanda do cliente"
-                    : "Interna"}
-                </dd>
-              </div>
-              <div className="flex justify-between gap-2">
-                <dt className="text-muted-foreground">Concluída em</dt>
-                <dd>{formatDate(task.completedAt)}</dd>
-              </div>
-            </dl>
-
-            <Separator />
-
-            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <Clock className="size-3.5" />
-              Criada por {creator?.name ?? "—"} em {formatDateTime(task.createdAt)}
-            </p>
-          </CardContent>
-        </Card>
       </div>
     </div>
   );
